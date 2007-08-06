@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 DEHS=` uscan --no-download --dehs`
 
@@ -13,7 +13,6 @@ KEYFILE="debian/KEYS.txt"
 KEYRING="debian/solr-keyring.gpg"
 
 # Download source tarball and signature file
-#wget --limit-rate=20k "$URL" -O $SOURCEFILE
 wget "$URL" -O $SOURCEFILE
 wget "$URL.asc" -O $SIGFILE
 
