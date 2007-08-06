@@ -2,8 +2,8 @@ Source: solr
 Section: contrib/text
 Priority: optional
 Maintainer:Jan-Pascal van Best <janpascal@vanbest.org>
-XS-Vcs-Browser: http://www.vanbest.org/websvn/solr
-XS-Vcs-svn: http://svn.vanbest.org/svn/solr
+XS-Vcs-Browser: http://svn.debian.org/wsvn/pkg-java/trunk/solr/
+XS-Vcs-svn: svn://svn.debian.org/svn/pkg-java/trunk/solr/
 Build-Depends: debhelper (>= 4.0.0), dpatch (>= 2.0), po-debconf,
  sun-java5-jre, sun-java5-jdk, ant, ant-optional, junit,
  libcommons-codec-java,
