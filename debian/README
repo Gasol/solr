@@ -7,7 +7,8 @@ Debian packaging of Solr consists of three binary packages:
 - solr-tomcat5.5 installs Solr as a servlet in Tomcat 5.5. After installation,
   point your browser to http://localhost:8180/solr/admin
   to see the Solr web administration interface.
-- solr-jetty installs Solr as a servlet in Jetty.
+- solr-jetty installs Solr as a servlet in Jetty. The Solr admin interface is at
+  http://localhost:8280/solr/admin/
 
 Solr-tomcat5.5 and solr-jetty use the same index files. If you remove solr-tomcat5.5 
 and install solr-jetty, you keep the indexes. This implies that solr-tomcat5.5 and 
@@ -15,7 +16,7 @@ solr-jetty cannot be installed at the same time.
 
 Jetty is broken: you need to add the line
   $(java.lib.home)/commons-el.jar
-near the end of your /etc/jetty/start.config
+near the end of your /etc/jetty/start.config (see bug #352093).
 
 Homepage: http://lucene.apache.org/solr/
 
