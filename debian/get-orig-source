@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DEHS=`( uscan --no-download --dehs ; echo "</dehs>" )`
+DEHS=` uscan --no-download --dehs`
 
 URL=`echo $DEHS | xsltproc debian/uscan-url.xslt -`
 VERSION=`echo $DEHS | xsltproc debian/uscan-upstream-version.xslt -`
