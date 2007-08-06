@@ -1,0 +1,51 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 05_use-debian-java-libraries.dpatch by Jan-Pascal van Best <janpascal@vanbest.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Link to libraries under /usr/share/java instead of those 
+## DP: included with upstream tarball. Do not include the libraries
+## DP: into the war file.
+
+@DPATCH@
+diff -urNad trunk~/build.xml trunk/build.xml
+--- trunk~/build.xml	2007-06-19 10:44:26.000000000 +0200
++++ trunk/build.xml	2007-06-19 10:44:48.000000000 +0200
+@@ -55,7 +55,7 @@
+   <property name="specversion" value="1.2.${dateversion}" />
+ 
+   <!-- 3rd party libraries for compilation -->
+-  <property name="lib" value="lib" />
++  <property name="lib" value="/usr/share/java" />
+ 
+   <!-- solr source files -->
+   <property name="src" value="src" />
+@@ -162,7 +162,17 @@
+   <!-- The compilation classpath -->
+   <path id="compile.classpath">
+     <fileset dir="${lib}">
+-      <include name="*.jar" />
++      <include name="servlet-api.jar" />
++      <include name="lucene-core.jar" />
++      <include name="lucene-analyzers.jar" />
++      <include name="lucene-highlighter.jar" />
++      <include name="lucene-snowball.jar" />
++      <include name="lucene-spellchecker.jar" />
++      <include name="commons-codec.jar" />
++      <include name="commons-csv.jar" />
++      <include name="commons-fileupload.jar" />
++      <include name="commons-io.jar" />
++      <include name="xpp3.jar" />
+     </fileset>
+   </path>
+ 
+@@ -388,10 +398,6 @@
+          webxml="${src}/webapp/WEB-INF/web.xml"
+          filesetmanifest="skip"
+          manifest="${dest}/META-INF/MANIFEST.MF">
+-       <lib dir="${lib}">
+-         <exclude name="servlet-api*.jar" />
+-         <exclude name="easymock.jar" />
+-       </lib>
+        <lib dir="${dist}">
+          <include name="${fullnamever}.jar" />
+        </lib>

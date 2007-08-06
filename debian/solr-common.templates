@@ -1,0 +1,8 @@
+Template: solr/purgeindexfiles
+Type: boolean
+Default: false
+_Description: Remove index files?
+ The script is about to remove the data directory /var/lib/solr.
+ If you think you need Solr's index files later, the data
+ should be kept.
+

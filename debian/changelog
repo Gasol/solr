@@ -1,0 +1,79 @@
+solr (1.2.0-1~pre3) unstable; urgency=low
+
+  * Include source tarball of upstream release in upload
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 20 Jun 2007 13:09:16 +0200
+
+solr (1.2.0-1~pre2) unstable; urgency=low
+
+  * Based on upstream release 1.2.0
+  * Removed all third-party jars
+  * Depends on the libcommons-csv-java package, which can be found in the same
+    inoffficial Debian repository as the solr package.
+  * Depends on liblucene2-java-2.2, which is in preparation. You can find the
+    package in the same inofficial Debian repository as the solr package.
+  * Needs the libcommons-fileupload-java package version 1.2, which isn't
+    packaged yet (Debian has 1.0). Place commons-fileupload.jar in
+    /usr/share/java for this package to work.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 19 Jun 2007 19:56:13 +0200
+
+solr (1.2.0-1~pre1) experimental; urgency=low
+
+  * New upstream release 1.2.0
+  * This release contains all third-party library upstream includes
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 07 Jun 2007 11:28:06 +0200
+
+solr (1.1.0-0vanbest7) UNRELEASED; urgency=low
+
+  * Removed Pre-Depends on tomcat5.5
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 06 Jun 2007 14:29:20 +0200
+
+solr (1.1.0-0vanbest6) unstable; urgency=low
+
+  * Moved solr config files to /etc/solr/conf (with appropriate symlinks)
+  * Installed replication scripts to /usr/share/solr/bin
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 05 Jun 2007 22:19:19 +0200
+
+solr (1.1.0-0vanbest5) unstable; urgency=low
+
+  * solr-jetty now functional
+  * you can switch between solr-jetty and solr-tomcat5.5 while keeping your
+    indexes.
+  * Renamed solr-tomcat55 package to solr-tomcat5.5
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 04 Jun 2007 20:24:30 +0200
+
+solr (1.1.0-0vanbest4) unstable; urgency=low
+
+  * Pre-Depend on tomcat5.5 to allow installation in one go (hopefully)
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 04 Jun 2007 20:08:16 +0200
+
+solr (1.1.0-0vanbest3) unstable; urgency=low
+
+  * Split solr into solr-common, solr-tomcat55 (and later: solr-jetty,
+    solr-standalone)
+  * Also removed library jar files from WEB-INF/lib
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 04 Jun 2007 17:41:30 +0200
+
+solr (1.1.0-0vanbest2) unstable; urgency=low
+
+  * Removed included library .jar files, use Debian packaged version instead.
+  * Those jar files are still copied to to WEB-INF/lib (don't know how to fix
+    that yet)
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Sat, 02 Jun 2007 10:44:14 +0200
+
+solr (1.1.0-0vanbest1) UNRELEASED; urgency=low
+
+  * Mostly working first private release
+  * Still includes library .jar files included in upstream tarball
+  * Still compiles with .jar files included in upstream tarball
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Fri, 01 Jun 2007 15:08:14 +0200
+

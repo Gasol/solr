@@ -1,0 +1,8 @@
+TODO.Debian for solr
+--------------------
+
+- Use minimal default configuration instead of everything from the example
+- Do something with the example (package it, or supply the example files under
+  /usr/share/doc/solr)
+- Maybe: add solr-standalone package (using embedded Jetty like the Solr example)
+

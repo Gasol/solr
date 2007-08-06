@@ -1,0 +1,6 @@
+/etc/solr
+/etc/tomcat5/policy.d 
+/usr/share/tomcat5.5/conf/Catalina/localhost
+/var/lib/solr
+/var/lib/solr/data
+

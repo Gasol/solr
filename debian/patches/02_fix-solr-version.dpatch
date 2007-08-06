@@ -1,0 +1,20 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 02_fix-solr-version.dpatch by Jan-Pascal van Best <janpascal@vanbest.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: The upstream source tarball contains a -dev version number in the
+## DP: build.xml file. Fix that.
+
+@DPATCH@
+diff -urNad trunk~/build.xml trunk/build.xml
+--- trunk~/build.xml	2006-12-17 23:08:58.000000000 +0100
++++ trunk/build.xml	2007-05-31 11:35:45.000000000 +0200
+@@ -42,7 +42,7 @@
+        By default, this should be set to "X.Y.N-dev" where X.Y.N is
+        "1 greater" then the last version released (on this branch).
+     -->
+-  <property name="version" value="1.2.1-dev" />
++  <property name="version" value="1.2.0" />
+   
+   <!-- Solr Specification Version -->
+   <!--

@@ -1,0 +1,196 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+#
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+#
+# Modified to make a template file for a multi-binary package with separated
+# build-arch and build-indep targets  by Bill Allombert 2001
+
+# Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+
+# This has to be exported to make some magic below work.
+export DH_OPTIONS
+
+DEBIAN_VERSION := $(shell dpkg-parsechangelog | grep "^Version:" | cut -c 10-)
+DEBIAN_ARCH := $(shell dpkg-architecture  | grep ^DEB_BUILD_ARCH= | cut -c 16-)
+
+# Upstream Solr version
+UPSTREAM_VERSION := $(shell echo $(DEBIAN_VERSION) | grep -o "^[[:digit:]\.]*")
+UPSTREAM_BASENAME = apache-solr-$(UPSTREAM_VERSION)
+
+COMMON_INSTDIR=$(CURDIR)/debian/solr-common
+TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat5.5
+JETTY_INSTDIR=$(CURDIR)/debian/solr-jetty
+SHAREDIR=$(COMMON_INSTDIR)/usr/share/solr
+
+WARFILE = $(UPSTREAM_BASENAME).war
+
+# Explicitly build with sun-java5-jdk
+export JAVA_HOME = /usr/lib/jvm/java-1.5.0-sun
+export JAVA = $(JAVA_HOME)/bin/java
+export JAVAC = $(JAVA_HOME)/bin/javac
+export JAR = $(JAVA_HOME)/bin/jar
+
+# Class path: Ant requires a JAXP-compatible XML parser
+# You need to set CLASSPATH here (even if your build.xml assembles its own
+# class path) to ensure the same build results in all cases
+JAVA_LIB=/usr/share/java
+ANT_HOME=/usr/share/ant
+ANT_CLASSPATH=$(JAVA_LIB)/junit.jar
+
+# Set path to Ant properties file
+ANT_PROPS=$(CURDIR)/debian/ant.properties
+
+# Universal Ant invocation for reliable builds;
+# place '-verbose' before -propertyfile to
+# obtain detailed build output.
+ANT=ant -propertyfile $(ANT_PROPS)
+
+# Include dpatch stuff per the documentation
+include /usr/share/dpatch/dpatch.make
+
+patch-stamp: patch
+
+configure: configure-stamp
+configure-stamp: patch-stamp
+	dh_testdir
+	# Add here commands to configure the package.
+
+	touch configure-stamp
+
+#Architecture 
+build: build-arch build-indep
+
+build-arch: build-arch-stamp
+build-arch-stamp: configure-stamp 
+
+	# Add here commands to compile the arch part of the package.
+	#$(MAKE) 
+	touch build-arch-stamp
+
+build-indep: build-indep-stamp
+build-indep-stamp: configure-stamp 
+
+	dh_testdir
+
+	$(ANT) compile
+	# $(ANT) test
+	$(ANT) dist-war
+
+	touch build-indep-stamp
+
+clean: unpatch
+	dh_testdir
+	dh_testroot
+	rm -f build-arch-stamp build-indep-stamp #CONFIGURE-STAMP#
+
+	# Add here commands to clean up after the build process.
+	# -$(MAKE) clean
+	$(ANT) clean
+
+	rm -rf example/solr/data/index
+	rm -f debian/solr-keyring.gpg
+	debconf-updatepo
+
+	dh_clean 
+
+install: install-indep install-arch
+install-indep:
+	dh_testdir
+	dh_testroot
+	dh_clean -k -i 
+	dh_installdirs
+
+	# Install the libraries into the solr package
+	
+	# First unpack the .war file, we need most of it.
+	cd $(SHAREDIR) ; $(JAR) xf $(CURDIR)/dist/$(WARFILE) 
+	mv $(SHAREDIR)/WEB-INF/web.xml $(COMMON_INSTDIR)/etc/solr/
+	
+	# Install replication scripts
+	install src/scripts/* $(SHAREDIR)/bin
+	
+	# Install Solr configuration files
+	# FIXME: this is example configuration, including example schema
+	# Should be changed to some minimal config, with pointers
+	# to documentation
+	cp -r $(CURDIR)/example/solr/conf/* $(COMMON_INSTDIR)/etc/solr/conf/
+
+	# Configure tomcat (also see solr-tomcat5.5.links)
+	install --mode 0644 debian/solr-tomcat5.5.xml $(TOMCAT_INSTDIR)/etc/solr/
+	install --mode 0644 debian/tomcat.policy $(TOMCAT_INSTDIR)/etc/solr/tomcat.policy
+
+	# Configure Jetty
+	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
+
+	# This information is already somewhere else
+	rm -f $(COMMON_INSTDIR)/usr/share/solr/META-INF/LICENSE.txt
+	
+	#dh_install
+
+install-arch:
+	dh_testdir
+	dh_testroot
+	dh_clean -k -s 
+	dh_installdirs -s
+
+	# Add here commands to install the arch part of the package into 
+	# debian/<package>
+
+	dh_install -s
+
+# Must not depend on anything. This is to be called by
+# binary-arch/binary-indep
+# in another 'make' thread.
+binary-common:
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs CHANGES.txt
+	dh_installdocs
+	dh_installexamples
+	dh_installdebconf	
+#	dh_installlogrotate	
+#	dh_installinit
+#	dh_installcron
+	dh_installman
+	dh_link
+	dh_compress 
+	dh_fixperms
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+# Build architecture independant packages using the common target.
+binary-indep: build-indep install-indep
+	$(MAKE) -f debian/rules DH_OPTIONS=-i binary-common
+
+binary: binary-indep
+
+binary-arch:
+	# empty
+
+remove-source:
+	rm -f build.xml
+	rm -f *.txt
+	rm -f *stamp
+	rm -rf debian/patched
+	rm -rf build dist docs example lib src
+	rm -rf apache-solr*
+
+restore-from-source: remove-source
+	tar xzf ../solr_$(UPSTREAM_VERSION).orig.tar.gz
+	mv $(UPSTREAM_BASENAME)/* .
+	rmdir $(UPSTREAM_BASENAME)
+
+get-orig-source:
+	debian/get-orig-source
+
+upload:
+	cd .. ; dupload -t vanbest solr_$(DEBIAN_VERSION)_$(DEBIAN_ARCH).changes 
+	#cd .. ; dupload -t mentors solr_$(DEBIAN_VERSION)_$(DEBIAN_ARCH).changes
+
+.PHONY: patched build clean binary-indep binary-arch binary install install-indep install-arch configure

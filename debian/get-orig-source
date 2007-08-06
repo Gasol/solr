@@ -1,0 +1,34 @@
+#!/bin/bash
+
+DEHS=`( uscan --no-download --dehs ; echo "</dehs>" )`
+
+URL=`echo $DEHS | xsltproc debian/uscan-url.xslt -`
+VERSION=`echo $DEHS | xsltproc debian/uscan-upstream-version.xslt -`
+
+SOURCEFILE=../solr_$VERSION.orig.tar.gz
+SIGFILE=../solr_$VERSION.orig.tar.gz.asc
+
+KEYURL="http://www.apache.org/dist/lucene/solr/KEYS.txt"
+KEYFILE="debian/KEYS.txt"
+KEYRING="debian/solr-keyring.gpg"
+
+# Download source tarball and signature file
+#wget --limit-rate=20k "$URL" -O $SOURCEFILE
+wget "$URL" -O $SOURCEFILE
+wget "$URL.asc" -O $SIGFILE
+
+# If necessary, recreate keyring used for signing
+# Only do this if the keyring is not yet downloaded
+if [ ! -r $KEYFILE ]; then
+    wget "$KEYURL" -O "$KEYFILE"
+fi
+
+if [ ! -r $KEYRING ]; then
+    touch $KEYRING
+    gpg --no-default-keyring --primary-keyring $KEYRING --import $KEYFILE
+fi
+
+# Check signature
+gpgv --quiet --keyring $KEYRING $SIGFILE $SOURCEFILE
+
+echo "Check whether the archive has been signed by Yorick Seeley, key ID 0AFCEE7C"
