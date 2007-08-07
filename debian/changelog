@@ -1,5 +1,5 @@
-solr (1.2.0-1~pre3) unstable; urgency=low
+solr (1.2.0-1~pre1) unstable; urgency=low
 
   * Initial upload (Closes: #426763)
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 06 Aug 2007 10:34:34 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue,  7 Aug 2007 11:53:32 +0200
