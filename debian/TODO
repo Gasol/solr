@@ -7,3 +7,6 @@ TODO.Debian for solr
 - Maybe: add solr-standalone package (using embedded Jetty like the Solr
   example). This would depend on the Jetty package, though, so maybe it's not
   such a useful idea.
+- Maybe: move the API docs to a separate package (it's 8.7 MB, and not generally
+  useful to people just interested in running Solr, only to those extending it).
+

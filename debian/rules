@@ -8,24 +8,30 @@ include /usr/share/cdbs/1/class/ant.mk
 # Uncomment this to turn on verbose mode.
 # export DH_VERBOSE=1
 
-# Upstream version information
-UPSTREAM_VERSION := $(shell echo $(DEB_VERSION) | grep -o "^[[:digit:]\.]*")
-UPSTREAM_BASENAME = apache-solr-$(UPSTREAM_VERSION)
+UPSTREAM_BASENAME = apache-solr-$(DEB_UPSTREAM_VERSION)
+WARFILE = $(UPSTREAM_BASENAME).war
+CHANGESFILE = ../solr_$(DEB_VERSION)_$(DEB_BUILD_ARCH).changes
 
 COMMON_INSTDIR=$(CURDIR)/debian/solr-common
 TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat5.5
 JETTY_INSTDIR=$(CURDIR)/debian/solr-jetty
 SHAREDIR=$(COMMON_INSTDIR)/usr/share/solr
 
-WARFILE = $(UPSTREAM_BASENAME).war
-
 # Explicitly build with sun-java5-jdk
 JAVA_HOME = /usr/lib/jvm/java-1.5.0-sun
 JAR = $(JAVA_HOME)/bin/jar
 
+# Set ant parameters
 DEB_ANT_BUILD_TARGET = compile dist-war
+# ant test needs easymock which is not in Debian
 #DEB_ANT_CHECK_TARGET = test
 DEB_JARS = ant-junit junit
+
+DEB_INSTALL_CHANGELOGS_solr-common := CHANGES.txt
+
+cleanbuilddir:: build.xml
+build.xml:
+	debian/rules restore-from-source
 
 clean::
 	rm -rf example/solr/data/index
@@ -39,9 +45,6 @@ install/solr-common::
 	# Install replication scripts
 	install src/scripts/* $(SHAREDIR)/bin
 	
-	install -d $(COMMON_INSTDIR)/usr/share/doc/solr-common/
-	install CHANGES.txt $(COMMON_INSTDIR)/usr/share/doc/solr-common/changelog
-	
 	# Install Solr configuration files
 	# FIXME: this is example configuration, including example schema
 	# Should be changed to some minimal config, with pointers
@@ -50,7 +53,7 @@ install/solr-common::
 	
 	# This information is already in debian/copyright
 	rm -f $(COMMON_INSTDIR)/usr/share/solr/META-INF/LICENSE.txt
-	
+
 install/solr-tomcat5.5::
 	# Configure tomcat (also see solr-tomcat5.5.links)
 	install --mode 0644 debian/solr-tomcat5.5.xml $(TOMCAT_INSTDIR)/etc/solr/
@@ -68,22 +71,23 @@ remove-source:
 	rm -rf build dist docs example lib src
 	rm -rf apache-solr*
 
-restore-from-source: remove-source
-	tar xzf ../solr_$(UPSTREAM_VERSION).orig.tar.gz
+restore-from-source: remove-source ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
+	tar xzf ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
 	mv $(UPSTREAM_BASENAME)/* .
 	rmdir $(UPSTREAM_BASENAME)
 
-get-orig-source:
+get-orig-source: ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
+
+../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz:
 	debian/get-orig-source
 
 check:
-	lintian -i ../solr_$(DEB_VERSION)_$(DEB_BUILD_ARCH).changes
-	linda -i ../solr_$(DEB_VERSION)_$(DEB_BUILD_ARCH).changes
-	zgrep "^---" ../solr_$(DEB_VERSION).diff.gz | grep -v debian || true
-	dpkg --contents ../solr-common_$(DEB_VERSION)_all.deb
-	dpkg --contents ../solr-tomcat5.5_$(DEB_VERSION)_all.deb
-	dpkg --contents ../solr-jetty_$(DEB_VERSION)_all.deb
+	lintian -i $(CHANGESFILE)
+	linda -i $(CHANGESFILE)
+	zgrep "^---" ../solr_$(DEB_VERSION).diff.gz | grep -v debian ; [ $$? != 0 ]
+	( dpkg --contents ../solr-common_$(DEB_VERSION)_all.deb ; \
+	  dpkg --contents ../solr-tomcat5.5_$(DEB_VERSION)_all.deb ; \
+	  dpkg --contents ../solr-jetty_$(DEB_VERSION)_all.deb ) | less
 
 upload:
-	cd .. ; dupload -t vanbest solr_$(DEB_VERSION)_$(DEB_BUILD_ARCH).changes 
-	#cd .. ; dupload -t mentors solr_$(DEB_VERSION)_$(DEB_BUILD_ARCH).changes
+	dupload -t mentors $(CHANGESFILE)
