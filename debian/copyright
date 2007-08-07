@@ -3,8 +3,10 @@ Mon, 06 Aug 2007 11:07:34 +0200
 
 It was downloaded from
     http://www.apache.org/dist/lucene/solr/1.2/apache-solr-1.2.tgz
-Run debian/rules get-orig-source to get the original source tarball and check
-the GPG signature on it.
+and then superflous library .jars and generated .jars, .war and Javadoc
+was removed to generate the .orig.tar.gz file. Run 
+    debian/rules get-orig-source 
+to download the source tarball from Apache and repack it into the Debian source.
 
 Apache Solr is 
     Copyright 2007 The Apache Software Foundation

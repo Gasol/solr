@@ -8,7 +8,10 @@ include /usr/share/cdbs/1/class/ant.mk
 # Uncomment this to turn on verbose mode.
 # export DH_VERBOSE=1
 
-UPSTREAM_BASENAME = apache-solr-$(DEB_UPSTREAM_VERSION)
+# UPSTREAM_VERSION is what Apache Solr thinks its version is
+# DEB_UPSTREAM_VERSION is the Debian source package version (with the +dsN)
+UPSTREAM_VERSION := $(shell echo $(DEB_UPSTREAM_VERSION) | grep -o "^[^+]*")
+UPSTREAM_BASENAME = apache-solr-$(UPSTREAM_VERSION)
 WARFILE = $(UPSTREAM_BASENAME).war
 CHANGESFILE = ../solr_$(DEB_VERSION)_$(DEB_BUILD_ARCH).changes
 
@@ -17,12 +20,12 @@ TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat5.5
 JETTY_INSTDIR=$(CURDIR)/debian/solr-jetty
 SHAREDIR=$(COMMON_INSTDIR)/usr/share/solr
 
-# Explicitly build with sun-java5-jdk
+# Explicitly build with sun-java5-jdk; gcj-java does not handle Solr (yet)
 JAVA_HOME = /usr/lib/jvm/java-1.5.0-sun
 JAR = $(JAVA_HOME)/bin/jar
 
 # Set ant parameters
-DEB_ANT_BUILD_TARGET = compile dist-war
+DEB_ANT_BUILD_TARGET = compile javadoc dist-war
 # ant test needs easymock which is not in Debian
 #DEB_ANT_CHECK_TARGET = test
 DEB_JARS = ant-junit junit

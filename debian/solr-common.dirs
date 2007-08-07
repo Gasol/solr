@@ -4,5 +4,5 @@
 /usr/share/solr/bin
 /var/lib/solr
 /var/lib/solr/data
-/usr/share/doc/solr/examples 
+/usr/share/doc/solr-common/examples 
 
