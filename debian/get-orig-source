@@ -1,6 +1,12 @@
 #!/bin/sh
 
-DEHS=` uscan --no-download --dehs`
+USCAN_VERSION=`uscan --version | grep -o "version [0-9.]*" | grep -o "[0-9]*\.[0-9]*\.[0-9]*"`
+if [ ${USCAN_VERSION:0:4} = "2.9." ]; then
+    # Version 2.9 of uscan has a bug, fixed in 2.10
+    DEHS=`( uscan --no-download --dehs ; echo "</dehs>")`
+else
+    DEHS=`uscan --no-download --dehs`
+fi
 
 URL=`echo $DEHS | xsltproc debian/uscan-url.xslt -`
 VERSION=`echo $DEHS | xsltproc debian/uscan-upstream-version.xslt -`
