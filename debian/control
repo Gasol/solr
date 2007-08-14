@@ -1,7 +1,8 @@
 Source: solr
 Section: contrib/text
 Priority: optional
-Maintainer:Jan-Pascal van Best <janpascal@vanbest.org>
+Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
+Uploaders: Jan-Pascal van Best <janpascal@vanbest.org>
 XS-Vcs-Browser: http://svn.debian.org/wsvn/pkg-java/trunk/solr/
 XS-Vcs-svn: svn://svn.debian.org/svn/pkg-java/trunk/solr/
 Build-Depends: cdbs, debhelper (>= 4.1.0), dpatch (>= 2.0), po-debconf,
@@ -14,7 +15,6 @@ Build-Depends: cdbs, debhelper (>= 4.1.0), dpatch (>= 2.0), po-debconf,
  liblucene2-java (>= 2.2),
  libxpp3-java
 Standards-Version: 3.7.2
-
 
 Package: solr-common
 Architecture: all
@@ -66,4 +66,3 @@ Description: enterprise search server based on Lucene (Jetty integration)
  This package contains the Jetty integration files for Solr. 
  .
   Homepage: http://lucene.apache.org/solr/
-
