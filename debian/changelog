@@ -1,5 +1,5 @@
 solr (1.2.0+ds1-1) unstable; urgency=low
 
-   * Initial upload (Closes: #426763)
+  * Initial upload (Closes: #426763)
 
  -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 06 Sep 2007 22:50:49 +0200
