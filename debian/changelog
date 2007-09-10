@@ -1,12 +1,5 @@
-solr (1.2.0+ds1-1~pre2) unstable; urgency=low
+solr (1.2.0+ds1-1) unstable; urgency=low
 
-  * Repackaged upstream without the included .jar files, .war file, generated
-    API docs
+   * Initial upload (Closes: #426763)
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 07 Aug 2007 21:53:27 +0200
-
-solr (1.2.0-1~pre1) unstable; urgency=low
-
-  * Initial upload (Closes: #426763)
-
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue,  7 Aug 2007 11:53:32 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 06 Sep 2007 22:50:49 +0200
