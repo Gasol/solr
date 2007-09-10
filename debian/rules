@@ -20,8 +20,8 @@ TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat5.5
 JETTY_INSTDIR=$(CURDIR)/debian/solr-jetty
 SHAREDIR=$(COMMON_INSTDIR)/usr/share/solr
 
-# Explicitly build with sun-java5-jdk; gcj-java does not handle Solr (yet)
-JAVA_HOME = /usr/lib/jvm/java-1.5.0-sun
+# Explicitly build with gcj
+JAVA_HOME = /usr/lib/jvm/java-gcj
 JAR = $(JAVA_HOME)/bin/jar
 
 # Set ant parameters
@@ -46,7 +46,7 @@ install/solr-common::
 	mv $(SHAREDIR)/WEB-INF/web.xml $(COMMON_INSTDIR)/etc/solr/
 	
 	# Install replication scripts
-	install src/scripts/* $(SHAREDIR)/bin
+	install src/scripts/* $(SHAREDIR)/scripts
 	
 	# Install Solr configuration files
 	# FIXME: this is example configuration, including example schema

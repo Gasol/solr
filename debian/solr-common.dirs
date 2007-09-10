@@ -1,8 +1,6 @@
 /etc/solr 
 /etc/solr/conf
 /usr/share/solr
-/usr/share/solr/bin
+/usr/share/solr/scripts
 /var/lib/solr
 /var/lib/solr/data
-/usr/share/doc/solr-common/examples 
-

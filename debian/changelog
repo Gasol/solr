@@ -1,3 +1,11 @@
+solr (1.2.0+ds1-2) unstable; urgency=low
+
+  * Build using gcj since Solr now builds using it
+  * Rename /usr/share/solr/bin directory to /usr/share/solr/scripts, since
+    this directory contains only scripts
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 10 Sep 2007 14:25:28 +0200
+
 solr (1.2.0+ds1-1) unstable; urgency=low
 
   * Initial upload (Closes: #426763)
