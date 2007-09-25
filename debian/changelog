@@ -1,10 +1,13 @@
 solr (1.2.0+ds1-2) unstable; urgency=low
 
-  * Build using gcj since Solr now builds using it
+  * Run unit tests during build (closes: #441890).
+  * Install link to config file in /etc/tomcat5.5/Catalina/localhost 
+    (closes: #443382).
   * Rename /usr/share/solr/bin directory to /usr/share/solr/scripts, since
     this directory contains only scripts
+  * Add Portuguese translation of debconf messages (closes: #442306).
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 10 Sep 2007 14:25:28 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 25 Sep 2007 15:23:28 +0200
 
 solr (1.2.0+ds1-1) unstable; urgency=low
 

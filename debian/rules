@@ -20,8 +20,10 @@ TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat5.5
 JETTY_INSTDIR=$(CURDIR)/debian/solr-jetty
 SHAREDIR=$(COMMON_INSTDIR)/usr/share/solr
 
-# Explicitly build with gcj
-JAVA_HOME = /usr/lib/jvm/java-gcj
+# We should like to build with gcj, but solr fails the unit
+# tests with gcj. Use Sun's java 1.5.0 instead.
+#JAVA_HOME = /usr/lib/jvm/java-gcj
+JAVA_HOME = /usr/lib/jvm/java-1.5.0-sun
 JAR = $(JAVA_HOME)/bin/jar
 
 # Set ant parameters
