@@ -7,7 +7,6 @@ XS-Vcs-Browser: http://svn.debian.org/wsvn/pkg-java/trunk/solr/
 XS-Vcs-svn: svn://svn.debian.org/svn/pkg-java/trunk/solr/
 Build-Depends: cdbs, debhelper (>= 4.1.0), dpatch (>= 2.0), po-debconf,
  sun-java5-jdk (>= 1.5.0),
- java-gcj-compat-dev (>= 1.0.76),
  ant (>= 1.7.0), ant-optional (>= 1.7.0), 
  junit (>= 3.8.1.1), libeasymock-java (>= 2.3),
  libcommons-codec-java (>= 1.3),
