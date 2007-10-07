@@ -5,9 +5,12 @@ solr (1.2.0+ds1-2) unstable; urgency=low
     (closes: #443382).
   * Rename /usr/share/solr/bin directory to /usr/share/solr/scripts, since
     this directory contains only scripts
-  * Add Portuguese translation of debconf messages (closes: #442306).
+  * Add Portuguese translation of debconf messages (closes: #442306, #445351).
+  * Add Tamil translation of debconf messages (closes: #445284).
+  * Add Czech translation of debconf messages (closes: #445652).
+  * Add Finnish translation of debconf messages (closes: #445701).
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 25 Sep 2007 15:23:28 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Sun, 07 Oct 2007 23:15:52 +0200
 
 solr (1.2.0+ds1-1) unstable; urgency=low
 

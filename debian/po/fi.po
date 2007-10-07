@@ -1,22 +1,16 @@
-# translation of solr debconf to Portuguese
-# Debian package for Solr.
-# Copyright (C) 2007 Jan-Pascal van Best
-# This file is distributed under the GNU General Public License, version 2.
-#
-# Jan-Pascal van Best <janpascal@vanbest.org>, 2007.
-# Américo Monteiro <a_monteiro@netcabo.pt>, 2007.
 msgid ""
 msgstr ""
-"Project-Id-Version: solr 1.2.0+ds1.2\n"
+"Project-Id-Version: solr\n"
 "Report-Msgid-Bugs-To: janpascal@vanbest.org\n"
 "POT-Creation-Date: 2007-06-05 10:21+0200\n"
-"PO-Revision-Date: 2007-10-04 18:46+0100\n"
-"Last-Translator: Américo Monteiro <a_monteiro@netcabo.pt>\n"
-"Language-Team: Portuguese <traduz@debianpt.org>\n"
+"PO-Revision-Date: 2007-10-07 23:12+0200\n"
+"Last-Translator: Esko Arajärvi <edu@iki.fi>\n"
+"Language-Team: Finnish <debian-l10n-finnish@lists.debian.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: KBabel 1.11.4\n"
+"X-Poedit-Language: Finnish\n"
+"X-Poedit-Country: FINLAND\n"
 
 #. Type: boolean
 #. Description
@@ -24,7 +18,7 @@ msgstr ""
 #, fuzzy
 #| msgid "Remove Solr index files?"
 msgid "Remove index files?"
-msgstr "Remover ficheiros de índice do Solr?"
+msgstr "Poistetaanko Solr hakemistotiedostot?"
 
 #. Type: boolean
 #. Description
@@ -38,12 +32,12 @@ msgstr ""
 #~ "The Solr data directory (/var/lib/solr), and the index files it contains, "
 #~ "may be removed while purging the package."
 #~ msgstr ""
-#~ "O directório de dados do Solr (/var/lib/solr), e os ficheiros índice que "
-#~ "ele contém, podem ser removidos enquanto se purga o pacote."
+#~ "Solrin tietohakemisto (/var/lib/solr) ja sen sisältämät "
+#~ "hakemistotiedostot voidaan poistaa poistettaessa (purge) paketti."
 
 #~ msgid ""
 #~ "You should not choose this option if you intend to re-use Solr's index "
 #~ "files later."
 #~ msgstr ""
-#~ "Você não deverá escolher esta opção se pretender mais tarde re-utilizar "
-#~ "os ficheiros índice do Solr."
+#~ "Älä valitse tätä vaihtoehtoa, jos aiot käyttää Solrin hakemistotiedostoja "
+#~ "uudelleen myöhemmin."
