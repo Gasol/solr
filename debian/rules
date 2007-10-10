@@ -28,8 +28,7 @@ JAR = $(JAVA_HOME)/bin/jar
 
 # Set ant parameters
 DEB_ANT_BUILD_TARGET = compile javadoc dist-war
-# ant test needs easymock which is not in Debian
-#DEB_ANT_CHECK_TARGET = test
+DEB_ANT_CHECK_TARGET = test
 DEB_JARS = ant-junit junit
 
 DEB_INSTALL_CHANGELOGS_solr-common := CHANGES.txt

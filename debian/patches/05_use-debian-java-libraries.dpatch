@@ -19,7 +19,7 @@ diff -urNad trunk~/build.xml trunk/build.xml
  
    <!-- solr source files -->
    <property name="src" value="src" />
-@@ -162,7 +162,17 @@
+@@ -162,7 +162,18 @@
    <!-- The compilation classpath -->
    <path id="compile.classpath">
      <fileset dir="${lib}">
@@ -35,6 +35,7 @@ diff -urNad trunk~/build.xml trunk/build.xml
 +      <include name="commons-fileupload.jar" />
 +      <include name="commons-io.jar" />
 +      <include name="xpp3.jar" />
++      <include name="easymock.jar" />
      </fileset>
    </path>
  
