@@ -12,6 +12,7 @@ solr (1.2.0+ds1-2~pre1) unstable; urgency=low
   * Add Finnish translation of debconf messages (closes: #445701).
   * Add Russian translation of debconf messages (closes: #446140).
   * Add German translation of debconf messages (closes: #446284).
+  * Add Galician translation of debconf messages (closes: #446607).
 
  -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 10 Oct 2007 22:24:25 +0200
 
