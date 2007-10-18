@@ -14,6 +14,7 @@ solr (1.2.0+ds1-2~pre1) unstable; urgency=low
   * Add German translation of debconf messages (closes: #446284).
   * Add Galician translation of debconf messages (closes: #446607).
   * Add Vietnamese translation of debconf messages (closes: #446986).
+  * Add Brazilian Portuguese translation of debconf messages (closes: #447091).
 
  -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 10 Oct 2007 22:24:25 +0200
 
