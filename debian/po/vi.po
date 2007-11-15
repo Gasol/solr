@@ -16,24 +16,28 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Generator: LocFactoryEditor 1.7b1\n"
 
-#: ../solr-common.templates:2001
 #. Type: boolean
 #. Description
+#: ../solr-common.templates:2001
 msgid "Remove Solr index files?"
 msgstr "Gỡ bỏ các tập tin chỉ mục Solr không?"
 
-#: ../solr-common.templates:2001
 #. Type: boolean
 #. Description
+#: ../solr-common.templates:2001
 msgid ""
 "The Solr data directory (/var/lib/solr), and the index files it contains, "
 "may be removed while purging the package."
-msgstr "Khi tẩy gọi, cũng có thể gỡ bỏ thư mục dữ liệu Solr (/var/lib/solr), và các tập tin chỉ mục ở trong."
+msgstr ""
+"Khi tẩy gọi, cũng có thể gỡ bỏ thư mục dữ liệu Solr (/var/lib/solr), và các "
+"tập tin chỉ mục ở trong."
 
-#: ../solr-common.templates:2001
 #. Type: boolean
 #. Description
+#: ../solr-common.templates:2001
 msgid ""
 "You should not choose this option if you intend to re-use Solr's index files "
 "later."
-msgstr "Đừng bật tùy chọn này nếu bạn định sử dụng lại tập tin chỉ mục của Solr về sau."
+msgstr ""
+"Đừng bật tùy chọn này nếu bạn định sử dụng lại tập tin chỉ mục của Solr về "
+"sau."

@@ -6,8 +6,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: solr\n"
-"Report-Msgid-Bugs-To: janpascal@vanbest.org\n"
-"POT-Creation-Date: 2007-06-05 10:21+0200\n"
+"Report-Msgid-Bugs-To: pkg-java-maintainers@lists.alioth.debian.org\n"
+"POT-Creation-Date: 2007-10-04 07:18+0200\n"
 "PO-Revision-Date: 2007-10-07 16:54+0200\n"
 "Last-Translator: Miroslav Kure <kurem@debian.cz>\n"
 "Language-Team: Czech <debian-l10n-czech@lists.debian.org>\n"
@@ -17,30 +17,26 @@ msgstr ""
 
 #. Type: boolean
 #. Description
-#: ../solr-common.templates:1001
-#, fuzzy
-#| msgid "Remove Solr index files?"
-msgid "Remove index files?"
+#: ../solr-common.templates:2001
+msgid "Remove Solr index files?"
 msgstr "Odstranit indexové soubory Solr?"
 
 #. Type: boolean
 #. Description
-#: ../solr-common.templates:1001
+#: ../solr-common.templates:2001
 msgid ""
-"The script is about to remove the data directory /var/lib/solr. If you think "
-"you need Solr's index files later, the data should be kept."
+"The Solr data directory (/var/lib/solr), and the index files it contains, "
+"may be removed while purging the package."
 msgstr ""
+"Při vyčištění balíku ze systému se může smazat také datový adresář Solr (/"
+"var/lib/solr) a indexové soubory v něm obsažené."
 
-#~ msgid ""
-#~ "The Solr data directory (/var/lib/solr), and the index files it contains, "
-#~ "may be removed while purging the package."
-#~ msgstr ""
-#~ "Při vyčištění balíku ze systému se může smazat také datový adresář Solr (/"
-#~ "var/lib/solr) a indexové soubory v něm obsažené."
-
-#~ msgid ""
-#~ "You should not choose this option if you intend to re-use Solr's index "
-#~ "files later."
-#~ msgstr ""
-#~ "Plánujete-li v budoucnu znovupoužít indexové soubory Solr, tuto možnost "
-#~ "zamítněte."
+#. Type: boolean
+#. Description
+#: ../solr-common.templates:2001
+msgid ""
+"You should not choose this option if you intend to re-use Solr's index files "
+"later."
+msgstr ""
+"Plánujete-li v budoucnu znovupoužít indexové soubory Solr, tuto možnost "
+"zamítněte."

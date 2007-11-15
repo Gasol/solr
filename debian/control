@@ -30,14 +30,14 @@ Depends: debconf (>= 1.5),
  liblucene2-java (>= 2.2),
  libxpp3-java (>= 1.1.3.4.0)
 Recommends: solr-tomcat5.5 (>= ${binary:Version}) | solr-jetty (>= ${binary:Version})
-Description: enterprise search server based on Lucene (common files)
+Description: enterprise search server based on Lucene - common files
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
  faceted search, caching, replication, and a web administration 
  interface. It runs in a Java servlet container such as Tomcat.
  .
- Common files for Solr. Install solr-tomcat5.5 or solr-jetty to use Solr under
- Tomcat or Jetty.
+ This package provides the common files for Solr. Install
+ solr-tomcat5.5 or solr-jetty to use Solr under Tomcat or Jetty.
  .
   Homepage: http://lucene.apache.org/solr/
 
@@ -45,13 +45,13 @@ Package: solr-tomcat5.5
 Architecture: all
 Depends: solr-common (>= ${binary:Version}), tomcat5.5 (>= 5.5.20)
 Conflicts: solr-jetty
-Description: enterprise search server based on Lucene (Tomcat integration)
+Description: enterprise search server based on Lucene - Tomcat integration
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
  faceted search, caching, replication, and a web administration 
  interface. It runs in a Java servlet container such as Tomcat.
  .
- This package contains the Tomcat integration files for Solr. 
+ This package provides the Tomcat integration files for Solr. 
  .
   Homepage: http://lucene.apache.org/solr/
 
@@ -59,12 +59,12 @@ Package: solr-jetty
 Architecture: all
 Depends: solr-common (>= ${binary:Version}), jetty (>= 5.1)
 Conflicts: solr-tomcat5.5
-Description: enterprise search server based on Lucene (Jetty integration)
+Description: enterprise search server based on Lucene - Jetty integration
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
  faceted search, caching, replication, and a web administration 
  interface. It runs in a Java servlet container such as Tomcat.
  .
- This package contains the Jetty integration files for Solr. 
+ This package provides the Jetty integration files for Solr. 
  .
   Homepage: http://lucene.apache.org/solr/
