@@ -1,10 +1,10 @@
 solr (1.2.0+ds1-2~pre1) unstable; urgency=low
 
   * Run unit tests during build (closes: #441890).
-  * Install link to config file in /etc/tomcat5.5/Catalina/localhost
-    (does not close yet: #443382).
   * Rename /usr/share/solr/bin directory to /usr/share/solr/scripts, since
     this directory contains only scripts
+  * Install link to config file in /etc/tomcat5.5/Catalina/localhost because
+    this is the new location in recent Tomcat packaging
   * Debconf templates and debian/control reviewed by the debian-l10n-
     english team as part of the Smith review project. (closes: #444655).
   * Add Portuguese translation of debconf messages (closes: #442306, #445351).
@@ -18,7 +18,7 @@ solr (1.2.0+ds1-2~pre1) unstable; urgency=low
   * Add Brazilian Portuguese translation of debconf messages (closes: #447091).
   * Add French translation of debconf messages (closes: #447223).
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 15 Nov 2007 09:54:00 +0100
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 20 Nov 2007 21:15:01 +0100
 
 solr (1.2.0+ds1-1) unstable; urgency=low
 
