@@ -52,7 +52,6 @@ Description: enterprise search server based on Lucene - Tomcat integration
  interface. It runs in a Java servlet container such as Tomcat.
  .
  This package provides the Tomcat integration files for Solr. 
- .
 
 Package: solr-jetty
 Architecture: all
@@ -66,4 +65,3 @@ Description: enterprise search server based on Lucene - Jetty integration
  interface. It runs in a Java servlet container such as Tomcat.
  .
  This package provides the Jetty integration files for Solr. 
- .
