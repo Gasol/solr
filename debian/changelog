@@ -1,4 +1,4 @@
-solr (1.2.0+ds1-2~pre1) unstable; urgency=low
+solr (1.2.0+ds1-2) unstable; urgency=low
 
   * Run unit tests during build (closes: #441890).
   * Rename /usr/share/solr/bin directory to /usr/share/solr/scripts, since
@@ -19,9 +19,8 @@ solr (1.2.0+ds1-2~pre1) unstable; urgency=low
   * Add Vietnamese translation of debconf messages (closes: #446986).
   * Add Brazilian Portuguese translation of debconf messages (closes: #447091).
   * Add French translation of debconf messages (closes: #447223).
-  * 
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 20 Nov 2007 21:21:03 +0100
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 26 Nov 2007 12:02:17 +0100
 
 solr (1.2.0+ds1-1) unstable; urgency=low
 
