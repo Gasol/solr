@@ -1,3 +1,9 @@
+solr (1.2.0+ds1-3~pre1) unstable; urgency=low
+
+  * Updated control file for new Vcs-* and Homepage fields
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 28 Nov 2007 21:17:22 +0100
+
 solr (1.2.0+ds1-2) unstable; urgency=low
 
   * Run unit tests during build (closes: #441890).
