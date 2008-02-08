@@ -1,4 +1,4 @@
-solr (1.2.0+ds1-3~pre1) unstable; urgency=low
+solr (1.2.0+ds1-3~pre1) UNRELEASED; urgency=low
 
   * Updated control file for new Vcs-* and Homepage fields
 
