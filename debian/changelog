@@ -1,8 +1,11 @@
-solr (1.2.0+ds1-3~pre1) UNRELEASED; urgency=low
+solr (1.2.0+ds1-3) unstable; urgency=low
 
   * Updated control file for new Vcs-* and Homepage fields
+  * Removed solr-jetty binary package since the jetty package 
+    has been removed from Lenny
+  * Update to Lucene 2.3
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 28 Nov 2007 21:17:22 +0100
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 22 Apr 2008 17:08:50 +0200
 
 solr (1.2.0+ds1-2) unstable; urgency=low
 

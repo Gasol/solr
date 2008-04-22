@@ -1,0 +1,24 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 07_fix-for-lucene-2.3.dpatch by Jan-Pascal van Best <janpascal@vanbest.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: Fix for update to Lucene 2.3 (upstream SVN rev. 614789).
+
+@DPATCH@
+diff -urNad solr~/src/java/org/apache/solr/analysis/StopFilterFactory.java solr/src/java/org/apache/solr/analysis/StopFilterFactory.java
+--- solr~/src/java/org/apache/solr/analysis/StopFilterFactory.java	2008-04-22 16:47:42.000000000 +0200
++++ solr/src/java/org/apache/solr/analysis/StopFilterFactory.java	2008-04-22 16:49:19.000000000 +0200
+@@ -44,10 +44,12 @@
+       } catch (IOException e) {
+         throw new RuntimeException(e);
+       }
++    } else {
++      stopWords = StopFilter.makeStopSet(StopAnalyzer.ENGLISH_STOP_WORDS, ignoreCase);
+     }
+   }
+ 
+-  private Set stopWords = StopFilter.makeStopSet(StopAnalyzer.ENGLISH_STOP_WORDS);
++  private Set stopWords;
+   private boolean ignoreCase;
+ 
+   public TokenStream create(TokenStream input) {
