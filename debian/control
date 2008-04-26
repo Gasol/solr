@@ -3,6 +3,7 @@ Section: contrib/web
 Priority: optional
 Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
 Uploaders: Jan-Pascal van Best <janpascal@vanbest.org>
+Homepage: http://lucene.apache.org/solr/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-java/trunk/solr/
 Vcs-Svn: svn://svn.debian.org/svn/pkg-java/trunk/solr/
 Build-Depends: cdbs, debhelper (>= 4.1.0), dpatch (>= 2.0), po-debconf,
@@ -30,7 +31,6 @@ Depends: debconf (>= 1.5),
  liblucene2-java (>= 2.3),
  libxpp3-java (>= 1.1.3.4.0)
 Recommends: solr-tomcat5.5 (>= ${binary:Version}) | solr-jetty (>= ${binary:Version})
-Homepage: http://lucene.apache.org/solr/
 Description: enterprise search server based on Lucene - common files
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
@@ -44,7 +44,6 @@ Package: solr-tomcat5.5
 Architecture: all
 Depends: solr-common (>= ${binary:Version}), tomcat5.5 (>= 5.5.20)
 Conflicts: solr-jetty
-Homepage: http://lucene.apache.org/solr/
 Description: enterprise search server based on Lucene - Tomcat integration
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
@@ -57,7 +56,6 @@ Description: enterprise search server based on Lucene - Tomcat integration
 #Architecture: all
 #Depends: solr-common (>= ${binary:Version}), jetty (>= 5.1)
 #Conflicts: solr-tomcat5.5
-#Homepage: http://lucene.apache.org/solr/
 #Description: enterprise search server based on Lucene - Jetty integration
 # Solr is an open source enterprise search server based on the Lucene 
 # Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
