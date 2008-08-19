@@ -20,10 +20,8 @@ TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat5.5
 JETTY_INSTDIR=$(CURDIR)/debian/solr-jetty
 SHAREDIR=$(COMMON_INSTDIR)/usr/share/solr
 
-# We should like to build with gcj, but solr fails the unit
-# tests with gcj. Use Sun's java 1.5.0 instead.
-#JAVA_HOME = /usr/lib/jvm/java-gcj
-JAVA_HOME = /usr/lib/jvm/java-1.5.0-sun
+# Build with OpenJDK
+JAVA_HOME = /usr/lib/jvm/java-6-openjdk
 JAR = $(JAVA_HOME)/bin/jar
 
 # Set ant parameters
@@ -32,6 +30,8 @@ DEB_ANT_CHECK_TARGET = test
 DEB_JARS = ant-junit junit
 
 DEB_INSTALL_CHANGELOGS_solr-common := CHANGES.txt
+
+DEB_COMPRESS_EXCLUDE = .xsl .js .xslt
 
 cleanbuilddir:: build.xml
 build.xml:
@@ -57,6 +57,15 @@ install/solr-common::
 	
 	# This information is already in debian/copyright
 	rm -f $(COMMON_INSTDIR)/usr/share/solr/META-INF/LICENSE.txt
+	
+	cp KEYS.txt NOTICE.txt README.txt $(COMMON_INSTDIR)/usr/share/doc/solr-common/
+	cp -a docs $(COMMON_INSTDIR)/usr/share/doc/solr-common/
+	cp -a build/docs/api $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/
+	
+	# Remove empty directories
+	rmdir --ignore-fail-on-non-empty $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/skin/css
+	rmdir --ignore-fail-on-non-empty $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/skin/scripts
+	rmdir --ignore-fail-on-non-empty $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/skin/translations
 
 install/solr-tomcat5.5::
 	# Configure tomcat (also see solr-tomcat5.5.links)

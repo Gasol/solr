@@ -2,5 +2,7 @@
 /etc/solr/conf
 /usr/share/solr
 /usr/share/solr/scripts
+/usr/share/doc/solr-common
+/usr/share/doc/solr-common/docs
 /var/lib/solr
 /var/lib/solr/data

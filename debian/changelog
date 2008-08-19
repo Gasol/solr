@@ -1,3 +1,17 @@
+solr (1.2.0+ds1-4) UNRELEASED; urgency=low
+
+  * Build with OpenJDK, move to main
+  * Update debian/copyright, refer to Apache 2.0 license in common-licenses
+  * Bump Standards-Version to 3.8.0
+  * Do not create unused directory /usr/share/tomcat5.5/conf/Catalina/localhost
+  * Install Solr docs from debian/rules instead of from debian/docs; remove
+    a few empty directories
+  * Do not compress .js, .xslt and .xsl files under doc/
+  * Update Debian README for the removal of solr-jetty; renamed to
+    README.Debian
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 19 Aug 2008 17:35:00 +0200
+
 solr (1.2.0+ds1-3) unstable; urgency=low
 
   * Updated control file for new Vcs-* and Homepage fields
