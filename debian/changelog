@@ -3,8 +3,9 @@ solr (1.2.0+ds2-1) unstable; urgency=low
   * New (fake) upstream version to work around a bug in dak.
   * Reinstated solr-jetty since Jetty is back in Lenny. Added workaround
     of bug #452586 in Jetty to debian/README.Debian.
+  * Added DM-Upload-Allowed: yes to debian/control
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 08 Sep 2008 15:16:49 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 08 Sep 2008 16:00:54 +0200
 
 solr (1.2.0+ds1-4) unstable; urgency=low
 
