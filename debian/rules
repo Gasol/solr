@@ -72,9 +72,9 @@ install/solr-tomcat5.5::
 	install --mode 0644 debian/solr-tomcat5.5.xml $(TOMCAT_INSTDIR)/etc/solr/
 	install --mode 0644 debian/tomcat.policy $(TOMCAT_INSTDIR)/etc/solr/tomcat.policy
 
-#install/solr-jetty::
-#	# Configure Jetty
-#	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
+install/solr-jetty::
+	# Configure Jetty
+	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
 
 remove-source:
 	rm -f build.xml
@@ -100,6 +100,7 @@ check:
 	zgrep "^---" ../solr_$(DEB_VERSION).diff.gz | grep -v debian ; [ $$? != 0 ]
 	( dpkg --contents ../solr-common_$(DEB_VERSION)_all.deb ; \
 	  dpkg --contents ../solr-tomcat5.5_$(DEB_VERSION)_all.deb ; \
+	  dpkg --contents ../solr-jetty_$(DEB_VERSION)_all.deb ; \
 	) | less
 	  #dpkg --contents ../solr-jetty_$(DEB_VERSION)_all.deb ; \
 

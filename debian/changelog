@@ -1,4 +1,12 @@
-solr (1.2.0+ds1-4) UNRELEASED; urgency=low
+solr (1.2.0+ds2-1) unstable; urgency=low
+
+  * New (fake) upstream version to work around a bug in dak.
+  * Reinstated solr-jetty since Jetty is back in Lenny. Added workaround
+    of bug #452586 in Jetty to debian/README.Debian.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 08 Sep 2008 15:16:49 +0200
+
+solr (1.2.0+ds1-4) unstable; urgency=low
 
   * Build with OpenJDK, move to main
   * Update debian/copyright, refer to Apache 2.0 license in common-licenses
@@ -11,7 +19,7 @@ solr (1.2.0+ds1-4) UNRELEASED; urgency=low
     README.Debian
   * Added Swedish translation of debconf messages (closes: #483416).
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 19 Aug 2008 17:53:18 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 20 Aug 2008 20:25:03 +0200
 
 solr (1.2.0+ds1-3) unstable; urgency=low
 
