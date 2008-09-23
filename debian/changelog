@@ -1,10 +1,10 @@
-solr (1.2.0+ds2-2) unstable; urgency=low
+solr (1.2.0+ds2-2) UNRELEASED; urgency=low
 
   * Reinstated solr-jetty since Jetty is back in Lenny. Added workaround
     of bug #452586 in Jetty to debian/README.Debian.
   * Added DM-Upload-Allowed: yes to debian/control
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 11 Sep 2008 11:12:10 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 23 Sep 2008 13:45:07 +0200
 
 solr (1.2.0+ds2-1) unstable; urgency=low
 
