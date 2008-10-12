@@ -1,0 +1,4 @@
+version=3
+
+opts=dversionmangle=s/\+ds\d+$// \
+  http://www.apache.org/dist/lucene/solr/(?:[0-9]*\.[0-9]*)/apache-solr-(.*).tgz

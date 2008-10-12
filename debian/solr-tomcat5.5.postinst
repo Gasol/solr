@@ -1,0 +1,46 @@
+#!/bin/sh
+
+set -e
+# Not needed
+# . /usr/share/debconf/confmodule
+
+# If proper permissions for the stuff under /var/lib/solr haven't
+# been set, set them now
+
+case "$1" in
+    configure)
+
+	if ! dpkg-statoverride --quiet --list /var/lib/solr > /dev/null; then
+	    dpkg-statoverride --quiet --update --add tomcat55 root 0750 /var/lib/solr 
+	fi
+
+	if ! dpkg-statoverride --quiet --list /var/lib/solr/data > /dev/null ; then
+	    dpkg-statoverride --quiet --update --add tomcat55 root 0750 /var/lib/solr/data 
+	fi
+
+	if [ -d /var/lib/solr/data/index ]; then
+	    chown -R tomcat55:root /var/lib/solr/data
+	fi
+
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+
+esac
+
+invoke-rc.d --quiet tomcat5.5 restart || {
+    RESULT=$?
+    # Ignore if tomcat5.5 init script does not exist (yet)
+    if [ $RESULT != 100 ]; then
+	exit $RESULT
+    fi
+}
+
+#DEBHELPER#

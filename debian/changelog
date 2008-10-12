@@ -1,0 +1,59 @@
+solr (1.2.0+ds2-1) unstable; urgency=low
+
+  * New (fake) upstream version to work around a bug in dak.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Sat, 23 Aug 2008 21:22:53 +0200
+
+solr (1.2.0+ds1-4) unstable; urgency=low
+
+  * Build with OpenJDK, move to main
+  * Update debian/copyright, refer to Apache 2.0 license in common-licenses
+  * Bump Standards-Version to 3.8.0
+  * Do not create unused directory /usr/share/tomcat5.5/conf/Catalina/localhost
+  * Install Solr docs from debian/rules instead of from debian/docs; remove
+    a few empty directories
+  * Do not compress .js, .xslt and .xsl files under doc/
+  * Update Debian README for the removal of solr-jetty; renamed to
+    README.Debian
+  * Added Swedish translation of debconf messages (closes: #483416).
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 20 Aug 2008 20:25:03 +0200
+
+solr (1.2.0+ds1-3) unstable; urgency=low
+
+  * Updated control file for new Vcs-* and Homepage fields
+  * Removed solr-jetty binary package since the jetty package 
+    has been removed from Lenny
+  * Update to Lucene 2.3
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 22 Apr 2008 17:08:50 +0200
+
+solr (1.2.0+ds1-2) unstable; urgency=low
+
+  * Run unit tests during build (closes: #441890).
+  * Rename /usr/share/solr/bin directory to /usr/share/solr/scripts, since
+    this directory contains only scripts.
+  * Install link to config file in /etc/tomcat5.5/Catalina/localhost because
+    this is the new location in recent Tomcat packaging.
+  * Remove portions of the copyright file that referred to libraries that are
+    not shipped with the Debian package for Solr.
+  * Debconf templates and debian/control reviewed by the debian-l10n-
+    english team as part of the Smith review project. (closes: #444655).
+  * Add Portuguese translation of debconf messages (closes: #442306, #445351).
+  * Add Tamil translation of debconf messages (closes: #445284).
+  * Add Czech translation of debconf messages (closes: #445652).
+  * Add Finnish translation of debconf messages (closes: #445701).
+  * Add Russian translation of debconf messages (closes: #446140).
+  * Add German translation of debconf messages (closes: #446284).
+  * Add Galician translation of debconf messages (closes: #446607).
+  * Add Vietnamese translation of debconf messages (closes: #446986).
+  * Add Brazilian Portuguese translation of debconf messages (closes: #447091).
+  * Add French translation of debconf messages (closes: #447223).
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 26 Nov 2007 12:02:17 +0100
+
+solr (1.2.0+ds1-1) unstable; urgency=low
+
+  * Initial upload (Closes: #426763)
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 06 Sep 2007 22:50:49 +0200

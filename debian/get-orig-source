@@ -1,0 +1,62 @@
+#!/bin/sh
+
+USCAN_VERSION=`uscan --version | grep -o "version [0-9.]*" | grep -o "[0-9]*\.[0-9]*\.[0-9]*"`
+if [ ${USCAN_VERSION:0:4} = "2.9." ]; then
+    # Version 2.9 of uscan has a bug, fixed in 2.10
+    DEHS=`( uscan --no-download --dehs ; echo "</dehs>")`
+else
+    DEHS=`uscan --no-download --dehs`
+fi
+
+URL=`echo $DEHS | xsltproc debian/uscan-url.xslt -`
+VERSION=`echo $DEHS | xsltproc debian/uscan-upstream-version.xslt -`
+
+DESTDIR=$PWD/..
+UPSTREAM_SOURCE=$DESTDIR/apache-solr-$VERSION.tgz
+UPSTREAM_SIG=$DESTDIR/apache-solr-$VERSION.tgz.asc
+ORIGFILE=$DESTDIR/solr_$VERSION+ds1.orig.tar.gz
+
+KEYURL="http://www.apache.org/dist/lucene/solr/KEYS.txt"
+KEYFILE="debian/KEYS.txt"
+KEYRING="debian/solr-keyring.gpg"
+
+# Download source tarball and signature file
+wget "$URL" -O $UPSTREAM_SOURCE
+wget "$URL.asc" -O $UPSTREAM_SIG
+
+# If necessary, recreate keyring used for signing
+# Only do this if the keyring is not yet downloaded
+if [ ! -r $KEYFILE ]; then
+    wget "$KEYURL" -O "$KEYFILE"
+fi
+
+if [ ! -r $KEYRING ]; then
+    touch $KEYRING
+    gpg --no-default-keyring --primary-keyring $KEYRING --import $KEYFILE
+fi
+
+# Check signature
+gpgv --quiet --keyring $KEYRING $UPSTREAM_SIG $UPSTREAM_SOURCE
+
+echo "Check whether the archive has been signed by Yorick Seeley, key ID 0AFCEE7C"
+
+# Repackage upstream source file without the third party jars
+TEMPDIR=`mktemp -d`
+echo "Unpacking into tempdir $TEMPDIR..."
+tar xzf $UPSTREAM_SOURCE -C $TEMPDIR
+
+echo "Removing third party jars, wars, and generated API docs..."
+find $TEMPDIR -name \*.jar -exec rm {} \;
+find $TEMPDIR -name \*.war -exec rm {} \;
+rm -rf $TEMPDIR/apache-solr-$VERSION/dist
+rm -rf $TEMPDIR/apache-solr-$VERSION/docs/api
+
+echo "Packing new orig source tarball $ORIGFILE..."
+rm -f $ORIGFILE
+cd $TEMPDIR
+GZIP=--best tar czf $ORIGFILE *
+cd $DESTDIR
+
+echo "Removing tempdir..."
+rm -rf "$TEMPDIR"
+

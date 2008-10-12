@@ -1,0 +1,6 @@
+01_remove-all-jarfiles.dpatch
+02_fix-solr-version.dpatch
+03_relocate-datadir.dpatch
+04_fix-lucene-lock-directory.dpatch
+05_use-debian-java-libraries.dpatch
+07_fix-for-lucene-2.3.dpatch
