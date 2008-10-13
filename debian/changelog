@@ -2,8 +2,10 @@ solr (1.2.0+ds2-2) unstable; urgency=low
 
   * Fix Swedish translation of debconf messages by renaming se.po to sv.po
     (closes: #483416).
+  * Added DM-Upload-Allowed: yes to debian/control
+  * Restricted dependency on liblucene2-java to version << 2.4.0
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 13 Oct 2008 11:27:29 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 13 Oct 2008 11:54:46 +0200
 
 solr (1.2.0+ds2-1) unstable; urgency=low
 

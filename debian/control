@@ -3,6 +3,7 @@ Section: web
 Priority: optional
 Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
 Uploaders: Jan-Pascal van Best <janpascal@vanbest.org>
+DM-Upload-Allowed: yes
 Homepage: http://lucene.apache.org/solr/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-java/trunk/solr/
 Vcs-Svn: svn://svn.debian.org/svn/pkg-java/trunk/solr/
@@ -15,7 +16,7 @@ Build-Depends: cdbs, debhelper (>= 4.1.0), dpatch (>= 2.0), po-debconf,
  libcommons-fileupload-java (>= 1.2),
  libcommons-io-java (>= 1.3.1),
  libservlet2.4-java (>= 5.0.30),
- liblucene2-java (>= 2.3.2),
+ liblucene2-java (>= 2.3.2), liblucene2-java (<< 2.4.0),
  libxpp3-java (>= 1.1.3.4.0)
 Standards-Version: 3.8.0
 
@@ -28,7 +29,7 @@ Depends: debconf (>= 1.5),
  libcommons-fileupload-java (>= 1.2),
  libcommons-io-java (>= 1.3.1),
  libservlet2.4-java (>= 5.0.30),
- liblucene2-java (>= 2.3),
+ liblucene2-java (>= 2.3), liblucene2-java (<< 2.4.0),
  libxpp3-java (>= 1.1.3.4.0)
 Recommends: solr-tomcat5.5 (>= ${binary:Version}) | solr-jetty (>= ${binary:Version})
 Description: enterprise search server based on Lucene - common files
