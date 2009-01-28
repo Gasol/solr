@@ -1,8 +1,9 @@
 solr (1.2.0+ds2-3) unstable; urgency=low
 
   * Update Galician translations in gl.po (closes: 513148).
+  * Update to compile with Lucene 2.4.
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 27 Jan 2009 11:10:19 +0100
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 28 Jan 2009 13:30:55 +0100
 
 solr (1.2.0+ds2-2) unstable; urgency=low
 
