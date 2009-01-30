@@ -1,3 +1,9 @@
+solr (1.2.0+ds2-4) UNRELEASED; urgency=low
+
+  * Updated watch file
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Fri, 30 Jan 2009 15:23:34 +0100
+
 solr (1.2.0+ds2-3) unstable; urgency=low
 
   * Update Galician translations in gl.po (closes: 513148).
