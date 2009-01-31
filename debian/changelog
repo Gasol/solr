@@ -1,8 +1,10 @@
 solr (1.2.0+ds2-4) UNRELEASED; urgency=low
 
   * Updated watch file
+  * Add ${misc:Depends} to debian/control to take into account indirect
+    dependencies from debhelper
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Fri, 30 Jan 2009 15:23:34 +0100
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Sat, 31 Jan 2009 21:10:01 +0100
 
 solr (1.2.0+ds2-3) unstable; urgency=low
 
