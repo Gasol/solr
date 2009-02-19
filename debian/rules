@@ -70,7 +70,7 @@ install/solr-common::
 install/solr-tomcat5.5::
 	# Configure tomcat (also see solr-tomcat5.5.links)
 	install --mode 0644 debian/solr-tomcat5.5.xml $(TOMCAT_INSTDIR)/etc/solr/
-	install --mode 0644 debian/tomcat.policy $(TOMCAT_INSTDIR)/etc/solr/tomcat.policy
+	install --mode 0644 debian/tomcat.policy $(TOMCAT_INSTDIR)/etc/tomcat5.5/policy.d/05solr.policy
 
 #install/solr-jetty::
 #	# Configure Jetty

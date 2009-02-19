@@ -4,8 +4,11 @@ solr (1.2.0+ds2-4) unstable; urgency=low
   * Add ${misc:Depends} to debian/control to take into account indirect
     dependencies from debhelper
   * Added depenency on libxpp3-java (typo in control file, closes: #483261).
+  * Moved /etc/solr/tomcat.policy to /etc/tomcat5.5/policy.d/ and reversed
+    symlink. Closes: #515945.
+  * Remove /etc/tomcat5/policy.d from solr-tomcat5.5.
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 18 Feb 2009 16:37:28 +0100
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 19 Feb 2009 20:48:07 +0100
 
 solr (1.2.0+ds2-3) unstable; urgency=low
 
