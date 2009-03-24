@@ -4,6 +4,7 @@
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/rules/dpatch.mk
 include /usr/share/cdbs/1/class/ant.mk
+#include /usr/share/cdbs/1/class/maven.mk
 
 # Uncomment this to turn on verbose mode.
 # export DH_VERBOSE=1
@@ -27,7 +28,7 @@ JAR = $(JAVA_HOME)/bin/jar
 # Set ant parameters
 DEB_ANT_BUILD_TARGET = compile javadoc dist-war
 DEB_ANT_CHECK_TARGET = test
-DEB_JARS = ant-junit junit
+DEB_JARS = ant-junit junit4
 
 DEB_INSTALL_CHANGELOGS_solr-common := CHANGES.txt
 
@@ -72,16 +73,16 @@ install/solr-tomcat5.5::
 	install --mode 0644 debian/solr-tomcat5.5.xml $(TOMCAT_INSTDIR)/etc/solr/
 	install --mode 0644 debian/tomcat.policy $(TOMCAT_INSTDIR)/etc/solr/tomcat.policy
 
-install/solr-jetty::
-	# Configure Jetty
-	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
+#install/solr-jetty::
+#	# Configure Jetty
+#	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
 
 remove-source:
-	rm -f build.xml
+	rm -f build.xml common-build.xml
 	rm -f *.txt
 	rm -f *stamp
 	rm -rf debian/patched
-	rm -rf build dist docs example lib src
+	rm -rf build dist docs example lib src contrib client
 	rm -rf apache-solr*
 
 restore-from-source: remove-source ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz

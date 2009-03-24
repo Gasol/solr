@@ -7,19 +7,19 @@
 ## DP: into the war file.
 
 @DPATCH@
-diff -urNad trunk~/build.xml trunk/build.xml
---- trunk~/build.xml	2007-06-19 10:44:26.000000000 +0200
-+++ trunk/build.xml	2007-06-19 10:44:48.000000000 +0200
-@@ -55,7 +55,7 @@
-   <property name="specversion" value="1.2.${dateversion}" />
- 
+diff -urNad solr~/build.xml solr/build.xml
+--- solr~/build.xml	2008-09-24 23:09:28.000000000 +0200
++++ solr/build.xml	2008-09-24 23:11:26.000000000 +0200
+@@ -22,7 +22,7 @@
+   <import file="common-build.xml"/>
+   
    <!-- 3rd party libraries for compilation -->
 -  <property name="lib" value="lib" />
 +  <property name="lib" value="/usr/share/java" />
  
    <!-- solr source files -->
    <property name="src" value="src" />
-@@ -162,7 +162,18 @@
+@@ -111,7 +111,27 @@
    <!-- The compilation classpath -->
    <path id="compile.classpath">
      <fileset dir="${lib}">
@@ -28,19 +28,49 @@ diff -urNad trunk~/build.xml trunk/build.xml
 +      <include name="lucene-core.jar" />
 +      <include name="lucene-analyzers.jar" />
 +      <include name="lucene-highlighter.jar" />
++      <include name="lucene-queries.jar" />
 +      <include name="lucene-snowball.jar" />
 +      <include name="lucene-spellchecker.jar" />
 +      <include name="commons-codec.jar" />
 +      <include name="commons-csv.jar" />
 +      <include name="commons-fileupload.jar" />
++      <include name="commons-httpclient.jar" />
 +      <include name="commons-io.jar" />
++      <include name="commons-logging.jar" />
 +      <include name="xpp3.jar" />
 +      <include name="easymock.jar" />
++      <include name="jetty6.jar" />
++      <include name="jetty6-servlet2.5.jar" />
++      <include name="jetty6-util.jar" />
++    </fileset>
++    <fileset dir="/usr/local/share/java">
++      <include name="stax-utils.jar" />
+     </fileset>
+     <pathelement location="${dest}/common"/>
+   </path>
+@@ -305,6 +323,7 @@
+     </fileset>
+     <fileset dir="${lib}">
+       <include name="commons-io-*.jar" />
++      <include name="commons-httpclient.jar" />
+       <include name="*stax-*.jar" />
+       <include name="wstx-*.jar" />
+     </fileset>
+@@ -318,8 +337,10 @@
+     <pathelement location="${dest}/core"/>
+     
+     <!-- jetty -->
+-    <fileset dir="example/lib">
+-      <include name="**/*.jar" />
++    <fileset dir="/usr/share/java">
++      <include name="/jetty6.jar" />
++      <include name="/jetty6-servlet2.5.jar" />
++      <include name="/jetty6-util.jar" />
      </fileset>
    </path>
- 
-@@ -388,10 +398,6 @@
-          webxml="${src}/webapp/WEB-INF/web.xml"
+     
+@@ -520,10 +540,6 @@
+          webxml="${src}/webapp/web/WEB-INF/web.xml"
           filesetmanifest="skip"
           manifest="${dest}/META-INF/MANIFEST.MF">
 -       <lib dir="${lib}">
@@ -48,5 +78,5 @@ diff -urNad trunk~/build.xml trunk/build.xml
 -         <exclude name="easymock.jar" />
 -       </lib>
         <lib dir="${dist}">
-          <include name="${fullnamever}.jar" />
-        </lib>
+          <include name="${fullname}-core-${version}.jar" />
+          <include name="${fullname}-common-${version}.jar" />

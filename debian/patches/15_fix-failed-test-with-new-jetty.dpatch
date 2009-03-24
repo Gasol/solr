@@ -1,0 +1,19 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 15_fix-failed-test-with-new-jetty.dpatch by Jan-Pascal van Best <janpascal@vanbest.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad solr~/src/test/org/apache/solr/servlet/CacheHeaderTest.java solr/src/test/org/apache/solr/servlet/CacheHeaderTest.java
+--- solr~/src/test/org/apache/solr/servlet/CacheHeaderTest.java	2008-08-27 15:04:10.000000000 +0200
++++ solr/src/test/org/apache/solr/servlet/CacheHeaderTest.java	2009-03-20 17:07:46.000000000 +0100
+@@ -62,7 +62,7 @@
+   protected void checkVetoHeaders(HttpMethodBase m) throws Exception {
+     Header head = m.getResponseHeader("Cache-Control");
+     assertNotNull("We got no Cache-Control header", head);
+-    assertEquals("no-cache, no-store", head.getValue());
++    assertEquals("must-revalidate, no-cache, no-store", head.getValue());
+ 
+     head = m.getResponseHeader("Pragma");
+     assertNotNull("We got no Pragma header", head);

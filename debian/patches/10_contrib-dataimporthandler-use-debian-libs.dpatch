@@ -1,0 +1,30 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+## 10_contrib-dataimporthandler-use-debian-libs.dpatch by Jan-Pascal van Best <janpascal@vanbest.org>
+##
+## All lines beginning with `## DP:' are a description of the patch.
+## DP: No description.
+
+@DPATCH@
+diff -urNad solr~/contrib/dataimporthandler/build.xml solr/contrib/dataimporthandler/build.xml
+--- solr~/contrib/dataimporthandler/build.xml	2008-10-21 16:54:57.000000000 +0200
++++ solr/contrib/dataimporthandler/build.xml	2008-10-21 16:55:07.000000000 +0200
+@@ -20,6 +20,7 @@
+ <project name="solr-dataimporthandler" default="build">
+ 	
+   <property name="solr-path" value="../.." />
++  <property name="lib" value="/usr/share/java"/>
+ 	
+   <import file="../../common-build.xml"/>
+ 
+@@ -30,7 +31,10 @@
+   <path id="common.classpath">
+   	<pathelement location="${solr-path}/build/common" />
+   	<pathelement location="${solr-path}/build/core" />
+-  	<fileset dir="${solr-path}/lib" includes="*.jar"></fileset>
++  	<fileset dir="${lib}">
++          <include name="lucene-core.jar"/>
++          <include name="junit4.jar"/>
++        </fileset>
+   </path>
+ 	
+   <path id="test.classpath">
