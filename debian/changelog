@@ -1,3 +1,10 @@
+solr (1.2.0+ds1-3+lenny1) stable; urgency=low
+
+  * Fix simultaneous installation of tomcat5.5 with solr-tomcat5.5.
+   (backport from fix in testing/unstable, closes: #522992).
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 08 Apr 2009 10:57:00 +0200
+
 solr (1.2.0+ds1-3) unstable; urgency=low
 
   * Updated control file for new Vcs-* and Homepage fields

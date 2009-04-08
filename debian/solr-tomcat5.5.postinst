@@ -22,6 +22,8 @@ case "$1" in
 	    chown -R tomcat55:root /var/lib/solr/data
 	fi
 
+        ln -sf /etc/solr/tomcat.policy /etc/tomcat5.5/policy.d/05solr.policy
+
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
