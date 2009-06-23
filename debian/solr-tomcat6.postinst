@@ -1,0 +1,39 @@
+#!/bin/sh
+
+set -e
+# Not needed
+# . /usr/share/debconf/confmodule
+
+# If proper permissions for the stuff under /var/lib/solr haven't
+# been set, set them now
+
+case "$1" in
+    configure)
+
+        chown -R tomcat6:tomcat6 /var/lib/solr/data
+        chmod -R 775 /var/lib/solr/data
+
+        ln -sf /etc/solr/tomcat.policy /etc/tomcat6/policy.d/05solr.policy
+
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+
+esac
+
+invoke-rc.d --quiet tomcat6 restart || {
+    RESULT=$?
+    # Ignore if tomcat6 init script does not exist (yet)
+    if [ $RESULT != 100 ]; then
+	exit $RESULT
+    fi
+}
+
+#DEBHELPER#

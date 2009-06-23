@@ -1,2 +1,0 @@
-/etc/solr/solr-tomcat5.5.xml /etc/tomcat5.5/Catalina/localhost/solr.xml
-/etc/tomcat5.5/policy.d/05solr.policy /etc/solr/tomcat.policy
