@@ -1,11 +1,11 @@
 solr (1.2.0+ds2-6) unstable; urgency=low
 
-  * Update dependency from tomcat5.5 to tomcat6 Closes: #526259.
+  * Update dependency from tomcat5.5 to tomcat6. Closes: #526259.
   * Bump Standards-Version to 3.8.1 (no changes needed).
   * Remove dpkg-statoverride stuff from solr-tomcat6.postinst. It's not needed
     and does not work.
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 23 Jun 2009 12:58:33 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 23 Jun 2009 15:37:07 +0200
 
 solr (1.2.0+ds2-5) unstable; urgency=low
 
