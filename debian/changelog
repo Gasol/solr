@@ -1,15 +1,59 @@
 solr (1.3.0+ds1-1) UNRELEASED; urgency=low
 
   * New upstream release (1.3.0).
-  * Fixed debian/watch for new upstream directory name schema.
   * Added workaround of bug #452586 in Jetty to debian/README.Debian. Note
     that solr-jetty is still disabled because Jetty has been removed from
     Lenny.
-  * Added DM-Upload-Allowed: yes to debian/control.
-  * Updated Galician translation
   * Removed dependency on javanet staxutils (see upstream issue SOLR-851).
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 01 Jul 2009 13:20:24 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 01 Jul 2009 20:54:28 +0200
+
+solr (1.2.0+ds2-6) unstable; urgency=low
+
+  * Update dependency from tomcat5.5 to tomcat6. Closes: #526259.
+  * Bump Standards-Version to 3.8.1 (no changes needed).
+  * Remove dpkg-statoverride stuff from solr-tomcat6.postinst. It's not needed
+    and does not work.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 23 Jun 2009 15:37:07 +0200
+
+solr (1.2.0+ds2-5) unstable; urgency=low
+
+  * Use tomcat.policy symlink in original direction and have symlink 
+    set by maintainer scripts to prevent problems with solr upgrades. 
+    Closes: #516288.
+  * Have solr-tomcat5.5 depend on solr-common with the exact same version
+    to prevent later problems.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Fri, 27 Feb 2009 22:47:55 +0100
+
+solr (1.2.0+ds2-4) unstable; urgency=low
+
+  * Updated watch file
+  * Add ${misc:Depends} to debian/control to take into account indirect
+    dependencies from debhelper
+  * Added depenency on libxpp3-java (typo in control file, closes: #483261).
+  * Moved /etc/solr/tomcat.policy to /etc/tomcat5.5/policy.d/ and reversed
+    symlink. Closes: #515945.
+  * Remove /etc/tomcat5/policy.d from solr-tomcat5.5.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 19 Feb 2009 20:48:07 +0100
+
+solr (1.2.0+ds2-3) unstable; urgency=low
+
+  * Update Galician translations in gl.po (closes: 513148).
+  * Update to compile with Lucene 2.4.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 28 Jan 2009 13:30:55 +0100
+
+solr (1.2.0+ds2-2) unstable; urgency=low
+
+  * Fix Swedish translation of debconf messages by renaming se.po to sv.po
+    (closes: #483416).
+  * Added DM-Upload-Allowed: yes to debian/control
+  * Restricted dependency on liblucene2-java to version << 2.4.0
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Mon, 13 Oct 2008 11:54:46 +0200
 
 solr (1.2.0+ds2-1) unstable; urgency=low
 
