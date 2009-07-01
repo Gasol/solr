@@ -4,5 +4,6 @@
 08_disable-tests-that-need-network-access.dpatch
 10_contrib-dataimporthandler-use-debian-libs.dpatch
 15_fix-failed-test-with-new-jetty.dpatch
+16_fix-failed-SolrInfoMBeanTest.dpatch
 20_remove-dependency-on-javanet-staxutils-SOLR-851.dpatch
 22_fix-compile-error-with-ambiguous-assert.dpatch
