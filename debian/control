@@ -1,5 +1,5 @@
 Source: solr
-Section: web
+Section: java
 Priority: optional
 Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
 Uploaders: Jan-Pascal van Best <janpascal@vanbest.org>
@@ -7,7 +7,7 @@ DM-Upload-Allowed: yes
 Homepage: http://lucene.apache.org/solr/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-java/trunk/solr/
 Vcs-Svn: svn://svn.debian.org/svn/pkg-java/trunk/solr/
-Build-Depends: cdbs, debhelper (>= 4.1.0), dpatch (>= 2.0), po-debconf,
+Build-Depends: cdbs, debhelper (>= 5.0.0), dpatch (>= 2.0), po-debconf,
  openjdk-6-jdk (>= 6b11-5),
  ant (>= 1.7.0), ant-optional (>= 1.7.0), 
  junit4 (>= 4.6), libeasymock-java (>= 2.4),
@@ -21,7 +21,7 @@ Build-Depends: cdbs, debhelper (>= 4.1.0), dpatch (>= 2.0), po-debconf,
  libtomcat6-java (>= 6.0.20),
  libservlet2.5-java (>= 6.0.20),
  libjetty-java (>= 6.1.18)
-Standards-Version: 3.8.1
+Standards-Version: 3.8.2
 
 Package: solr-common
 Architecture: all

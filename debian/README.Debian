@@ -4,20 +4,9 @@ README for solr
 Solr is an enterprise search server based on the Lucene Java library. The
 Debian packaging of Solr consists of three binary packages:
 - solr-common contains the Solr software itself and general configuration.
-- solr-tomcat5.5 installs Solr as a servlet in Tomcat 5.5. After installation,
-  point your browser to http://localhost:8180/solr/admin
+- solr-tomcat6 installs Solr as a servlet in Tomcat 6. After installation,
+  point your browser to http://localhost:8080/solr/admin
   to see the Solr web administration interface.
-- solr-jetty installs Solr as a servlet in Jetty. After installation,
-  point your browser to http://localhost:8280/solr/admin
-  to see the Solr web administration interface.
-
-Solr-tomcat5.5 and solr-jetty use the same index files. If you remove solr-tomcat5.5 
-and install solr-jetty, you keep the indexes. This implies that solr-tomcat5.5 and 
-solr-jetty cannot be installed at the same time.
-
-Jetty is broken as of version 5.1.14-1: you need to add the line
-  $(tomcat.lib.home)/jasper-compiler-jdt.jar       ! available org.eclipse.jdt.core.JDTCompilerAdapter
-near the end of your /etc/jetty/start.config
 
 Homepage: http://lucene.apache.org/solr/
 
