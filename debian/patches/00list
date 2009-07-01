@@ -1,7 +1,8 @@
 01_remove-all-jarfiles.dpatch
-#03_relocate-datadir.dpatch
 04_fix-lucene-lock-directory.dpatch
 05_use-debian-java-libraries.dpatch
-#07_fix-for-lucene-2.3.dpatch
+08_disable-tests-that-need-network-access.dpatch
 10_contrib-dataimporthandler-use-debian-libs.dpatch
 15_fix-failed-test-with-new-jetty.dpatch
+20_remove-dependency-on-javanet-staxutils-SOLR-851.dpatch
+22_fix-compile-error-with-ambiguous-assert.dpatch

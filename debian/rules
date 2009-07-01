@@ -39,8 +39,20 @@ build.xml:
 	debian/rules restore-from-source
 
 clean::
-	rm -rf example/solr/data/index
 	rm -f debian/solr-keyring.gpg
+	#rm -f src/test/test-files/solr/data/spellcheckerFile/*
+	#rm -f src/test/test-files/solr/data/spellchecker1/*
+	#rm -f src/test/test-files/solr/data/spellchecker2/*
+	#rm -f src/test/test-files/solr/data/spellchecker3/*
+	#rm -f src/test/test-files/solr/data/index/*
+	#rm -f src/test/test-files/solr/data/*
+	rm -rf src/test/test-files/solr/data
+	#rm -f example/solr/data/index/*
+	rm -rf example/solr/data
+	#rm -f example/multicore/core0/data/index/*
+	#rm -f example/multicore/core1/data/index/*
+	rm -rf example/multicore/core0/data
+	rm -rf example/multicore/core1/data
 
 install/solr-common::
 	# First unpack the .war file, we need most of it.
@@ -86,9 +98,7 @@ remove-source:
 	rm -rf apache-solr*
 
 restore-from-source: remove-source ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
-	tar xzf ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
-	mv $(UPSTREAM_BASENAME)/* .
-	rmdir $(UPSTREAM_BASENAME)
+	tar xzf ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz --strip 1
 
 get-orig-source: ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
 

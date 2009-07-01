@@ -6,8 +6,8 @@
 
 @DPATCH@
 diff -urNad solr~/contrib/dataimporthandler/build.xml solr/contrib/dataimporthandler/build.xml
---- solr~/contrib/dataimporthandler/build.xml	2008-10-21 16:54:57.000000000 +0200
-+++ solr/contrib/dataimporthandler/build.xml	2008-10-21 16:55:07.000000000 +0200
+--- solr~/contrib/dataimporthandler/build.xml	2009-07-01 13:11:12.000000000 +0200
++++ solr/contrib/dataimporthandler/build.xml	2009-07-01 13:13:47.000000000 +0200
 @@ -20,6 +20,7 @@
  <project name="solr-dataimporthandler" default="build">
  	
@@ -16,7 +16,7 @@ diff -urNad solr~/contrib/dataimporthandler/build.xml solr/contrib/dataimporthan
  	
    <import file="../../common-build.xml"/>
  
-@@ -30,7 +31,10 @@
+@@ -30,14 +31,20 @@
    <path id="common.classpath">
    	<pathelement location="${solr-path}/build/common" />
    	<pathelement location="${solr-path}/build/core" />
@@ -28,3 +28,15 @@ diff -urNad solr~/contrib/dataimporthandler/build.xml solr/contrib/dataimporthan
    </path>
  	
    <path id="test.classpath">
+   	<path refid="common.classpath" />
+-	  <pathelement path="target/classes" />
++	<pathelement path="target/classes" />
+   	<pathelement path="target/test-classes" />
+-    <pathelement path="${java.class.path}"/>
++        <pathelement path="${java.class.path}"/>
++  	<fileset dir="${lib}">
++          <include name="lucene-highlighter.jar"/>
++        </fileset>
+   </path>
+ 	
+   <target name="clean">

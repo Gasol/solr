@@ -7,8 +7,9 @@ solr (1.3.0+ds1-1) UNRELEASED; urgency=low
     Lenny.
   * Added DM-Upload-Allowed: yes to debian/control.
   * Updated Galician translation
+  * Removed dependency on javanet staxutils (see upstream issue SOLR-851).
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Sun, 01 Feb 2009 12:32:49 +0100
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 01 Jul 2009 13:20:24 +0200
 
 solr (1.2.0+ds2-1) unstable; urgency=low
 

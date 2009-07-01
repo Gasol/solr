@@ -8,8 +8,8 @@
 
 @DPATCH@
 diff -urNad solr~/build.xml solr/build.xml
---- solr~/build.xml	2008-09-24 23:09:28.000000000 +0200
-+++ solr/build.xml	2008-09-24 23:11:26.000000000 +0200
+--- solr~/build.xml	2009-07-01 10:51:58.000000000 +0200
++++ solr/build.xml	2009-07-01 10:52:16.000000000 +0200
 @@ -22,7 +22,7 @@
    <import file="common-build.xml"/>
    
@@ -19,7 +19,7 @@ diff -urNad solr~/build.xml solr/build.xml
  
    <!-- solr source files -->
    <property name="src" value="src" />
-@@ -111,7 +111,27 @@
+@@ -111,7 +111,23 @@
    <!-- The compilation classpath -->
    <path id="compile.classpath">
      <fileset dir="${lib}">
@@ -39,37 +39,38 @@ diff -urNad solr~/build.xml solr/build.xml
 +      <include name="commons-logging.jar" />
 +      <include name="xpp3.jar" />
 +      <include name="easymock.jar" />
-+      <include name="jetty6.jar" />
-+      <include name="jetty6-servlet2.5.jar" />
-+      <include name="jetty6-util.jar" />
-+    </fileset>
-+    <fileset dir="/usr/local/share/java">
-+      <include name="stax-utils.jar" />
++      <include name="jetty.jar" />
++      <include name="jetty-util.jar" />
      </fileset>
      <pathelement location="${dest}/common"/>
    </path>
-@@ -305,6 +323,7 @@
+@@ -305,7 +321,7 @@
      </fileset>
      <fileset dir="${lib}">
        <include name="commons-io-*.jar" />
+-      <include name="*stax-*.jar" />
 +      <include name="commons-httpclient.jar" />
-       <include name="*stax-*.jar" />
        <include name="wstx-*.jar" />
      </fileset>
-@@ -318,8 +337,10 @@
+     <pathelement location="${dest}/common"/>
+@@ -318,8 +334,14 @@
      <pathelement location="${dest}/core"/>
      
      <!-- jetty -->
 -    <fileset dir="example/lib">
 -      <include name="**/*.jar" />
 +    <fileset dir="/usr/share/java">
-+      <include name="/jetty6.jar" />
-+      <include name="/jetty6-servlet2.5.jar" />
-+      <include name="/jetty6-util.jar" />
++      <include name="jetty6.jar" />
++      <include name="jetty6-util.jar" />
++      <include name="jsp-api-2.1.jar" />
++      <include name="el-api-2.1.jar" />
++      <include name="jasper.jar" />
++      <include name="jasper-el.jar" />
++      <include name="tomcat-juli.jar" />
      </fileset>
    </path>
      
-@@ -520,10 +540,6 @@
+@@ -520,10 +542,6 @@
           webxml="${src}/webapp/web/WEB-INF/web.xml"
           filesetmanifest="skip"
           manifest="${dest}/META-INF/MANIFEST.MF">
@@ -80,3 +81,11 @@ diff -urNad solr~/build.xml solr/build.xml
         <lib dir="${dist}">
           <include name="${fullname}-core-${version}.jar" />
           <include name="${fullname}-common-${version}.jar" />
+@@ -598,7 +616,6 @@
+       <fileset dir="${lib}">
+         <include name="commons-codec-*.jar"/>
+         <include name="commons-io-*.jar"/>
+-        <include name="*stax-*.jar" />
+         <include name="wstx-*.jar" />
+       </fileset>
+       <fileset dir="${solrj-dir}/lib">
