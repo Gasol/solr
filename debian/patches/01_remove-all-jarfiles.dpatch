@@ -19,7 +19,7 @@ fi
 
 case "$OPERATION" in
   -patch)
-		echo "Removing jar files under $DIRECTORY..."
+		echo "Removing jar files under \"$DIRECTORY\" ..."
 		find $DIRECTORY -name \*.jar -exec rm {} \;
 		;;
   -unpatch)
