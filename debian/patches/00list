@@ -7,3 +7,4 @@
 16_fix-failed-SolrInfoMBeanTest.dpatch
 20_remove-dependency-on-javanet-staxutils-SOLR-851.dpatch
 22_fix-compile-error-with-ambiguous-assert.dpatch
+24_fix-syntax-error-in-shell-script.dpatch
