@@ -5,8 +5,8 @@ TODO.Debian for solr
 - Do something with the example (package it, or supply the example files under
   /usr/share/doc/solr)
 - Maybe: add solr-standalone package (using embedded Jetty like the Solr
-  example). This would depend on the Jetty package, though, so maybe it's not
-  such a useful idea.
+  example). 
 - Maybe: move the API docs to a separate package (it's 8.7 MB, and not generally
   useful to people just interested in running Solr, only to those extending it).
-
+- Maybe: make seperate solrj client library package
+- Do a license check also of things that 'licensecheck -r' does not catch

@@ -4,9 +4,11 @@ README for solr
 Solr is an enterprise search server based on the Lucene Java library. The
 Debian packaging of Solr consists of three binary packages:
 - solr-common contains the Solr software itself and general configuration.
-- solr-tomcat6 installs Solr as a servlet in Tomcat 6. After installation,
+- solr-tomcat installs Solr as a servlet in Tomcat 6. After installation,
   point your browser to http://localhost:8080/solr/admin
   to see the Solr web administration interface.
+- solr-jetty installs Solr as a servlet in the Jetty application server. 
+  The Solr admin interface is at http://localhost:8080/solr/admin/
 
 Homepage: http://lucene.apache.org/solr/
 

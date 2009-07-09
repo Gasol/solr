@@ -16,7 +16,7 @@ WARFILE = $(UPSTREAM_BASENAME).war
 CHANGESFILE = ../solr_$(DEB_VERSION)_$(DEB_BUILD_ARCH).changes
 
 COMMON_INSTDIR=$(CURDIR)/debian/solr-common
-TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat6
+TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat
 JETTY_INSTDIR=$(CURDIR)/debian/solr-jetty
 SHAREDIR=$(COMMON_INSTDIR)/usr/share/solr
 
@@ -70,14 +70,14 @@ install/solr-common::
 	rmdir --ignore-fail-on-non-empty $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/skin/scripts
 	rmdir --ignore-fail-on-non-empty $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/skin/translations
 
-install/solr-tomcat6::
-	# Configure tomcat (also see solr-tomcat6.links)
-	install --mode 0644 debian/solr-tomcat6.xml $(TOMCAT_INSTDIR)/etc/solr/
+install/solr-tomcat::
+	# Configure tomcat (also see solr-tomcat.links)
+	install --mode 0644 debian/solr-tomcat.xml $(TOMCAT_INSTDIR)/etc/solr/
 	install --mode 0644 debian/tomcat.policy $(TOMCAT_INSTDIR)/etc/solr/
 
-#install/solr-jetty::
-#	# Configure Jetty
-#	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
+install/solr-jetty::
+	# Configure Jetty
+	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
 
 remove-source:
 	rm -f build.xml common-build.xml
@@ -93,13 +93,13 @@ restore-from-source: remove-source ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
 get-orig-source: ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
 
 ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz:
-	debian/get-orig-source
+	debian/orig-tar.sh --upstream-version $(UPSTREAM_VERSION) 
 
 check:
 	lintian -i $(CHANGESFILE)
 	linda -i $(CHANGESFILE)
 	zgrep "^---" ../solr_$(DEB_VERSION).diff.gz | grep -v debian ; [ $$? != 0 ]
 	( dpkg --contents ../solr-common_$(DEB_VERSION)_all.deb ; \
-	  dpkg --contents ../solr-tomcat6_$(DEB_VERSION)_all.deb ; \
+	  dpkg --contents ../solr-tomcat_$(DEB_VERSION)_all.deb ; \
+	  dpkg --contents ../solr-jetty_$(DEB_VERSION)_all.deb ; \
 	) | less
-	  #dpkg --contents ../solr-jetty_$(DEB_VERSION)_all.deb ; \

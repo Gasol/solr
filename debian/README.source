@@ -1,0 +1,14 @@
+The Debian source for the solr package is created by
+removing superfluous library .jars and generated .jars, 
+.war and Javadoc from the upstream source archive.
+
+Run 
+    debian/rules get-orig-source 
+to download the source tarball from Apache and repack 
+it into the Debian source.
+
+A note about the build system: most of the contents of the
+Debian package is created by first building the .war file 
+using the upstream (ant) build system. The .war file
+is then unpacked, and its components are installed into 
+the proper locations.
