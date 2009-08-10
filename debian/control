@@ -18,7 +18,7 @@ Build-Depends: cdbs, debhelper (>= 5.0.0), dpatch (>= 2.0), po-debconf,
  libcommons-io-java (>= 1.3.1),
  liblucene2-java (>= 2.4.0),
  libxpp3-java (>= 1.1.3.4.0),
- libtomcat6-java (>= 6.0.20),
+ libtomcat6-java (>= 6.0.20-5),
  libservlet2.5-java (>= 6.0.20),
  libjetty-java (>= 6.1.18)
 Standards-Version: 3.8.2

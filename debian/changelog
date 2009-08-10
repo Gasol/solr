@@ -1,8 +1,9 @@
-solr (1.3.0+ds1-1~pre1) UNRELEASED; urgency=low
+solr (1.3.0+ds1-1) unstable; urgency=low
 
   * New upstream release (1.3.0). Closes: #521009.
   * Removed dependency on javanet staxutils (see upstream issue SOLR-851).
-  * Disable unit tests that need network access. Closes: #534031.
+  * Disable unit tests that need network access or otherwise break on buildds. 
+    Closes: #534031.
   * Change Section: to java.
   * Fix Tomcat policy for Solr 1.3.0.
   * Bump Standards-Version to 3.8.2 (no changes needed).
@@ -11,7 +12,7 @@ solr (1.3.0+ds1-1~pre1) UNRELEASED; urgency=low
   * Update watch file to automatically repackage source
   * Convert debian/copyright to machine-readable version
 
- -- Jan-Pascal van Best <janpascal@vanbest.org>  Thu, 09 Jul 2009 15:09:11 +0200
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Sun, 09 Aug 2009 13:40:18 +0200
 
 solr (1.2.0+ds2-6) unstable; urgency=low
 
