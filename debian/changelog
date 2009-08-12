@@ -1,3 +1,9 @@
+solr (1.3.0+ds1-2) unstable; urgency=low
+
+  * Moved Debian packaging source repository to git.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Wed, 12 Aug 2009 11:36:53 +0200
+
 solr (1.3.0+ds1-1) unstable; urgency=low
 
   * New upstream release (1.3.0). Closes: #521009.

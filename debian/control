@@ -5,8 +5,8 @@ Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.or
 Uploaders: Jan-Pascal van Best <janpascal@vanbest.org>
 DM-Upload-Allowed: yes
 Homepage: http://lucene.apache.org/solr/
-Vcs-Browser: http://svn.debian.org/wsvn/pkg-java/trunk/solr/
-Vcs-Svn: svn://svn.debian.org/svn/pkg-java/trunk/solr/
+Vcs-Browser: http://git.debian.org/?p=pkg-java/solr.git
+Vcs-Git: git://git.debian.org/git/pkg-java/solr.git
 Build-Depends: cdbs, debhelper (>= 5.0.0), dpatch (>= 2.0), po-debconf,
  openjdk-6-jdk (>= 6b11-5),
  ant (>= 1.7.0), ant-optional (>= 1.7.0), 
