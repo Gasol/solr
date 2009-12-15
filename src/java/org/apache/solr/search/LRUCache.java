@@ -232,7 +232,7 @@ public class LRUCache implements SolrCache {
   }
 
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/search/LRUCache.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/search/LRUCache.java $";
   }
 
   public URL[] getDocs() {

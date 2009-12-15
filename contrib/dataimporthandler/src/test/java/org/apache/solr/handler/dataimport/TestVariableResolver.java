@@ -18,18 +18,17 @@ package org.apache.solr.handler.dataimport;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.apache.solr.util.DateMathParser;
 
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * <p>
  * Test for VariableResolver
  * </p>
  *
- * @version $Id: TestVariableResolver.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TestVariableResolver.java 822889 2009-10-07 20:08:53Z shalin $
  * @since solr 1.3
  */
 public class TestVariableResolver {
@@ -70,32 +69,30 @@ public class TestVariableResolver {
   @Test
   public void dateNamespaceWithValue() {
     VariableResolverImpl vri = new VariableResolverImpl();
-    HashMap<String, Evaluator> evaluators = new HashMap<String, Evaluator>();
-    evaluators.put("formatDate", EvaluatorBag.getDateFormatEvaluator());
+    vri.context = new ContextImpl(null,vri, null, Context.FULL_DUMP, Collections.EMPTY_MAP, null,null);
     vri.addNamespace("dataimporter.functions", EvaluatorBag
-            .getFunctionsNamespace(vri, evaluators));
+            .getFunctionsNamespace(Collections.EMPTY_LIST, null));
     Map<String, Object> ns = new HashMap<String, Object>();
     Date d = new Date();
     ns.put("dt", d);
     vri.addNamespace("A", ns);
-    Assert
-            .assertEquals(
-                    new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(d),
-                    vri
-                            .replaceTokens("${dataimporter.functions.formatDate(A.dt,yyyy-MM-dd HH:mm:ss)}"));
+    Assert.assertEquals(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(d),
+                    vri.replaceTokens("${dataimporter.functions.formatDate(A.dt,'yyyy-MM-dd HH:mm:ss')}"));
   }
 
   @Test
-  public void dateNamespaceWithExpr() {
+  public void dateNamespaceWithExpr() throws Exception {
     VariableResolverImpl vri = new VariableResolverImpl();
-    HashMap<String, Evaluator> evaluators = new HashMap<String, Evaluator>();
-    evaluators.put("formatDate", EvaluatorBag.getDateFormatEvaluator());
+    vri.context = new ContextImpl(null,vri, null, Context.FULL_DUMP, Collections.EMPTY_MAP, null,null);
     vri.addNamespace("dataimporter.functions", EvaluatorBag
-            .getFunctionsNamespace(vri, evaluators));
-    String s = vri
-            .replaceTokens("${dataimporter.functions.formatDate('NOW',yyyy-MM-dd HH:mm)}");
-    Assert.assertEquals(new SimpleDateFormat("yyyy-MM-dd HH:mm")
-            .format(new Date()), s);
+            .getFunctionsNamespace(Collections.EMPTY_LIST,null));
+
+    SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+    format.setTimeZone(TimeZone.getTimeZone("UTC"));
+    DateMathParser dmp = new DateMathParser(TimeZone.getDefault(), Locale.getDefault());
+
+    String s = vri.replaceTokens("${dataimporter.functions.formatDate('NOW/DAY','yyyy-MM-dd HH:mm')}");
+    Assert.assertEquals(new SimpleDateFormat("yyyy-MM-dd HH:mm").format(dmp.parseMath("/DAY")), s);
   }
 
   @Test
@@ -117,23 +114,32 @@ public class TestVariableResolver {
   }
 
   @Test
-  public void testFunctionNamespace1() {
+  public void testFunctionNamespace1() throws Exception {
     final VariableResolverImpl resolver = new VariableResolverImpl();
-    final Map<String, Evaluator> evaluators = new HashMap<String, Evaluator>();
-    evaluators.put("formatDate", EvaluatorBag.getDateFormatEvaluator());
-    evaluators.put("test", new Evaluator() {
-      public String evaluate(VariableResolver resolver, String expression) {
-        return "Hello World";
-      }
-    });
+    resolver.context = new ContextImpl(null,resolver, null, Context.FULL_DUMP, Collections.EMPTY_MAP, null,null);
+    final List<Map<String ,String >> l = new ArrayList<Map<String, String>>();
+    Map<String ,String > m = new HashMap<String, String>();
+    m.put("name","test");
+    m.put("class",E.class.getName());
+    l.add(m);
+
+    SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+    format.setTimeZone(TimeZone.getTimeZone("UTC"));
+    DateMathParser dmp = new DateMathParser(TimeZone.getDefault(), Locale.getDefault());
 
     resolver.addNamespace("dataimporter.functions", EvaluatorBag
-            .getFunctionsNamespace(resolver, evaluators));
+            .getFunctionsNamespace(l,null));
     String s = resolver
-            .replaceTokens("${dataimporter.functions.formatDate('NOW',yyyy-MM-dd HH:mm)}");
+            .replaceTokens("${dataimporter.functions.formatDate('NOW/DAY','yyyy-MM-dd HH:mm')}");
     Assert.assertEquals(new SimpleDateFormat("yyyy-MM-dd HH:mm")
-            .format(new Date()), s);
+            .format(dmp.parseMath("/DAY")), s);
     Assert.assertEquals("Hello World", resolver
             .replaceTokens("${dataimporter.functions.test('TEST')}"));
+  }
+
+  public static class E extends Evaluator{
+      public String evaluate(String expression, Context context) {
+        return "Hello World";
+      }
   }
 }

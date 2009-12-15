@@ -29,7 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
@@ -41,16 +42,8 @@ import org.apache.lucene.analysis.Token;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.search.BooleanClause;
-import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.FieldCache;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.ScoreDocComparator;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.SortComparatorSource;
-import org.apache.lucene.search.SortField;
-import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.*;
+import org.apache.lucene.util.StringHelper;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.DOMUtil;
@@ -72,12 +65,12 @@ import org.w3c.dom.NodeList;
 /**
  * A component to elevate some documents to the top of the result set.
  * 
- * @version $Id: QueryElevationComponent.java 678418 2008-07-21 14:01:34Z yonik $
+ * @version $Id: QueryElevationComponent.java 819234 2009-09-26 23:46:44Z markrmiller $
  * @since solr 1.3
  */
 public class QueryElevationComponent extends SearchComponent implements SolrCoreAware
 {
-  private static Logger log = Logger.getLogger(QueryElevationComponent.class.getName());
+  private static Logger log = LoggerFactory.getLogger(QueryElevationComponent.class);
   
   // Constants used in solrconfig.xml
   static final String FIELD_TYPE = "queryFieldType";
@@ -107,6 +100,9 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
     final BooleanQuery include;
     final Map<String,Integer> priority;
     
+    // use singletons so hashCode/equals on Sort will just work
+    final FieldComparatorSource comparatorSource;
+
     ElevationObj( String qstr, List<String> elevate, List<String> exclude ) throws IOException
     {
       this.text = qstr;
@@ -132,6 +128,8 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
           this.exclude[i] = new BooleanClause( tq, BooleanClause.Occur.MUST_NOT );
         }
       }
+
+      this.comparatorSource = new ElevationComparatorSource(priority);
     }
   }
   
@@ -150,7 +148,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
         throw new SolrException( SolrException.ErrorCode.SERVER_ERROR,
             "Unknown FieldType: '"+a+"' used in QueryElevationComponent" );
       }
-      analyzer = ft.getAnalyzer();
+      analyzer = ft.getQueryAnalyzer();
     }
 
     SchemaField sf = core.getSchema().getUniqueKeyField();
@@ -158,7 +156,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
       throw new SolrException( SolrException.ErrorCode.SERVER_ERROR, 
           "QueryElevationComponent requires the schema to have a uniqueKeyField" );
     }
-    idField = sf.getName().intern();
+    idField = StringHelper.intern(sf.getName());
     
     forceElevation = initArgs.getBool( FORCE_ELEVATION, forceElevation );
     try {
@@ -186,7 +184,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
           // preload the first data
           RefCounted<SolrIndexSearcher> searchHolder = null;
           try {
-            searchHolder = core.getNewestSearcher(true);
+            searchHolder = core.getNewestSearcher(false);
             IndexReader reader = searchHolder.get().getReader();
             getElevationMap( reader, core );
           } finally {
@@ -296,10 +294,12 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
       return query;
     }
     StringBuilder norm = new StringBuilder();
-    TokenStream tokens = analyzer.tokenStream( null, new StringReader( query ) );
+    TokenStream tokens = analyzer.reusableTokenStream( "", new StringReader( query ) );
+    tokens.reset();
+    
     Token token = tokens.next();
     while( token != null ) {
-      norm.append( token.termText() );
+      norm.append( new String(token.termBuffer(), 0, token.termLength()) );
       token = tokens.next();
     }
     return norm.toString();
@@ -318,14 +318,17 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
     if( !params.getBool( ENABLE, true ) ) {
       return;
     }
+
+    // A runtime parameter can alter the config value for forceElevation
+    boolean force = params.getBool( FORCE_ELEVATION, forceElevation );
     
     Query query = rb.getQuery();
-    if( query == null ) {
-      throw new SolrException( SolrException.ErrorCode.SERVER_ERROR,
-          "The QueryElevationComponent needs to be registered 'after' the query component" );
+    String qstr = rb.getQueryString();
+    if( query == null || qstr == null) {
+      return;
     }
-    
-    String qstr = getAnalyzedQuery( rb.getQueryString() );
+
+    qstr = getAnalyzedQuery(qstr);
     IndexReader reader = req.getSearcher().getReader();
     ElevationObj booster = null;
     try {
@@ -353,7 +356,7 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
       SortSpec sortSpec = rb.getSortSpec();
       if( sortSpec.getSort() == null ) {
         sortSpec.setSort( new Sort( new SortField[] {
-            new SortField(idField, new ElevationComparatorSource(booster.priority), false ),
+            new SortField(idField, booster.comparatorSource, false ),
             new SortField(null, SortField.SCORE, false)
         }));
       }
@@ -363,15 +366,13 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
         SortField[] current = sortSpec.getSort().getSort();
         ArrayList<SortField> sorts = new ArrayList<SortField>( current.length + 1 );
         // Perhaps force it to always sort by score
-        if( forceElevation && current[0].getType() != SortField.SCORE ) {
-          sorts.add( new SortField(idField, 
-              new ElevationComparatorSource(booster.priority), false ) );
+        if( force && current[0].getType() != SortField.SCORE ) {
+          sorts.add( new SortField(idField, booster.comparatorSource, false ) );
           modify = true;
         }
         for( SortField sf : current ) {
           if( sf.getType() == SortField.SCORE ) {
-            sorts.add( new SortField(idField, 
-                new ElevationComparatorSource(booster.priority), sf.getReverse() ) );
+            sorts.add( new SortField(idField, booster.comparatorSource, sf.getReverse() ) );
             modify = true;
           }
           sorts.add( sf );
@@ -417,17 +418,17 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
 
   @Override
   public String getVersion() {
-    return "$Revision: 678418 $";
+    return "$Revision: 819234 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: QueryElevationComponent.java 678418 2008-07-21 14:01:34Z yonik $";
+    return "$Id: QueryElevationComponent.java 819234 2009-09-26 23:46:44Z markrmiller $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/component/QueryElevationComponent.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/component/QueryElevationComponent.java $";
   }
 
   @Override
@@ -443,58 +444,49 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
   }
 }
 
-/**
- * Comparator source that knows about elevated documents
- */
-class ElevationComparatorSource implements SortComparatorSource 
-{
+class ElevationComparatorSource extends FieldComparatorSource {
   private final Map<String,Integer> priority;
-  
+
   public ElevationComparatorSource( final Map<String,Integer> boosts) {
     this.priority = boosts;
   }
-  
-  public ScoreDocComparator newComparator(final IndexReader reader, final String fieldname)
-    throws IOException 
-  {
 
-    // A future alternate version could store internal docids (would need to be regenerated per IndexReader)
-    // instead of loading the FieldCache instance into memory.
+  public FieldComparator newComparator(final String fieldname, final int numHits, int sortPos, boolean reversed) throws IOException {
+    return new FieldComparator() {
+      
+      FieldCache.StringIndex idIndex;
+      private final int[] values = new int[numHits];
+      int bottomVal;
 
-    final FieldCache.StringIndex index =
-            FieldCache.DEFAULT.getStringIndex(reader, fieldname);
-  
-    return new ScoreDocComparator () 
-    {
-      public final int compare (final ScoreDoc d0, final ScoreDoc d1) {
-        final int f0 = index.order[d0.doc];
-        final int f1 = index.order[d1.doc];
- 
-        final String id0 = index.lookup[f0];
-        final String id1 = index.lookup[f1];
- 
-        final Integer b0 = priority.get( id0 );
-        final Integer b1 = priority.get( id1 );
-
-        final int v0 = (b0 == null) ? -1 : b0.intValue();
-        final int v1 = (b1 == null) ? -1 : b1.intValue();
-       
-        return v1 - v0;
+      public int compare(int slot1, int slot2) {
+        return values[slot2] - values[slot1];  // values will be small enough that there is no overflow concern
       }
-  
-      public Comparable sortValue (final ScoreDoc d0) {
-        final int f0 = index.order[d0.doc];
-        final String id0 = index.lookup[f0];
-        final Integer b0 = priority.get( id0 );
-        final int v0 = (b0 == null) ? -1 : b0.intValue();       
-        return new Integer( v0 );
+
+      public void setBottom(int slot) {
+        bottomVal = values[slot];
       }
-  
-      public int sortType() {
-        return SortField.CUSTOM;
+
+      private int docVal(int doc) throws IOException {
+        String id = idIndex.lookup[idIndex.order[doc]];
+        Integer prio = priority.get(id);
+        return prio == null ? 0 : prio.intValue();
+      }
+
+      public int compareBottom(int doc) throws IOException {
+        return docVal(doc) - bottomVal;
+      }
+
+      public void copy(int slot, int doc) throws IOException {
+        values[slot] = docVal(doc);
+      }
+
+      public void setNextReader(IndexReader reader, int docBase) throws IOException {
+        idIndex = FieldCache.DEFAULT.getStringIndex(reader, fieldname);
+      }
+
+      public Comparable value(int slot) {
+        return values[slot];
       }
     };
   }
 }
-
-

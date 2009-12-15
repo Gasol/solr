@@ -21,15 +21,21 @@ package org.apache.solr.util;
 
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.common.SolrInputField;
 import org.apache.solr.common.util.XML;
 import org.apache.solr.request.*;
 import org.apache.solr.util.TestHarness;
 
 import org.xml.sax.SAXException;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import junit.framework.TestCase;
 import javax.xml.xpath.XPathExpressionException;
 
 import java.io.*;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * An Abstract base class that makes writing Solr JUnit tests "easier"
@@ -91,26 +97,53 @@ public abstract class AbstractSolrTestCase extends TestCase {
    * </ul>
    *
    */
+
+  public static Logger log = LoggerFactory.getLogger(AbstractSolrTestCase.class);
+
   public void setUp() throws Exception {
+    log.info("####SETUP_START " + getName());
     dataDir = new File(System.getProperty("java.io.tmpdir")
-        + System.getProperty("file.separator")
-        + getClass().getName() + "-" + System.currentTimeMillis());
+            + System.getProperty("file.separator")
+            + getClass().getName() + "-" + System.currentTimeMillis());
     dataDir.mkdirs();
-        
-    solrConfig = h.createConfig(getSolrConfigFile());
-    h = new TestHarness( dataDir.getAbsolutePath(),
-                    solrConfig,
-                    getSchemaFile());
-    lrf = h.getRequestFactory
-      ("standard",0,20,"version","2.2");
+
+    String configFile = getSolrConfigFile();
+    if (configFile != null) {
+
+      solrConfig = h.createConfig(getSolrConfigFile());
+      h = new TestHarness( dataDir.getAbsolutePath(),
+              solrConfig,
+              getSchemaFile());
+      lrf = h.getRequestFactory
+              ("standard",0,20,"version","2.2");
+    }
+    log.info("####SETUP_END " + getName());
   }
-    
+
+  /** Subclasses that override setUp can optionally call this method
+   * to log the fact that their setUp process has ended.
+   */
+  public void postSetUp() {
+    log.info("####POSTSETUP " + getName());
+  }
+
+
+  /** Subclasses that override tearDown can optionally call this method
+   * to log the fact that the tearDown process has started.  This is necessary
+   * since subclasses will want to call super.tearDown() at the *end* of their
+   * tearDown method.
+   */
+  public void preTearDown() {
+    log.info("####PRETEARDOWN " + getName());      
+  }
+
   /**
    * Shuts down the test harness, and makes the best attempt possible
    * to delete dataDir, unless the system property "solr.test.leavedatadir"
    * is set.
    */
   public void tearDown() throws Exception {
+    log.info("####TEARDOWN_START " + getName());
     if (h != null) { h.close(); }
     String skip = System.getProperty("solr.test.leavedatadir");
     if (null != skip && 0 != skip.trim().length()) {
@@ -176,7 +209,8 @@ public abstract class AbstractSolrTestCase extends TestCase {
       String results = h.validateXPath(response, tests);
       if (null != results) {
         fail(m + "query failed XPath: " + results +
-             " xml response was: " + response);
+             "\n xml response was: " + response +
+             "\n request was: " + req.getParamString());
       }
     } catch (XPathExpressionException e1) {
       throw new RuntimeException("XPath is invalid", e1);
@@ -202,13 +236,13 @@ public abstract class AbstractSolrTestCase extends TestCase {
    * @see TestHarness#optimize
    */
   public String optimize(String... args) {
-    return h.optimize();
+    return h.optimize(args);
   }
   /**
    * @see TestHarness#commit
    */
   public String commit(String... args) {
-    return h.commit();
+    return h.commit(args);
   }
 
   /**
@@ -222,6 +256,21 @@ public abstract class AbstractSolrTestCase extends TestCase {
     Doc d = doc(fieldsAndValues);
     return add(d);
   }
+
+  /**
+   * Generates a simple &lt;add&gt;&lt;doc&gt;... XML String with no options
+   */
+  public String adoc(SolrInputDocument sdoc) {
+    List<String> fields = new ArrayList<String>();
+    for (SolrInputField sf : sdoc) {
+      for (Object o : sf.getValues()) {
+        fields.add(sf.getName());
+        fields.add(o.toString());
+      }
+    }
+    return adoc(fields.toArray(new String[fields.size()]));
+  }
+
     
   /**
    * Generates an &lt;add&gt;&lt;doc&gt;... XML String with options

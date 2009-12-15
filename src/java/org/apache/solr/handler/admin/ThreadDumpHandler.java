@@ -36,7 +36,7 @@ import org.apache.solr.request.SolrQueryResponse;
  * that it works nicely with an XSLT transformation.  Until we have a nice
  * XSLT front end for /admin, the format is still open to change.
  * 
- * @version $Id: ThreadDumpHandler.java 690026 2008-08-28 22:20:00Z yonik $
+ * @version $Id: ThreadDumpHandler.java 790580 2009-07-02 13:20:22Z markrmiller $
  * @since solr 1.2
  */
 public class ThreadDumpHandler extends RequestHandlerBase
@@ -76,6 +76,7 @@ public class ThreadDumpHandler extends RequestHandlerBase
       lst.add( "thread", getThreadInfo( ti, tmbean ) );
     }
     system.add( "threadDump", lst );
+    rsp.setHttpCaching(false);
   }
 
   //--------------------------------------------------------------------------------
@@ -134,16 +135,16 @@ public class ThreadDumpHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-      return "$Revision: 690026 $";
+      return "$Revision: 790580 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: ThreadDumpHandler.java 690026 2008-08-28 22:20:00Z yonik $";
+    return "$Id: ThreadDumpHandler.java 790580 2009-07-02 13:20:22Z markrmiller $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/admin/ThreadDumpHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/admin/ThreadDumpHandler.java $";
   }
 }

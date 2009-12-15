@@ -23,6 +23,7 @@ import org.apache.solr.search.function.ValueSource;
 import org.apache.lucene.search.FieldCache;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * Obtains the ordinal of the field value from the default Lucene {@link org.apache.lucene.search.FieldCache} using getStringIndex()
@@ -37,7 +38,12 @@ import java.io.IOException;
  * <p>
  *  WARNING: ord() depends on the position in an index and can thus change when other documents are inserted or deleted,
  *  or if a MultiSearcher is used.
- * @version $Id: ReverseOrdFieldSource.java 555343 2007-07-11 17:46:25Z hossman $
+ * <br>
+ *  WARNING: as of Solr 1.4, ord() and rord() can cause excess memory use since they must use a FieldCache entry
+ * at the top level reader, while sorting and function queries now use entries at the segment level.  Hence sorting
+ * or using a different function query, in addition to ord()/rord() will double memory use.
+ * 
+ * @version $Id: ReverseOrdFieldSource.java 826531 2009-10-18 21:41:54Z yonik $
  */
 
 public class ReverseOrdFieldSource extends ValueSource {
@@ -51,7 +57,7 @@ public class ReverseOrdFieldSource extends ValueSource {
     return "rord("+field+')';
   }
 
-  public DocValues getValues(IndexReader reader) throws IOException {
+  public DocValues getValues(Map context, IndexReader reader) throws IOException {
     final FieldCache.StringIndex sindex = FieldCache.DEFAULT.getStringIndex(reader, field);
 
     final int arr[] = sindex.order;
@@ -88,7 +94,7 @@ public class ReverseOrdFieldSource extends ValueSource {
   public boolean equals(Object o) {
     if (o.getClass() !=  ReverseOrdFieldSource.class) return false;
     ReverseOrdFieldSource other = (ReverseOrdFieldSource)o;
-    return this.field.equals(field);
+    return this.field.equals(other.field);
   }
 
   private static final int hcode = ReverseOrdFieldSource.class.hashCode();

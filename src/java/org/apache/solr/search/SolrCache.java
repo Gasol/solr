@@ -20,17 +20,18 @@ package org.apache.solr.search;
 import org.apache.solr.core.SolrInfoMBean;
 
 import java.util.Map;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 
 /**
  * Primary API for dealing with Solr's internal caches.
  * 
- * @version $Id: SolrCache.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: SolrCache.java 696539 2008-09-18 02:16:26Z ryan $
  */
 public interface SolrCache extends SolrInfoMBean {
-  public final static Logger log = Logger.getLogger(SolrCache.class.getName());
+  public final static Logger log = LoggerFactory.getLogger(SolrCache.class);
 
 
   /**

@@ -32,7 +32,7 @@ import java.util.logging.Logger;
 /**
  * Admin JDK Logger level report and selection servlet.
  *
- * @version $Id: LogLevelSelection.java 683672 2008-08-07 18:38:42Z shalin $
+ * @version $Id: LogLevelSelection.java 777492 2009-05-22 11:57:07Z markrmiller $
  * @since solr 1.3
  */
 public final class LogLevelSelection extends HttpServlet {
@@ -54,7 +54,7 @@ public final class LogLevelSelection extends HttpServlet {
     out.write("<title>Solr Admin: JDK Log Level Selector</title>\n");
     out.write("<link rel=\"stylesheet\" type=\"text/css\" href=\"solr-admin.css\" />");
     out.write("</head><body>\n");
-    out.write("<a href=\".\"><img border=\"0\" align=\"right\" height=\"61\" width=\"142\" src=\"solr-head.gif\" alt=\"Solr\"></a>");
+    out.write("<a href=\".\"><img border=\"0\" align=\"right\" height=\"78\" width=\"142\" src=\"solr_small.png\" alt=\"Solr\"></a>");
     out.write("<h1>JDK Log Level Selector</h1>");
 
     out.write("<p>Below is the complete JDK Log hierarchy with " +
@@ -65,9 +65,7 @@ public final class LogLevelSelection extends HttpServlet {
             "with a level setting.  Note that this only shows " +
             "JDK Log levels.</p>\n");
 
-    out.write("<form action='");
-    out.write(request.getRequestURI());
-    out.write("' method='POST'>\n");
+    out.write("<form method='POST'>\n");
 
     out.write("<input type='submit' name='submit' value='set' " +
             "class='button'>\n");
@@ -227,13 +225,15 @@ public final class LogLevelSelection extends HttpServlet {
     }
     for (Level l : LEVELS) {
       if (l == null) {
+        // avoid NPE
         continue;
       }
       if (logger.isLoggable(l)) {
-        level = l;
+        // return first level loggable
+        return l;
       }
     }
-    return level != null ? level : Level.OFF;
+    return Level.OFF;
   }
 
   private static class LogWrapper
@@ -259,8 +259,27 @@ public final class LogLevelSelection extends HttpServlet {
       return name.compareTo(((LogWrapper) other).name);
     }
 
-    public boolean equals(Object other) {
-      return name.equals(((LogWrapper) other).name);
+    public boolean equals(Object obj) {
+      if (this == obj)
+        return true;
+      if (obj == null)
+        return false;
+      if (getClass() != obj.getClass())
+        return false;
+      LogWrapper other = (LogWrapper) obj;
+      if (name == null) {
+        if (other.name != null)
+          return false;
+      } else if (!name.equals(other.name))
+        return false;
+      return true;
+    }
+    
+    public int hashCode() {
+      final int prime = 31;
+      int result = 1;
+      result = prime * result + ((name == null) ? 0 : name.hashCode());
+      return result;
     }
 
     public Level level() {

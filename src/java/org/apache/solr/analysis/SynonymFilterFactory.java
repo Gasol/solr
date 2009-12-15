@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @version $Id: SynonymFilterFactory.java 680936 2008-07-30 08:24:07Z shalin $
+ * @version $Id: SynonymFilterFactory.java 712457 2008-11-09 01:24:11Z koji $
  */
 public class SynonymFilterFactory extends BaseTokenFilterFactory implements ResourceLoaderAware {
 
@@ -56,8 +56,10 @@ public class SynonymFilterFactory extends BaseTokenFilterFactory implements Reso
           wlist = loader.getLines(synonyms);
         } else  {
           List<String> files = StrUtils.splitFileNames(synonyms);
+          wlist = new ArrayList<String>();
           for (String file : files) {
-            wlist = loader.getLines(file.trim());
+            List<String> lines = loader.getLines(file.trim());
+            wlist.addAll(lines);
           }
         }
       } catch (IOException e) {
@@ -134,7 +136,7 @@ public class SynonymFilterFactory extends BaseTokenFilterFactory implements Reso
     List<String> tokList = new ArrayList<String>();
     try {
       for( Token token = ts.next(); token != null; token = ts.next() ){
-        String text = token.termText();
+        String text = new String(token.termBuffer(), 0, token.termLength());
         if( text.length() > 0 )
           tokList.add( text );
       }

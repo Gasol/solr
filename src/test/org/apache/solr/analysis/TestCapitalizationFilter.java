@@ -17,12 +17,14 @@
 
 package org.apache.solr.analysis;
 
+import junit.framework.TestCase;
+
 import java.util.HashMap;
 import java.util.Map;
 
 
 /**
- * @version $Id: TestCapitalizationFilter.java 630572 2008-02-24 02:34:15Z gsingers $
+ * @version $Id: TestCapitalizationFilter.java 799593 2009-07-31 12:54:02Z ehatcher $
  */
 public class TestCapitalizationFilter extends BaseTokenTestCase {
   
@@ -115,5 +117,10 @@ public class TestCapitalizationFilter extends BaseTokenTestCase {
     termBuffer = "kiTTEN".toCharArray();
     factory.processWord(termBuffer, 0, termBuffer.length, 0 );
     assertEquals( "kiTTEN",  new String(termBuffer, 0, termBuffer.length));
+
+    factory.keep = null;
+    termBuffer = "kiTTEN".toCharArray();
+    factory.processWord(termBuffer, 0, termBuffer.length, 0 );
+    assertEquals( "Kitten",  new String(termBuffer, 0, termBuffer.length));
   }
 }

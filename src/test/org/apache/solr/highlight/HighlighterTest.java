@@ -17,11 +17,20 @@
 
 package org.apache.solr.highlight;
 
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.Token;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.WhitespaceAnalyzer;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.util.*;
 import org.apache.solr.common.params.HighlightParams;
 
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Tests some basic functionality of Solr while demonstrating good
@@ -54,8 +63,7 @@ public class HighlighterTest extends AbstractSolrTestCase {
   
   public void testConfig()
   {
-    SolrHighlighter highlighter = SolrCore.getSolrCore().getHighlighter();
-    System.out.println( "highlighter" );
+    SolrHighlighter highlighter = h.getCore().getHighlighter();
 
     // Make sure we loaded the one formatter
     SolrFormatter fmt1 = highlighter.formatters.get( null );
@@ -138,6 +146,47 @@ public class HighlighterTest extends AbstractSolrTestCase {
             "//lst[@name='highlighting']/lst[@name='1']",
             "//lst[@name='1']/arr[@name='tv_text']/str[.='a <em>long</em> days night this should be a piece of text which']",
             "//arr[@name='tv_text']/str[.=' <em>long</em> fragments.']"
+            );
+  }
+  
+  public void testTermOffsetsTokenStream() throws Exception {
+    String[] multivalued = { "a b c d", "e f g", "h", "i j k l m n" };
+    Analyzer a1 = new WhitespaceAnalyzer();
+    TermOffsetsTokenStream tots = new TermOffsetsTokenStream(
+        a1.tokenStream( "", new StringReader( "a b c d e f g h i j k l m n" ) ) );
+    for( String v : multivalued ){
+      TokenStream ts1 = tots.getMultiValuedTokenStream( v.length() );
+      Analyzer a2 = new WhitespaceAnalyzer();
+      TokenStream ts2 = a2.tokenStream( "", new StringReader( v ) );
+      Token t1 = new Token();
+      Token t2 = new Token();
+      for( t1 = ts1.next( t1 ); t1 != null; t1 = ts1.next( t1 ) ){
+        t2 = ts2.next( t2 );
+        assertEquals( t2, t1 );
+      }
+    }
+  }
+
+  public void testTermVecMultiValuedHighlight() throws Exception {
+
+    // do summarization using term vectors on multivalued field
+    HashMap<String,String> args = new HashMap<String,String>();
+    args.put("hl", "true");
+    args.put("hl.fl", "tv_mv_text");
+    args.put("hl.snippets", "2");
+    TestHarness.LocalRequestFactory sumLRF = h.getRequestFactory(
+      "standard",0,200,args);
+    
+    assertU(adoc("tv_mv_text", LONG_TEXT, 
+                 "tv_mv_text", LONG_TEXT, 
+                 "id", "1"));
+    assertU(commit());
+    assertU(optimize());
+    assertQ("Basic summarization",
+            sumLRF.makeRequest("tv_mv_text:long"),
+            "//lst[@name='highlighting']/lst[@name='1']",
+            "//lst[@name='1']/arr[@name='tv_mv_text']/str[.='a <em>long</em> days night this should be a piece of text which']",
+            "//arr[@name='tv_mv_text']/str[.=' <em>long</em> fragments.']"
             );
   }
 
@@ -490,7 +539,8 @@ public class HighlighterTest extends AbstractSolrTestCase {
      //long document
      assertU(adoc("tv_text", "keyword is only here",
                   "t_text", "a piece of text to be substituted",
-                  "id", "1"));
+                  "id", "1",
+                  "foo_t","hi"));
      assertU(commit());
      assertU(optimize());
 
@@ -510,12 +560,12 @@ public class HighlighterTest extends AbstractSolrTestCase {
             );
 
     // with an alternate
-    args.put("hl.alternateField", "id");
+    args.put("hl.alternateField", "foo_t");
     sumLRF = h.getRequestFactory("standard", 0, 200, args);
     assertQ("Alternate summarization",
             sumLRF.makeRequest("tv_text:keyword"),
             "//lst[@name='highlighting']/lst[@name='1' and count(*)=1]",
-            "//lst[@name='highlighting']/lst[@name='1']/arr[@name='t_text']/str[.='1']"
+            "//lst[@name='highlighting']/lst[@name='1']/arr[@name='t_text']/str[.='hi']"
             );
 
     // with an alternate + max length
@@ -535,6 +585,7 @@ public class HighlighterTest extends AbstractSolrTestCase {
     args.put("hl.fl", "t_text");
     args.put("hl.fragsize", "40");
     args.put("hl.snippets", "10");
+    args.put("hl.usePhraseHighlighter", "false");
 
     TestHarness.LocalRequestFactory sumLRF = h.getRequestFactory(
       "standard", 0, 200, args);
@@ -582,5 +633,90 @@ public class HighlighterTest extends AbstractSolrTestCase {
         "//lst[@name='highlighting']/lst[@name='1']",
         oldHighlight1, oldHighlight2, oldHighlight3
         );
+  }
+  
+  public void testGetHighlightFields() {
+    HashMap<String, String> args = new HashMap<String, String>();
+    args.put("fl", "id score");
+    args.put("hl", "true");
+    args.put("hl.fl", "t*");
+
+    assertU(adoc("id", "0", "title", "test", // static stored
+        "text", "test", // static not stored
+        "foo_s", "test", // dynamic stored
+        "foo_sI", "test", // dynamic not stored
+        "weight", "1.0")); // stored but not text
+    assertU(commit());
+    assertU(optimize());
+
+    TestHarness.LocalRequestFactory lrf = h.getRequestFactory("standard", 0,
+        10, args);
+    SolrQueryRequest request = lrf.makeRequest("test");
+    SolrHighlighter highlighter = request.getCore().getHighlighter();
+    List<String> highlightFieldNames = Arrays.asList(highlighter
+        .getHighlightFields(null, request, new String[] {}));
+    assertTrue("Expected to highlight on field \"title\"", highlightFieldNames
+        .contains("title"));
+    assertFalse("Expected to not highlight on field \"text\"",
+        highlightFieldNames.contains("text"));
+    assertFalse("Expected to not highlight on field \"weight\"",
+        highlightFieldNames.contains("weight"));
+
+    args.put("hl.fl", "foo_*");
+    lrf = h.getRequestFactory("standard", 0, 10, args);
+    request = lrf.makeRequest("test");
+    highlighter = request.getCore().getHighlighter();
+    highlightFieldNames = Arrays.asList(highlighter.getHighlightFields(null,
+        request, new String[] {}));
+    assertEquals("Expected one field to highlight on", 1, highlightFieldNames
+        .size());
+    assertEquals("Expected to highlight on field \"foo_s\"", "foo_s",
+        highlightFieldNames.get(0));
+  }
+
+  public void testDefaultFieldPrefixWildcardHighlight() {
+
+    // do summarization using re-analysis of the field
+    HashMap<String,String> args = new HashMap<String,String>();
+    args.put("hl", "true");
+    args.put("df", "t_text");
+    args.put("hl.fl", "");
+    args.put("hl.usePhraseHighlighter", "true");
+    args.put("hl.highlightMultiTerm", "true");
+    TestHarness.LocalRequestFactory sumLRF = h.getRequestFactory(
+      "standard", 0, 200, args);
+    
+    assertU(adoc("t_text", "a long day's night", "id", "1"));
+    assertU(commit());
+    assertU(optimize());
+    assertQ("Basic summarization",
+            sumLRF.makeRequest("lon*"),
+            "//lst[@name='highlighting']/lst[@name='1']",
+            "//lst[@name='1']/arr[@name='t_text']/str"
+            );
+
+  }
+
+  public void testDefaultFieldNonPrefixWildcardHighlight() {
+
+    // do summarization using re-analysis of the field
+    HashMap<String,String> args = new HashMap<String,String>();
+    args.put("hl", "true");
+    args.put("df", "t_text");
+    args.put("hl.fl", "");
+    args.put("hl.usePhraseHighlighter", "true");
+    args.put("hl.highlightMultiTerm", "true");
+    TestHarness.LocalRequestFactory sumLRF = h.getRequestFactory(
+      "standard", 0, 200, args);
+    
+    assertU(adoc("t_text", "a long day's night", "id", "1"));
+    assertU(commit());
+    assertU(optimize());
+    assertQ("Basic summarization",
+            sumLRF.makeRequest("l*g"),
+            "//lst[@name='highlighting']/lst[@name='1']",
+            "//lst[@name='1']/arr[@name='t_text']/str"
+            );
+
   }
 }

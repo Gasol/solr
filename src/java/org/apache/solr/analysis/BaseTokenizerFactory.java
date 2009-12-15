@@ -18,16 +18,17 @@
 package org.apache.solr.analysis;
 
 import java.util.Map;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Simple abstract implementation that handles init arg processing.
  * 
- * @version $Id: BaseTokenizerFactory.java 597847 2007-11-24 13:51:46Z ryan $
+ * @version $Id: BaseTokenizerFactory.java 696539 2008-09-18 02:16:26Z ryan $
  */
 public abstract class BaseTokenizerFactory implements TokenizerFactory {
-  final static Logger log = Logger.getLogger(BaseTokenizerFactory.class.getName());
+  public static final Logger log = LoggerFactory.getLogger(BaseTokenizerFactory.class);
   
   /** The init args */
   protected Map<String,String> args;

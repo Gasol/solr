@@ -18,44 +18,46 @@
 package org.apache.solr.schema;
 
 import java.io.IOException;
+import java.util.Map;
 
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.ScoreDocComparator;
-import org.apache.lucene.search.SortComparatorSource;
-import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.*;
 import org.apache.solr.request.TextResponseWriter;
 import org.apache.solr.request.XMLWriter;
 import org.apache.solr.search.function.DocValues;
 import org.apache.solr.search.function.ValueSource;
+import org.apache.solr.search.SolrIndexReader;
 
 /**
  * Utility Field used for random sorting.  It should not be passed a value.
- * 
+ * <p>
  * This random sorting implementation uses the dynamic field name to set the
  * random 'seed'.  To get random sorting order, you need to use a random
  * dynamic field name.  For example, you will need to configure schema.xml:
- * 
- * <types>
+ * <pre>
+ * &lt;types&gt;
  *  ...
- *  <fieldType name="random" class="solr.RandomSortField" />
+ *  &lt;fieldType name="random" class="solr.RandomSortField" /&gt;
  *  ... 
- * </types>
- * <fields>
+ * &lt;/types&gt;
+ * &lt;fields&gt;
  *  ...
- *  <dynamicField name="random*" type="rand" indexed="true" stored="false"/>
+ *  &lt;dynamicField name="random*" type="rand" indexed="true" stored="false"/&gt;
  *  ...
- * </fields>
+ * &lt;/fields&gt;
+ * </pre>
  * 
- *  http://localhost:8983/solr/select/?q=*:*&fl=name&sort=rand_1234%20desc
- *  http://localhost:8983/solr/select/?q=*:*&fl=name&sort=rand_2345%20desc
- *  http://localhost:8983/solr/select/?q=*:*&fl=name&sort=rand_ABDC%20desc
- *  http://localhost:8983/solr/select/?q=*:*&fl=name&sort=rand_21%20desc
- *  
+ * Examples of queries:
+ * <ul>
+ * <li>http://localhost:8983/solr/select/?q=*:*&fl=name&sort=rand_1234%20desc</li>
+ * <li>http://localhost:8983/solr/select/?q=*:*&fl=name&sort=rand_2345%20desc</li>
+ * <li>http://localhost:8983/solr/select/?q=*:*&fl=name&sort=rand_ABDC%20desc</li>
+ * <li>http://localhost:8983/solr/select/?q=*:*&fl=name&sort=rand_21%20desc</li>
+ * </ul>
  * Note that multiple calls to the same URL will return the same sorting order.
  * 
- * @version $Id: RandomSortField.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: RandomSortField.java 819234 2009-09-26 23:46:44Z markrmiller $
  * @since solr 1.3
  */
 public class RandomSortField extends FieldType {
@@ -76,12 +78,21 @@ public class RandomSortField extends FieldType {
    * Using dynamic fields, you can force the random order to change 
    */
   private static int getSeed(String fieldName, IndexReader r) {
-    return (int) (fieldName.hashCode()^r.getVersion() );
+    SolrIndexReader top = (SolrIndexReader)r;
+    int base=0;
+    while (top.getParent() != null) {
+      base += top.getBase();
+      top = top.getParent();
+    }
+
+    // calling getVersion() on a segment will currently give you a null pointer exception, so
+    // we use the top-level reader.
+    return fieldName.hashCode() + base + (int)top.getVersion();
   }
 
   @Override
   public SortField getSortField(SchemaField field, boolean reverse) {
-    return new RandomSort(field.getName(), reverse);
+    return new SortField(field.getName(), randomComparatorSource, reverse);
   }
 
   @Override
@@ -95,60 +106,43 @@ public class RandomSortField extends FieldType {
   @Override
   public void write(TextResponseWriter writer, String name, Fieldable f) throws IOException { }
 
-  private static class RandomComparator implements ScoreDocComparator {
-    final int seed;
 
-    RandomComparator(int seed) {
-      this.seed = seed;
-    }
+  private static FieldComparatorSource randomComparatorSource = new FieldComparatorSource() {
+    public FieldComparator newComparator(final String fieldname, final int numHits, int sortPos, boolean reversed) throws IOException {
+      return new FieldComparator() {
+        int seed;
+        private final int[] values = new int[numHits];
+        int bottomVal;
 
-    public int compare(ScoreDoc i, ScoreDoc j) {
-      return hash(i.doc + seed) - hash(j.doc + seed);
-    }
+        public int compare(int slot1, int slot2) {
+          return values[slot1] - values[slot2];  // values will be positive... no overflow possible.
+        }
 
-    public Comparable sortValue(ScoreDoc i) {
-      return new Integer(hash(i.doc + seed));
-    }
+        public void setBottom(int slot) {
+          bottomVal = values[slot];
+        }
 
-    public int sortType() {
-      return SortField.CUSTOM;
+        public int compareBottom(int doc) throws IOException {
+          return bottomVal - hash(doc+seed);
+        }
+
+        public void copy(int slot, int doc) throws IOException {
+          values[slot] = hash(doc+seed);
+        }
+
+        public void setNextReader(IndexReader reader, int docBase) throws IOException {
+          seed = getSeed(fieldname, reader);
+        }
+
+        public Comparable value(int slot) {
+          return values[slot];
+        }
+      };
     }
   };
 
-  private static class RandomSort extends SortField {
-    public RandomSort(String n, boolean reverse) {
-      super(n, SortField.CUSTOM, reverse);
-    }
-    
-    static class RandomComparatorSource implements SortComparatorSource {
-      final String field;
-      public RandomComparatorSource( String field ){
-        this.field = field;
-      }
-      public ScoreDocComparator newComparator(IndexReader reader, String fieldname) throws IOException {
-        return new RandomComparator( getSeed(field, reader) );
-      }
-      
-      @Override
-      public int hashCode() {
-        return field.hashCode();
-      }
 
-      @Override
-      public boolean equals(Object o) {
-        if( !(o instanceof RandomComparatorSource ) ) return false;
-        RandomComparatorSource other = (RandomComparatorSource)o;
-        if( !field.equals( other.field ) ) return false;
-        return true;
-      }
-    }
 
-    @Override
-    public SortComparatorSource getFactory() {
-      return new RandomComparatorSource( getField() );
-    }
-  }
-  
   public class RandomValueSource extends ValueSource {
     private final String field;
 
@@ -162,7 +156,7 @@ public class RandomSortField extends FieldType {
     }
 
     @Override
-    public DocValues getValues(final IndexReader reader) throws IOException {
+    public DocValues getValues(Map context, final IndexReader reader) throws IOException {
       return new DocValues() {
           private final int seed = getSeed(field, reader);
           @Override

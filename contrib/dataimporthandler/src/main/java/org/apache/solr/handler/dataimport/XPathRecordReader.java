@@ -28,44 +28,132 @@ import java.util.regex.Pattern;
 
 /**
  * <p>
- * A streaming xpath parser which uses StAX for XML parsing. It supports only a
- * subset of xpath syntax.
+ * A streaming xpath parser which uses StAX for XML parsing. It supports only
+ * a subset of xpath syntax.
+ * </p><pre>
+ * /a/b/subject[@qualifier='fullTitle']
+ * /a/b/subject[@qualifier=]/subtag
+ * /a/b/subject/@qualifier
+ * //a
+ * //a/b...
+ * /a//b
+ * /a//b...
+ * /a/b/c
+ * </pre>
+ * A record is a Map<String,Object> . The key is the provided name
+ * and the value is a String or a List<String>
+ *
+ * This class is thread-safe for parsing xml. But adding fields is not
+ * thread-safe. The recommended usage is to addField() in one thread and 
+ * then share the instance across threads.
  * </p>
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
- *
- * @version $Id: XPathRecordReader.java 681182 2008-07-30 19:35:58Z shalin $
+ * <p>
+ * @version $Id: XPathRecordReader.java 822154 2009-10-06 07:42:28Z noble $
  * @since solr 1.3
  */
 public class XPathRecordReader {
   private Node rootNode = new Node("/", null);
 
+  /** 
+   * The FLATTEN flag indicates that all text and cdata under a specific
+   * tag should be recursivly fetched and appended to the current Node's
+   * value.
+   */
+  public static final int FLATTEN = 1;
+
+  /**
+   * A constructor called with a '|' seperated list of Xpath expressions
+   * which define sub sections of the XML stream that are to be emitted as
+   * seperate records.
+   * 
+   * @param forEachXpath  The XPATH for which a record is emitted. Once the
+   * xpath tag is encountered, the Node.parse method starts collecting wanted 
+   * fields and at the close of the tag, a record is emitted containing all 
+   * fields collected since the tag start. Once 
+   * emitted the collected fields are cleared. Any fields collected in the 
+   * parent tag or above will also be included in the record, but these are
+   * not cleared after emitting the record.
+   *
+   * It uses the ' | ' syntax of XPATH to pass in multiple xpaths.
+   */
   public XPathRecordReader(String forEachXpath) {
     String[] splits = forEachXpath.split("\\|");
     for (String split : splits) {
       split = split.trim();
+      if (split.startsWith("//"))
+         throw new RuntimeException("forEach cannot start with '//': " + split);
       if (split.length() == 0)
         continue;
-      addField0(split, split, false, true);
+      // The created Node has a name set to the full forEach attribute xpath
+      addField0(split, split, false, true, 0);
     }
   }
 
-  public synchronized XPathRecordReader addField(String name, String xpath,
-                                                 boolean multiValued) {
-    if (!xpath.startsWith("/"))
-      throw new RuntimeException("xpath must start with '/' : " + xpath);
-    addField0(xpath, name, multiValued, false);
+  /**
+   * A wrapper around {@link #addField0 addField0()} to create a series of  
+   * Nodes based on the supplied Xpath and a given fieldName. The created  
+   * nodes are inserted into a Node tree.
+   *
+   * @param name The name for this field in the emitted record
+   * @param xpath The xpath expression for this field
+   * @param multiValued If 'true' then the emitted record will have values in 
+   *                    a List<String>
+   */
+  public synchronized XPathRecordReader addField(String name, String xpath, boolean multiValued) {
+    addField0(xpath, name, multiValued, false, 0);
     return this;
   }
 
-  private void addField0(String xpath, String name, boolean multiValued,
-                         boolean isRecord) {
-    List<String> paths = new LinkedList<String>(Arrays.asList(xpath.split("/")));
-    if ("".equals(paths.get(0).trim()))
-      paths.remove(0);
-    rootNode.build(paths, name, multiValued, isRecord);
+  /**
+   * A wrapper around {@link #addField0 addField0()} to create a series of  
+   * Nodes based on the supplied Xpath and a given fieldName. The created  
+   * nodes are inserted into a Node tree.
+   *
+   * @param name The name for this field in the emitted record
+   * @param xpath The xpath expression for this field
+   * @param multiValued If 'true' then the emitted record will have values in 
+   *                    a List<String>
+   * @param flags FLATTEN: Recursivly combine text from all child XML elements
+   */
+  public synchronized XPathRecordReader addField(String name, String xpath, boolean multiValued, int flags) {
+    addField0(xpath, name, multiValued, false, flags);
+    return this;
   }
 
+  /**
+   * Splits the XPATH into a List of xpath segments and calls build() to
+   * construct a tree of Nodes representing xpath segments. The resulting
+   * tree structure ends up describing all the Xpaths we are interested in.
+   *
+   * @param xpath The xpath expression for this field
+   * @param name The name for this field in the emitted record
+   * @param multiValued If 'true' then the emitted record will have values in 
+   *                    a List<String>
+   * @param isRecord Flags that this XPATH is from a forEach statement
+   * @param flags The only supported flag is 'FLATTEN'
+   */
+  private void addField0(String xpath, String name, boolean multiValued,
+                         boolean isRecord, int flags) {
+    if (!xpath.startsWith("/"))
+      throw new RuntimeException("xpath must start with '/' : " + xpath);
+    List<String> paths = splitEscapeQuote(xpath);
+    // deal with how split behaves when seperator starts a string!
+    if ("".equals(paths.get(0).trim()))
+      paths.remove(0);
+    rootNode.build(paths, name, multiValued, isRecord, flags);
+    rootNode.buildOptimise(null);
+  }
+
+  /** 
+   * Uses {@link #streamRecords streamRecords} to parse the XML source but with
+   * a handler that collects all the emitted records into a single List which 
+   * is returned upon completion.
+   *
+   * @param r the stream reader
+   * @return results a List of emitted records
+   */
   public List<Map<String, Object>> getAllRecords(Reader r) {
     final List<Map<String, Object>> results = new ArrayList<Map<String, Object>>();
     streamRecords(r, new Handler() {
@@ -76,6 +164,14 @@ public class XPathRecordReader {
     return results;
   }
 
+  /** 
+   * Creates an XML stream reader on top of whatever reader has been
+   * configured. Then calls parse() with a handler which is
+   * invoked forEach record emitted.
+   *
+   * @param r the stream reader
+   * @param handler The callback instance
+   */
   public void streamRecords(Reader r, Handler handler) {
     try {
       XMLStreamReader parser = factory.createXMLStreamReader(r);
@@ -86,45 +182,81 @@ public class XPathRecordReader {
     }
   }
 
-  private class Node {
-    String name, fieldName, xpathName, forEachPath;
 
-    List<Node> attributes, childNodes;
-
+  /**
+   * For each node/leaf in the Node tree there is one object of this class.
+   * This tree of objects represents all the XPaths we are interested in.
+   * For each Xpath segment of interest we create a node. In most cases the
+   * node (branch) is rather basic , but for the final portion (leaf) of any
+   * Xpath we add more information to the Node. When parsing the XML document 
+   * we step though this tree as we stream records from the reader. If the XML
+   * document departs from this tree we skip start tags till we are back on 
+   * the tree.
+   */
+  private static class Node {
+    String name;      // genrally: segment of the Xpath represented by this Node
+    String fieldName; // the fieldname in the emitted record (key of the map)
+    String xpathName; // the segment of the Xpath represented by this Node
+    String forEachPath; // the full Xpath from the forEach entity attribute
+    List<Node> attributes; // List of attribute Nodes associated with this Node
+    List<Node> childNodes; // List of immediate child Nodes of this node
+    List<Node> wildCardNodes; // List of '//' style decendants of this Node
     List<Map.Entry<String, String>> attribAndValues;
+    Node wildAncestor; // ancestor Node containing '//' style decendants 
+    Node parent; // parent Node in the tree
+    boolean hasText=false; // flag: store/emit streamed text for this node
+    boolean multiValued=false; //flag: this fields values are returned as a List
+    boolean isRecord=false; //flag: this Node starts a new record
+    private boolean flatten; //flag: child text is also to be emitted
 
-    Node parent;
-
-    boolean hasText = false, multiValued = false, isRecord = false;
 
     public Node(String name, Node p) {
+      // Create a basic Node, suitable for the mid portions of any Xpath.
+      // Node.xpathName and Node.name are set to same value.
       xpathName = this.name = name;
       parent = p;
     }
 
     public Node(String name, String fieldName, boolean multiValued) {
-      this.name = name;
-      this.fieldName = fieldName;
-      this.multiValued = multiValued;
+      // This is only called from build() when describing an attribute.
+      this.name = name;               // a segment from the Xpath
+      this.fieldName = fieldName;     // name to store collected values against
+      this.multiValued = multiValued; // return collected values in a List
     }
 
-    private void parse(XMLStreamReader parser, Handler handler,
-                       Map<String, Object> values, Stack<Set<String>> stack,
-                       boolean recordStarted) throws IOException, XMLStreamException {
+    /**
+     * This is the method where all the XML parsing happens. For each 
+     * tag/subtag read from the source, this method is called recursively.
+     *
+     */
+    private void parse(XMLStreamReader parser, 
+                       Handler handler,
+                       Map<String, Object> values, 
+                       Stack<Set<String>> stack, // lists of values to purge
+                       boolean recordStarted
+                       ) throws IOException, XMLStreamException {
       Set<String> valuesAddedinThisFrame = null;
       if (isRecord) {
+        // This Node is a match for an XPATH from a forEach attribute, 
+        // prepare for the clean up that will occurr when the record
+        // is emitted after its END_ELEMENT is matched 
         recordStarted = true;
         valuesAddedinThisFrame = new HashSet<String>();
         stack.push(valuesAddedinThisFrame);
       } else if (recordStarted) {
+        // This node is a child of some parent which matched against forEach 
+        // attribute. Continue to add values to an existing record.
         valuesAddedinThisFrame = stack.peek();
-      } else {
-        if (attributes != null || hasText)
-          valuesAddedinThisFrame = new HashSet<String>();
-        stack.push(valuesAddedinThisFrame);
       }
+
       try {
+        /* The input stream has deposited us at this Node in our tree of 
+         * intresting nodes. Depending on how this node is of interest,
+         * process further tokens from the input stream and decide what
+         * we do next
+         */
         if (attributes != null) {
+          // we interested in storing attributes from the input stream
           for (Node node : attributes) {
             String value = parser.getAttributeValue(null, node.name);
             if (value != null || (recordStarted && !isRecord)) {
@@ -133,71 +265,135 @@ public class XPathRecordReader {
             }
           }
         }
-        Set<Node> childrenFound = new HashSet<Node>();
-        boolean skipNextEvent = false;
-        int event = -1;
-        while (true) {
-          if (!skipNextEvent) {
-            event = parser.next();
-            skipNextEvent = false;
-          }
-          if (event == END_DOCUMENT) {
-            return;
-          }
-          if (event == END_ELEMENT) {
-            if (isRecord)
-              handler.handle(new HashMap<String, Object>(values), forEachPath);
-            if (recordStarted && !isRecord
-                    && !childrenFound.containsAll(childNodes)) {
-              for (Node n : childNodes) {
-                if (!childrenFound.contains(n))
-                  n.putNulls(values);
-              }
-            }
-            return;
-          }
-          if ((event == CDATA || event == CHARACTERS || event == SPACE)
-                  && hasText) {
-            valuesAddedinThisFrame.add(fieldName);
-            skipNextEvent = true;
-            String text = parser.getText();
-            event = parser.next();
-            while (event == CDATA || event == CHARACTERS || event == SPACE) {
-              text = text + parser.getText();
-              event = parser.next();
-            }
-            putText(values, text, fieldName, multiValued);
-          } else if (event == START_ELEMENT) {
-            Node n = getMatchingChild(parser);
-            if (n != null) {
-              childrenFound.add(n);
-              n.parse(parser, handler, values, stack, recordStarted);
-            } else {
-              skipTag(parser);
-            }
-          }
-        }
-      } finally {
 
-        Set<String> cleanThis = null;
-        if (isRecord || !recordStarted) {
-          cleanThis = stack.pop();
-        } else {
-          return;
-        }
-        if (cleanThis != null) {
-          for (String fld : cleanThis) {
-            values.remove(fld);
+        Set<Node> childrenFound = new HashSet<Node>();
+        int event = -1;
+        int flattenedStarts=0; // our tag depth when flattening elements
+        StringBuilder text = new StringBuilder();
+
+        while (true) {  
+          event = parser.next();
+   
+          if (event == END_ELEMENT) {
+            if (flattenedStarts > 0) flattenedStarts--;
+            else {
+              if (text.length() > 0 && valuesAddedinThisFrame != null) {
+                valuesAddedinThisFrame.add(fieldName);
+                putText(values, text.toString(), fieldName, multiValued);
+              }
+              if (isRecord) handler.handle(getDeepCopy(values), forEachPath);
+              if (childNodes != null && recordStarted && !isRecord && !childrenFound.containsAll(childNodes)) {
+                // nonReccord nodes where we have not collected text for ALL
+                // the child nodes.
+                for (Node n : childNodes) {
+                  // For the multivalue child nodes where we could have, but
+                  // didnt, collect text. Push a null string into values.
+                  if (!childrenFound.contains(n)) n.putNulls(values);
+                }
+              }
+              return;
+            }
+          }
+          else if (hasText && (event==CDATA || event==CHARACTERS || event==SPACE)) {
+            text.append(parser.getText());
+          } 
+          else if (event == START_ELEMENT) {
+            if ( flatten ) 
+               flattenedStarts++;
+            else 
+               handleStartElement(parser, childrenFound, handler, values, stack, recordStarted);
+          }
+          // END_DOCUMENT is least likely to appear and should be 
+          // last in if-then-else skip chain
+          else if (event == END_DOCUMENT) return;
+          }
+        }finally {
+        if ((isRecord || !recordStarted) && !stack.empty()) {
+          Set<String> cleanThis = stack.pop();
+          if (cleanThis != null) {
+            for (String fld : cleanThis) values.remove(fld);
           }
         }
       }
     }
 
-    private Node getMatchingChild(XMLStreamReader parser) {
-      if (childNodes == null)
+    /**
+     * If a new tag is encountered, check if it is of interest or not by seeing
+     * if it matches against our node tree. If we have deperted from the node 
+     * tree then walk back though the tree's ancestor nodes checking to see if
+     * any // expressions exist for the node and compare them against the new
+     * tag. If matched then "jump" to that node, otherwise ignore the tag.
+     *
+     * Note, the list of // expressions found while walking back up the tree
+     * is chached in the HashMap decends. Then if the new tag is to be skipped,
+     * any inner chil tags are compared against the cache and jumped to if
+     * matched.
+     */
+    private void handleStartElement(XMLStreamReader parser, Set<Node> childrenFound,
+                                    Handler handler, Map<String, Object> values,
+                                    Stack<Set<String>> stack, boolean recordStarted)
+            throws IOException, XMLStreamException {
+      Node n = getMatchingNode(parser,childNodes);
+      Map<String, Object> decends=new HashMap<String, Object>();
+      if (n != null) {
+        childrenFound.add(n);
+        n.parse(parser, handler, values, stack, recordStarted);
+        return;
+        }
+      // The stream has diverged from the tree of interesting elements, but
+      // are there any wildCardNodes ... anywhere in our path from the root?
+      Node dn = this; // checking our Node first!
+            
+      do {
+        if (dn.wildCardNodes != null) {
+          // Check to see if the streams tag matches one of the "//" all
+          // decendents type expressions for this node.
+          n = getMatchingNode(parser, dn.wildCardNodes);
+          if (n != null) {
+            childrenFound.add(n);
+            n.parse(parser, handler, values, stack, recordStarted);
+            break;
+          }
+          // add the list of this nodes wild decendents to the cache
+          for (Node nn : dn.wildCardNodes) decends.put(nn.name, nn);
+        }
+        dn = dn.wildAncestor; // leap back along the tree toward root
+      } while (dn != null) ;
+ 
+      if (n == null) {
+        // we have a START_ELEMENT which is not within the tree of
+        // interesting nodes. Skip over the contents of this element
+        // but recursivly repeat the above for any START_ELEMENTs
+        // found within this element.
+        int count = 1; // we have had our first START_ELEMENT
+        while (count != 0) {
+          int token = parser.next();
+          if (token == START_ELEMENT) {
+            Node nn = (Node) decends.get(parser.getLocalName());
+            if (nn != null) {
+              // We have a //Node which matches the stream's parser.localName
+              childrenFound.add(nn);
+              // Parse the contents of this stream element
+              nn.parse(parser, handler, values, stack, recordStarted);
+            } 
+            else count++;
+          } 
+          else if (token == END_ELEMENT) count--;
+        }
+      }
+    }
+
+
+    /**
+     * Check if the current tag is to be parsed or not. We step through the
+     * supplied List "searchList" looking for a match. If matched, return the
+     * Node object.
+     */
+    private Node getMatchingNode(XMLStreamReader parser,List<Node> searchL){
+      if (searchL == null)
         return null;
       String localName = parser.getLocalName();
-      for (Node n : childNodes) {
+      for (Node n : searchL) {
         if (n.name.equals(localName)) {
           if (n.attribAndValues == null)
             return n;
@@ -216,11 +412,15 @@ public class XPathRecordReader {
           return false;
         if (e.getValue() != null && !e.getValue().equals(val))
           return false;
-
       }
       return true;
     }
 
+    /**
+     * A recursive routine that walks the Node tree from a supplied start
+     * pushing a null string onto every multiValued fieldName's List of values
+     * where a value has not been provided from the stream.
+     */
     private void putNulls(Map<String, Object> values) {
       if (attributes != null) {
         for (Node n : attributes) {
@@ -236,6 +436,12 @@ public class XPathRecordReader {
       }
     }
 
+    /**
+     * Add the field name and text into the values Map. If it is a non
+     * multivalued field, then the text is simply placed in the object
+     * portion of the Map. If it is a multivalued field then the text is
+     * pushed onto a List which is the object portion of the Map.
+     */
     @SuppressWarnings("unchecked")
     private void putText(Map<String, Object> values, String value,
                          String fieldName, boolean multiValued) {
@@ -251,50 +457,98 @@ public class XPathRecordReader {
       }
     }
 
-    private void skipTag(XMLStreamReader parser) throws IOException,
-            XMLStreamException {
-      int type;
-      while ((type = parser.next()) != END_ELEMENT) {
-        if (type == START_ELEMENT)
-          skipTag(parser);
-      }
-    }
 
-    public void build(List<String> paths, String fieldName,
-                      boolean multiValued, boolean record) {
-      String name = paths.remove(0);
-      if (paths.isEmpty() && name.startsWith("@")) {
+    /**
+     * Walk the Node tree propagating any wildDescentant information to
+     * child nodes. This allows us to optimise the performance of the
+     * main parse method.
+     */
+    private void buildOptimise(Node wa) {
+     wildAncestor=wa;
+     if ( wildCardNodes != null ) wa = this;
+     if ( childNodes != null )
+       for ( Node n : childNodes ) n.buildOptimise(wa);
+     }
+
+    /**
+     * Build a Node tree structure representing all Xpaths of intrest to us.
+     * This must be done before parsing of the XML stream starts. Each node 
+     * holds one portion of an Xpath. Taking each Xpath segment in turn this
+     * method walks the Node tree  and finds where the new segment should be
+     * inserted. It creates a Node representing a field's name, XPATH and 
+     * some flags and inserts the Node into the Node tree.
+     */
+    private void build(
+        List<String> paths,   // a List of segments from the split xpaths
+        String fieldName,     // the fieldName assoc with this Xpath
+        boolean multiValued,  // flag if this fieldName is multiValued or not
+        boolean record,       // is this xpath a record or a field
+        int flags             // are we to flatten matching xpaths
+        ) {
+      // recursivly walk the paths Lists adding new Nodes as required
+      String xpseg = paths.remove(0); // shift out next Xpath segment
+
+      if (paths.isEmpty() && xpseg.startsWith("@")) {
+        // we have reached end of element portion of Xpath and can now only
+        // have an element attribute. Add it to this nodes list of attributes
         if (attributes == null) {
           attributes = new ArrayList<Node>();
         }
-        name = name.substring(1);
-        attributes.add(new Node(name, fieldName, multiValued));
-
-      } else {
+        xpseg = xpseg.substring(1); // strip the '@'
+        attributes.add(new Node(xpseg, fieldName, multiValued));
+      }
+      else if ( xpseg.length() == 0) {
+        // we have a '//' selector for all decendents of the current nodes
+        xpseg = paths.remove(0); // shift out next Xpath segment
+        if (wildCardNodes == null) wildCardNodes = new ArrayList<Node>();
+        Node n = getOrAddNode(xpseg, wildCardNodes);
+        if (paths.isEmpty()) {
+          // We are current a leaf node.
+          // xpath with content we want to store and return
+          n.hasText = true;        // we have to store text found here
+          n.fieldName = fieldName; // name to store collected text against
+          n.multiValued = multiValued; // true: text be stored in a List
+          n.flatten = flags == FLATTEN; // true: store text from child tags
+        }
+        else {
+          // recurse to handle next paths segment
+          n.build(paths, fieldName, multiValued, record, flags);
+        }
+      }
+      else {
         if (childNodes == null)
           childNodes = new ArrayList<Node>();
-        Node n = getOrAddChildNode(name);
+        // does this "name" already exist as a child node.
+        Node n = getOrAddNode(xpseg,childNodes);
         if (paths.isEmpty()) {
+          // We have emptied paths, we are for the moment a leaf of the tree.
+          // When parsing the actual input we have traversed to a position 
+          // where we actutally have to do something. getOrAddNode() will
+          // have created and returned a new minimal Node with name and
+          // xpathName already populated. We need to add more information.
           if (record) {
-            n.isRecord = true;
-            n.forEachPath = fieldName;
+            // forEach attribute
+            n.isRecord = true; // flag: forEach attribute, prepare to emit rec
+            n.forEachPath = fieldName; // the full forEach attribute xpath
           } else {
-            n.hasText = true;
-            n.fieldName = fieldName;
-            n.multiValued = multiValued;
+            // xpath with content we want to store and return
+            n.hasText = true;        // we have to store text found here
+            n.fieldName = fieldName; // name to store collected text against
+            n.multiValued = multiValued; // true: text be stored in a List
+            n.flatten = flags == FLATTEN; // true: store text from child tags
           }
         } else {
-          n.build(paths, fieldName, multiValued, record);
+          // recurse to handle next paths segment
+          n.build(paths, fieldName, multiValued, record, flags);
         }
       }
     }
 
-    private Node getOrAddChildNode(String xpathName) {
-      for (Node n : childNodes)
-        if (n.xpathName.equals(xpathName))
-          return n;
-
-      Node n = new Node(xpathName, this);
+    private Node getOrAddNode(String xpathName, List<Node> searchList ) {
+      for (Node n : searchList)
+        if (n.xpathName.equals(xpathName)) return n;
+      // new territory! add a new node for this Xpath bitty
+      Node n = new Node(xpathName, this); // a minimal Node initalization
       Matcher m = ATTRIB_PRESENT_WITHVAL.matcher(xpathName);
       if (m.find()) {
         n.name = m.group(1);
@@ -308,17 +562,80 @@ public class XPathRecordReader {
           if (n.attribAndValues == null)
             n.attribAndValues = new ArrayList<Map.Entry<String, String>>();
           n.attribAndValues.addAll(attribs.entrySet());
-
         }
       }
-      childNodes.add(n);
+      searchList.add(n);
       return n;
     }
+
+    /**
+     * Copies a supplied Map to a new Map which is returned. Used to copy a
+     * records values. If a fields value is a List then they have to be
+     * deep-copied for thread safety
+     */
+    private static Map<String, Object> getDeepCopy(Map<String, Object> values) {
+      Map<String, Object> result = new HashMap<String, Object>();
+      for (Map.Entry<String, Object> entry : values.entrySet()) {
+        if (entry.getValue() instanceof List) {
+          result.put(entry.getKey(), new ArrayList((List) entry.getValue()));
+        } else {
+          result.put(entry.getKey(), entry.getValue());
+        }
+      }
+      return result;
+    }
+  } // end of class Node
+
+
+  /**
+   * The Xpath is split into segments using the '/' as a seperator. However
+   * this method deals with special cases where there is a slash '/' character
+   * inside the attribute value e.g. x/@html='text/html'. We split by '/' but 
+   * then reassemble things were the '/' appears within a quoted sub-string.
+   *
+   * We have already enforced that the string must begin with a seperator. This
+   * method depends heavily on how split behaves if the string starts with the
+   * seperator or if a sequence of multiple seperator's appear. 
+   */
+  private static List<String> splitEscapeQuote(String str) {
+    List<String> result = new LinkedList<String>();
+    String[] ss = str.split("/");
+    for (int i=0; i<ss.length; i++) { // i=1: skip seperator at start of string
+      StringBuilder sb = new StringBuilder();
+      int quoteCount = 0;
+      while (true) {
+        sb.append(ss[i]);
+        for (int j=0; j<ss[i].length(); j++)
+            if (ss[i].charAt(j) == '\'') quoteCount++;
+        // have we got a split inside quoted sub-string?
+        if ((quoteCount % 2) == 0) break;
+        // yes!; replace the '/' and loop to concat next token
+        i++;
+        sb.append("/");
+      }
+      result.add(sb.toString());
+    }
+    return result;
   }
 
   static XMLInputFactory factory = XMLInputFactory.newInstance();
+  static{
+    factory.setProperty(XMLInputFactory.IS_VALIDATING , Boolean.FALSE); 
+    factory.setProperty(XMLInputFactory.SUPPORT_DTD , Boolean.FALSE);
+  }
 
+  /**Implement this interface to stream records as and when one is found.
+   *
+   */
   public static interface Handler {
+    /**
+     * @param record The record map. The key is the field name as provided in 
+     * the addField() methods. The value can be a single String (for single 
+     * valued fields) or a List<String> (for multiValued).
+     * @param xpath The forEach XPATH for which this record is being emitted
+     * If there is any change all parsing will be aborted and the Exception
+     * is propogated up
+     */
     public void handle(Map<String, Object> record, String xpath);
   }
 

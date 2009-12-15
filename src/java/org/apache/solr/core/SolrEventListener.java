@@ -20,13 +20,14 @@ package org.apache.solr.core;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.search.SolrIndexSearcher;
 
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * @version $Id: SolrEventListener.java 681447 2008-07-31 19:27:36Z yonik $
+ * @version $Id: SolrEventListener.java 801417 2009-08-05 21:25:06Z gsingers $
  */
 public interface SolrEventListener {
-  static final Logger log = Logger.getLogger(SolrCore.class.getName());
+  static final Logger log = LoggerFactory.getLogger(SolrCore.class);
 
   public void init(NamedList args);
 
@@ -35,6 +36,28 @@ public interface SolrEventListener {
   /** The searchers passed here are only guaranteed to be valid for the duration
    * of this method call, so care should be taken not to spawn threads or asynchronous
    * tasks with references to these searchers.
+   * <p/>
+   * Implementations should add the {@link org.apache.solr.common.params.EventParams#EVENT} parameter and set it to a value of either:
+   * <ul>
+   * <li>{@link org.apache.solr.common.params.EventParams#FIRST_SEARCHER} - First Searcher event</li>
+   * <li>{@link org.apache.solr.common.params.EventParams#NEW_SEARCHER} - New Searcher event</li>
+   * </ul>
+   *
+   * Sample:
+   * <pre>
+    if (currentSearcher != null) {
+      nlst.add(CommonParams.EVENT, CommonParams.NEW_SEARCHER);
+    } else {
+      nlst.add(CommonParams.EVENT, CommonParams.FIRST_SEARCHER);
+    }
+   *
+   * </pre>
+   *
+   * @see org.apache.solr.core.AbstractSolrEventListener#addEventParms(org.apache.solr.search.SolrIndexSearcher, org.apache.solr.common.util.NamedList) 
+   *
+   * @param newSearcher The new {@link org.apache.solr.search.SolrIndexSearcher} to use
+   * @param currentSearcher The existing {@link org.apache.solr.search.SolrIndexSearcher}.  null if this is a firstSearcher event.
+   *
    */
   public void newSearcher(SolrIndexSearcher newSearcher, SolrIndexSearcher currentSearcher);
 

@@ -33,7 +33,7 @@ import java.util.Properties;
  * Test for XPathEntityProcessor
  * </p>
  *
- * @version $Id: TestXPathEntityProcessor.java 682383 2008-08-04 13:36:55Z shalin $
+ * @version $Id: TestXPathEntityProcessor.java 823451 2009-10-09 08:23:35Z noble $
  * @since solr 1.3
  */
 public class TestXPathEntityProcessor {
@@ -52,7 +52,7 @@ public class TestXPathEntityProcessor {
     fields.add(createMap("column", "artist", "xpath", "/catalog/cd/artist"));
     fields.add(createMap("column", "year", "xpath", "/catalog/cd/year"));
     Context c = AbstractDataImportHandlerTest.getContext(null,
-            new VariableResolverImpl(), getds(), 0, fields, entityAttrs);
+            new VariableResolverImpl(), getDataSource(cdData), Context.FULL_DUMP, fields, entityAttrs);
     XPathEntityProcessor xPathEntityProcessor = new XPathEntityProcessor();
     xPathEntityProcessor.init(c);
     List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
@@ -69,6 +69,46 @@ public class TestXPathEntityProcessor {
   }
 
   @Test
+  public void testMultiValued() throws Exception  {
+    Map entityAttrs = createMap("name", "e", "url", "testdata.xml",
+            XPathEntityProcessor.FOR_EACH, "/root");
+    List fields = new ArrayList();
+    fields.add(createMap("column", "a", "xpath", "/root/a", DataImporter.MULTI_VALUED, "true"));
+    Context c = AbstractDataImportHandlerTest.getContext(null,
+            new VariableResolverImpl(), getDataSource(testXml), Context.FULL_DUMP, fields, entityAttrs);
+    XPathEntityProcessor xPathEntityProcessor = new XPathEntityProcessor();
+    xPathEntityProcessor.init(c);
+    List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
+    while (true) {
+      Map<String, Object> row = xPathEntityProcessor.nextRow();
+      if (row == null)
+        break;
+      result.add(row);
+    }
+    Assert.assertEquals(2, ((List)result.get(0).get("a")).size());
+  }
+
+  @Test
+  public void testMultiValuedFlatten() throws Exception  {
+    Map entityAttrs = createMap("name", "e", "url", "testdata.xml",
+            XPathEntityProcessor.FOR_EACH, "/root");
+    List fields = new ArrayList();
+    fields.add(createMap("column", "a", "xpath", "/root/a" ,"flatten","true"));
+    Context c = AbstractDataImportHandlerTest.getContext(null,
+            new VariableResolverImpl(), getDataSource(testXmlFlatten), Context.FULL_DUMP, fields, entityAttrs);
+    XPathEntityProcessor xPathEntityProcessor = new XPathEntityProcessor();
+    xPathEntityProcessor.init(c);
+    Map<String, Object> result = null;
+    while (true) {
+      Map<String, Object> row = xPathEntityProcessor.nextRow();
+      if (row == null)
+        break;
+      result = row;
+    }
+    Assert.assertEquals("1B2", result.get("a"));
+  }
+
+  @Test
   public void withFieldsAndXpathStream() throws Exception {
     Map entityAttrs = createMap("name", "e", "url", "cd.xml",
         XPathEntityProcessor.FOR_EACH, "/catalog/cd", "stream", "true", "batchSize","1");
@@ -77,7 +117,7 @@ public class TestXPathEntityProcessor {
     fields.add(createMap("column", "artist", "xpath", "/catalog/cd/artist"));
     fields.add(createMap("column", "year", "xpath", "/catalog/cd/year"));
     Context c = AbstractDataImportHandlerTest.getContext(null,
-        new VariableResolverImpl(), getds(), 0, fields, entityAttrs);
+        new VariableResolverImpl(), getDataSource(cdData), Context.FULL_DUMP, fields, entityAttrs);
     XPathEntityProcessor xPathEntityProcessor = new XPathEntityProcessor();
     xPathEntityProcessor.init(c);
     List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
@@ -105,7 +145,7 @@ public class TestXPathEntityProcessor {
             XPathEntityProcessor.USE_SOLR_ADD_SCHEMA, "true", "xsl", ""
             + new File(tmpdir, "x.xsl").getAbsolutePath(), "url", "cd.xml");
     Context c = AbstractDataImportHandlerTest.getContext(null,
-            new VariableResolverImpl(), getds(), 0, null, entityAttrs);
+            new VariableResolverImpl(), getDataSource(cdData), Context.FULL_DUMP, null, entityAttrs);
     XPathEntityProcessor xPathEntityProcessor = new XPathEntityProcessor();
     xPathEntityProcessor.init(c);
     List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
@@ -121,7 +161,7 @@ public class TestXPathEntityProcessor {
     Assert.assertEquals("1982", result.get(2).get("year"));
   }
 
-  private DataSource<Reader> getds() {
+  private DataSource<Reader> getDataSource(final String xml) {
     return new DataSource<Reader>() {
 
       public void init(Context context, Properties initProps) {
@@ -131,7 +171,7 @@ public class TestXPathEntityProcessor {
       }
 
       public Reader getData(String query) {
-        return new StringReader(cdData);
+        return new StringReader(xml);
       }
     };
   }
@@ -182,4 +222,8 @@ public class TestXPathEntityProcessor {
           + "\t\t<company>RCA</company>\n"
           + "\t\t<price>9.90</price>\n"
           + "\t\t<year>1982</year>\n" + "\t</cd>\n" + "</catalog>\t";
+
+  private static final String testXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><root><a>1</a><a>2</a></root>";
+
+  private static final String testXmlFlatten = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><root><a>1<b>B</b>2</a></root>";
 }

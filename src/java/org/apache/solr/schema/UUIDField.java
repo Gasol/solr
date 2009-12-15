@@ -33,7 +33,7 @@ import org.apache.solr.request.XMLWriter;
  *
  * @see UUID#toString
  * @see UUID#randomUUID
- * @version $Id: UUIDField.java 569279 2007-08-24 07:28:36Z hossman $
+ * @version $Id: UUIDField.java 712014 2008-11-06 23:41:39Z yonik $
  */
 public class UUIDField extends FieldType {
   private static final String NEW = "NEW";

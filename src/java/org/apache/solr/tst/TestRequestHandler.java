@@ -24,11 +24,11 @@ import org.apache.lucene.index.IndexReader;
 
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.logging.Logger;
-import java.util.logging.Level;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.net.URL;
 
-import org.apache.solr.util.OpenBitSet;
+import org.apache.lucene.util.OpenBitSet;
 import org.apache.solr.search.*;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
@@ -39,16 +39,16 @@ import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
 
 /**
- * @version $Id: TestRequestHandler.java 684908 2008-08-11 20:37:36Z gsingers $
+ * @version $Id: TestRequestHandler.java 723994 2008-12-06 14:55:21Z gsingers $
  * 
  * @deprecated Test against the real request handlers instead.
  */
 @Deprecated
 public class TestRequestHandler implements SolrRequestHandler {
-  private static Logger log = Logger.getLogger(SolrIndexSearcher.class.getName());
+  private static Logger log = LoggerFactory.getLogger(SolrIndexSearcher.class);
 
   public void init(NamedList args) {
-    SolrCore.log.log(Level.INFO, "Unused request handler arguments:" + args);
+    SolrCore.log.info( "Unused request handler arguments:" + args);
   }
 
   // use test instead of assert since asserts may be turned off
@@ -273,11 +273,11 @@ public class TestRequestHandler implements SolrRequestHandler {
   }
 
   public String getSourceId() {
-    return "$Id: TestRequestHandler.java 684908 2008-08-11 20:37:36Z gsingers $";
+    return "$Id: TestRequestHandler.java 723994 2008-12-06 14:55:21Z gsingers $";
   }
 
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/tst/TestRequestHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/tst/TestRequestHandler.java $";
   }
 
   public URL[] getDocs() {

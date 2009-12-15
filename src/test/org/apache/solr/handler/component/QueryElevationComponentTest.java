@@ -39,8 +39,8 @@ import org.apache.solr.util.AbstractSolrTestCase;
 
 public class QueryElevationComponentTest extends AbstractSolrTestCase {
 
-  @Override public String getSchemaFile() { return "schema.xml"; }
-  @Override public String getSolrConfigFile() { return "solrconfig.xml"; }
+  @Override public String getSchemaFile() { return "schema12.xml"; }
+  @Override public String getSolrConfigFile() { return "solrconfig-elevate.xml"; }
   
   public void testInterface() throws Exception
   {
@@ -85,7 +85,23 @@ public class QueryElevationComponentTest extends AbstractSolrTestCase {
     assertEquals( "xxxx", comp.getAnalyzedQuery( "XXXX" ) );
     assertEquals( "xxxxyyyy", comp.getAnalyzedQuery( "XXXX YYYY" ) );
   }
-  
+
+  public void testEmptyQuery() throws Exception {
+    SolrCore core = h.getCore();
+
+    //String query = "title:ipod";
+
+    Map<String,String> args = new HashMap<String, String>();
+    args.put( "q.alt", "*:*" );
+    args.put( "defType", "dismax");
+    args.put( CommonParams.QT, "/elevate" );
+    //args.put( CommonParams.FL, "id,title,score" );
+    SolrQueryRequest req = new LocalSolrQueryRequest( core, new MapSolrParams( args) );
+    assertQ("Make sure QEC handles null queries", req, "//*[@numFound='0']");
+
+  }
+
+
   public void testSorting() throws IOException
   {
     SolrCore core = h.getCore();
@@ -111,9 +127,9 @@ public class QueryElevationComponentTest extends AbstractSolrTestCase {
     
     assertQ("Make sure standard sort works as expected", req
             ,"//*[@numFound='3']"
-            ,"//result/doc[1]/int[@name='id'][.='a']"
-            ,"//result/doc[2]/int[@name='id'][.='b']"
-            ,"//result/doc[3]/int[@name='id'][.='c']"
+            ,"//result/doc[1]/str[@name='id'][.='a']"
+            ,"//result/doc[2]/str[@name='id'][.='b']"
+            ,"//result/doc[3]/str[@name='id'][.='c']"
             );
     
     // Explicitly set what gets boosted
@@ -124,34 +140,34 @@ public class QueryElevationComponentTest extends AbstractSolrTestCase {
 
     assertQ("All six should make it", req
             ,"//*[@numFound='6']"
-            ,"//result/doc[1]/int[@name='id'][.='x']"
-            ,"//result/doc[2]/int[@name='id'][.='y']"
-            ,"//result/doc[3]/int[@name='id'][.='z']"
-            ,"//result/doc[4]/int[@name='id'][.='a']"
-            ,"//result/doc[5]/int[@name='id'][.='b']"
-            ,"//result/doc[6]/int[@name='id'][.='c']"
+            ,"//result/doc[1]/str[@name='id'][.='x']"
+            ,"//result/doc[2]/str[@name='id'][.='y']"
+            ,"//result/doc[3]/str[@name='id'][.='z']"
+            ,"//result/doc[4]/str[@name='id'][.='a']"
+            ,"//result/doc[5]/str[@name='id'][.='b']"
+            ,"//result/doc[6]/str[@name='id'][.='c']"
             );
     
     booster.elevationCache.clear();
     
     // now switch the order:
     booster.setTopQueryResults( reader, query, new String[] { "a", "x" }, null );
-    assertQ("All six should make it", req
+    assertQ("All four should make it", req
             ,"//*[@numFound='4']"
-            ,"//result/doc[1]/int[@name='id'][.='a']"
-            ,"//result/doc[2]/int[@name='id'][.='x']"
-            ,"//result/doc[3]/int[@name='id'][.='b']"
-            ,"//result/doc[4]/int[@name='id'][.='c']"
+            ,"//result/doc[1]/str[@name='id'][.='a']"
+            ,"//result/doc[2]/str[@name='id'][.='x']"
+            ,"//result/doc[3]/str[@name='id'][.='b']"
+            ,"//result/doc[4]/str[@name='id'][.='c']"
             );
     
     // Test reverse sort
     args.put( CommonParams.SORT, "score asc" );
-    assertQ("All six should make it", req
+    assertQ("All four should make it", req
         ,"//*[@numFound='4']"
-        ,"//result/doc[4]/int[@name='id'][.='a']"
-        ,"//result/doc[3]/int[@name='id'][.='x']"
-        ,"//result/doc[2]/int[@name='id'][.='b']"
-        ,"//result/doc[1]/int[@name='id'][.='c']"
+        ,"//result/doc[4]/str[@name='id'][.='a']"
+        ,"//result/doc[3]/str[@name='id'][.='x']"
+        ,"//result/doc[2]/str[@name='id'][.='b']"
+        ,"//result/doc[1]/str[@name='id'][.='c']"
         );
     
     // Try normal sort by 'id'
@@ -160,19 +176,19 @@ public class QueryElevationComponentTest extends AbstractSolrTestCase {
     args.put( CommonParams.SORT, "str_s asc" );
     assertQ( null, req
         ,"//*[@numFound='4']"
-        ,"//result/doc[1]/int[@name='id'][.='a']"
-        ,"//result/doc[2]/int[@name='id'][.='b']"
-        ,"//result/doc[3]/int[@name='id'][.='c']"
-        ,"//result/doc[4]/int[@name='id'][.='x']"
+        ,"//result/doc[1]/str[@name='id'][.='a']"
+        ,"//result/doc[2]/str[@name='id'][.='b']"
+        ,"//result/doc[3]/str[@name='id'][.='c']"
+        ,"//result/doc[4]/str[@name='id'][.='x']"
         );
     
     booster.forceElevation = true;
     assertQ( null, req
         ,"//*[@numFound='4']"
-        ,"//result/doc[1]/int[@name='id'][.='a']"
-        ,"//result/doc[2]/int[@name='id'][.='x']"
-        ,"//result/doc[3]/int[@name='id'][.='b']"
-        ,"//result/doc[4]/int[@name='id'][.='c']"
+        ,"//result/doc[1]/str[@name='id'][.='a']"
+        ,"//result/doc[2]/str[@name='id'][.='x']"
+        ,"//result/doc[3]/str[@name='id'][.='b']"
+        ,"//result/doc[4]/str[@name='id'][.='c']"
         );
     
     // Test exclusion
@@ -181,9 +197,9 @@ public class QueryElevationComponentTest extends AbstractSolrTestCase {
     booster.setTopQueryResults( reader, query, new String[] { "x" },  new String[] { "a" } );
     assertQ( null, req
         ,"//*[@numFound='3']"
-        ,"//result/doc[1]/int[@name='id'][.='x']"
-        ,"//result/doc[2]/int[@name='id'][.='b']"
-        ,"//result/doc[3]/int[@name='id'][.='c']"
+        ,"//result/doc[1]/str[@name='id'][.='x']"
+        ,"//result/doc[2]/str[@name='id'][.='b']"
+        ,"//result/doc[3]/str[@name='id'][.='c']"
         );
   }
   
@@ -226,6 +242,7 @@ public class QueryElevationComponentTest extends AbstractSolrTestCase {
     
     // now change the file
     writeFile( f, "bbb", "B" );
+    assertU(adoc("id", "10000")); // will get same reader if no index change
     assertU(commit());
     
     reader = core.getSearcher().get().getReader();

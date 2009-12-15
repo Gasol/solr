@@ -20,6 +20,7 @@ package org.apache.solr.core;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.DocList;
 import org.apache.solr.search.DocIterator;
+import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
@@ -27,13 +28,13 @@ import org.apache.solr.request.SolrQueryResponse;
 import java.util.List;
 
 /**
- * @version $Id: QuerySenderListener.java 573946 2007-09-09 04:34:44Z ryan $
+ * @version $Id: QuerySenderListener.java 801417 2009-08-05 21:25:06Z gsingers $
  */
 class QuerySenderListener extends AbstractSolrEventListener {
   public QuerySenderListener(SolrCore core) {
     super(core);
   }
-  
+
   @Override
   public void newSearcher(SolrIndexSearcher newSearcher, SolrIndexSearcher currentSearcher) {
     final SolrIndexSearcher searcher = newSearcher;
@@ -41,13 +42,14 @@ class QuerySenderListener extends AbstractSolrEventListener {
     for (NamedList nlst : (List<NamedList>)args.get("queries")) {
       try {
         // bind the request to a particular searcher (the newSearcher)
-        LocalSolrQueryRequest req = new LocalSolrQueryRequest(core,nlst) {
+        NamedList params = addEventParms(currentSearcher, nlst);
+        LocalSolrQueryRequest req = new LocalSolrQueryRequest(core,params) {
           @Override public SolrIndexSearcher getSearcher() { return searcher; }
           @Override public void close() { }
         };
 
         SolrQueryResponse rsp = new SolrQueryResponse();
-        core.execute(req,rsp);
+        core.execute(core.getRequestHandler(req.getParams().get(CommonParams.QT)), req, rsp);
 
         // Retrieve the Document instances (not just the ids) to warm
         // the OS disk cache, and any Solr document cache.  Only the top
@@ -69,10 +71,9 @@ class QuerySenderListener extends AbstractSolrEventListener {
         // do nothing... we want to continue with the other requests.
         // the failure should have already been logged.
       }
-      log.info("QuerySenderListener done.");
     }
+    log.info("QuerySenderListener done.");
   }
-
 
 
 }

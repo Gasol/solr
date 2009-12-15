@@ -27,7 +27,7 @@ import org.apache.solr.request.TextResponseWriter;
 import java.util.Map;
 import java.io.IOException;
 /**
- * @version $Id: FloatField.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: FloatField.java 799698 2009-07-31 18:59:47Z yonik $
  */
 public class FloatField extends FieldType {
   protected void init(IndexSchema schema, Map<String,String> args) {
@@ -47,7 +47,27 @@ public class FloatField extends FieldType {
   }
 
   public void write(TextResponseWriter writer, String name, Fieldable f) throws IOException {
-    writer.writeFloat(name, f.stringValue());
+    String s = f.stringValue();
+
+    // these values may be from a legacy lucene index, which may
+    // not be properly formatted in some output formats, or may
+    // incorrectly have a zero length.
+
+    if (s.length()==0) {
+      // zero length value means someone mistakenly indexed the value
+      // instead of simply leaving it out.  Write a null value instead of a numeric.
+      writer.writeNull(name);
+      return;
+    }
+
+    try {
+      float fval = Float.parseFloat(s);
+      writer.writeFloat(name, fval);
+    } catch (NumberFormatException e){
+      // can't parse - write out the contents as a string so nothing is lost and
+      // clients don't get a parse error.
+      writer.writeStr(name, s, true);
+    }
   }
 
   @Override

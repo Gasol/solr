@@ -22,7 +22,7 @@ import org.apache.lucene.search.*;
 /**
  * Extra lucene sorting utilities & convenience methods
  *
- * @version $Id: Sorting.java 631357 2008-02-26 19:47:07Z yonik $
+ * @version $Id: Sorting.java 778893 2009-05-26 21:34:53Z yonik $
  *
  */
 
@@ -52,6 +52,6 @@ public class Sorting {
   }
 
 
-  static final SortComparatorSource nullStringLastComparatorSource = new MissingStringLastComparatorSource(null);
+  static final FieldComparatorSource nullStringLastComparatorSource = new MissingStringLastComparatorSource(null);
 }
 

@@ -42,7 +42,7 @@ public class DumpRequestHandler extends RequestHandlerBase
       for( ContentStream content : req.getContentStreams() ) {
         NamedList<Object> stream = new SimpleOrderedMap<Object>();
         stream.add( "name", content.getName() );
-        stream.add( "fieldName", content.getSourceInfo() );
+        stream.add( "sourceInfo", content.getSourceInfo() );
         stream.add( "size", content.getSize() );
         stream.add( "contentType", content.getContentType() );
         stream.add( "stream", IOUtils.toString( content.getStream() ) );
@@ -63,16 +63,16 @@ public class DumpRequestHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-      return "$Revision: 547101 $";
+      return "$Revision: 707990 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: DumpRequestHandler.java 547101 2007-06-14 03:26:18Z ryan $";
+    return "$Id: DumpRequestHandler.java 707990 2008-10-26 13:23:43Z ehatcher $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/DumpRequestHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/DumpRequestHandler.java $";
   }
 }

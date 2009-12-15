@@ -23,47 +23,42 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.index.TermDocs;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.util.PriorityQueue;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrInfoMBean;
 import org.apache.solr.schema.IndexSchema;
-import org.apache.solr.util.OpenBitSet;
+import org.apache.solr.schema.SchemaField;
+import org.apache.solr.request.UnInvertedField;
+import org.apache.lucene.util.OpenBitSet;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * SolrIndexSearcher adds schema awareness and caching functionality
  * over the lucene IndexSearcher.
  *
- * @version $Id: SolrIndexSearcher.java 689514 2008-08-27 16:27:26Z yonik $
+ * @version $Id: SolrIndexSearcher.java 794328 2009-07-15 17:21:04Z shalin $
  * @since solr 0.9
  */
-
-// Since the internal reader in IndexSearcher is
-// package protected, I can't get to it by inheritance.
-// For now, I am using delgation and creating the
-// IndexReader to pass to the searcher myself.
-// NOTE: as of Lucene 1.9, this has changed!
-
-public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
-  private static Logger log = Logger.getLogger(SolrIndexSearcher.class.getName());
+public class SolrIndexSearcher extends IndexSearcher implements SolrInfoMBean {
+  private static Logger log = LoggerFactory.getLogger(SolrIndexSearcher.class);
   private final SolrCore core;
   private final IndexSchema schema;
+  private String indexDir;
 
   private final String name;
   private long openTime = System.currentTimeMillis();
   private long registerTime = 0;
   private long warmupTime = 0;
-  private final IndexSearcher searcher;
-  private final IndexReader reader;
+  private final SolrIndexReader reader;
   private final boolean closeReader;
 
   private final int queryResultWindowSize;
@@ -75,11 +70,9 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
   private final SolrCache filterCache;
   private final SolrCache queryResultCache;
   private final SolrCache documentCache;
+  private final SolrCache fieldValueCache;
 
   private final LuceneQueryOptimizer optimizer;
-  
-  private final float HASHSET_INVERSE_LOAD_FACTOR;
-  private final int HASHDOCSET_MAXSIZE;
   
   // map of generic caches - not synchronized since it's read-only after the constructor.
   private final HashMap<String, SolrCache> cacheMap;
@@ -88,15 +81,32 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
   // list of all caches associated with this searcher.
   private final SolrCache[] cacheList;
   private static final SolrCache[] noCaches = new SolrCache[0];
+  
+  private final Collection<String> fieldNames;
+  private Collection<String> storedHighlightFieldNames;
 
-  /** Creates a searcher searching the index in the named directory. */
+  /** Creates a searcher searching the index in the named directory.
+   * 
+   * @deprecated use alternate constructor
+   */
   public SolrIndexSearcher(SolrCore core, IndexSchema schema, String name, String path, boolean enableCache) throws IOException {
-    this(core, schema,name,IndexReader.open(path), true, enableCache);
+    this(core, schema,name, core.getIndexReaderFactory().newReader(core.getDirectoryFactory().open(path), false), true, enableCache);
   }
 
+  /*
+   * Creates a searcher searching the index in the provided directory. Note:
+   * uses the main IndexReaderFactory for the specified SolrCore.
+   * 
+   * @see SolrCore#getMainIndexReaderFactory
+   */
+  public SolrIndexSearcher(SolrCore core, IndexSchema schema, String name,
+      Directory directory, boolean enableCache) throws IOException {
+    this(core, schema,name, core.getIndexReaderFactory().newReader(directory, false), true, enableCache);
+  }
+  
   /** Creates a searcher searching the index in the provided directory. */
-  public SolrIndexSearcher(SolrCore core, IndexSchema schema, String name, Directory directory, boolean enableCache) throws IOException {
-    this(core, schema,name,IndexReader.open(directory), true, enableCache);
+  public SolrIndexSearcher(SolrCore core, IndexSchema schema, String name, Directory directory, boolean readOnly, boolean enableCache) throws IOException {
+    this(core, schema,name, core.getIndexReaderFactory().newReader(directory, readOnly), true, enableCache);
   }
 
   /** Creates a searcher searching the provided index. */
@@ -104,19 +114,37 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
     this(core, schema,name,r, false, enableCache);
   }
 
+  private static SolrIndexReader wrap(IndexReader r) {
+    SolrIndexReader sir;
+    // wrap the reader
+    if (!(r instanceof SolrIndexReader)) {
+      sir = new SolrIndexReader(r, null, 0);
+      sir.associateInfo(null);
+    } else {
+      sir = (SolrIndexReader)r;
+    }
+    return sir;
+  }
+
   public SolrIndexSearcher(SolrCore core, IndexSchema schema, String name, IndexReader r, boolean closeReader, boolean enableCache) {
+    super(wrap(r));
+    this.reader = (SolrIndexReader)super.getIndexReader();
     this.core = core;
     this.schema = schema;
     this.name = "Searcher@" + Integer.toHexString(hashCode()) + (name!=null ? " "+name : "");
-
     log.info("Opening " + this.name);
 
-    reader = r;
-    searcher = new IndexSearcher(r);
-    this.closeReader = closeReader;
-    searcher.setSimilarity(schema.getSimilarity());
+    SolrIndexReader.setSearcher(reader, this);
 
-    SolrConfig solrConfig = schema.getSolrConfig();
+    if (r.directory() instanceof FSDirectory) {
+      FSDirectory fsDirectory = (FSDirectory) r.directory();
+      indexDir = fsDirectory.getFile().getAbsolutePath();
+    }
+
+    this.closeReader = closeReader;
+    setSimilarity(schema.getSimilarity());
+
+    SolrConfig solrConfig = core.getSolrConfig();
     queryResultWindowSize = solrConfig.queryResultWindowSize;
     queryResultMaxDocsCached = solrConfig.queryResultMaxDocsCached;
     useFilterForSortedQuery = solrConfig.useFilterForSortedQuery;
@@ -125,6 +153,8 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
     cachingEnabled=enableCache;
     if (cachingEnabled) {
       ArrayList<SolrCache> clist = new ArrayList<SolrCache>();
+      fieldValueCache = solrConfig.fieldValueCacheConfig==null ? null : solrConfig.fieldValueCacheConfig.newInstance();
+      if (fieldValueCache!=null) clist.add(fieldValueCache);
       filterCache= solrConfig.filterCacheConfig==null ? null : solrConfig.filterCacheConfig.newInstance();
       if (filterCache!=null) clist.add(filterCache);
       queryResultCache = solrConfig.queryResultCacheConfig==null ? null : solrConfig.queryResultCacheConfig.newInstance();
@@ -151,14 +181,13 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
       filterCache=null;
       queryResultCache=null;
       documentCache=null;
+      fieldValueCache=null;
       cacheMap = noGenericCaches;
       cacheList= noCaches;
     }
     optimizer = solrConfig.filtOptEnabled ? new LuceneQueryOptimizer(solrConfig.filtOptCacheSize,solrConfig.filtOptThreshold) : null;
 
-    // for DocSets
-    HASHSET_INVERSE_LOAD_FACTOR = solrConfig.hashSetInverseLoadFactor;
-    HASHDOCSET_MAXSIZE = solrConfig.hashDocSetMaxSize;
+    fieldNames = r.getFieldNames(IndexReader.FieldOption.ALL);
   }
 
 
@@ -195,28 +224,71 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
       }
       log.info(sb.toString());
     } else {
-      log.fine("Closing " + name);
+      log.debug("Closing " + name);
     }
     core.getInfoRegistry().remove(name);
-    try {
-      searcher.close();
-    }
-    finally {
-      if(closeReader) reader.close();
-      for (SolrCache cache : cacheList) {
-        cache.close();
-      }
+
+    // super.close();
+    // can't use super.close() since it just calls reader.close() and that may only be called once
+    // per reader (even if incRef() was previously called).
+    if (closeReader) reader.decRef();
+
+    for (SolrCache cache : cacheList) {
+      cache.close();
     }
   }
 
   /** Direct access to the IndexReader used by this searcher */
-  public IndexReader getReader() { return reader; }
+  public SolrIndexReader getReader() { return reader; }
   /** Direct access to the IndexSchema for use with this searcher */
   public IndexSchema getSchema() { return schema; }
+  
+  /**
+   * Returns a collection of all field names the index reader knows about.
+   */
+  public Collection<String> getFieldNames() {
+    return fieldNames;
+  }
+
+  /**
+   * Returns a collection of the names of all stored fields which can be
+   * highlighted the index reader knows about.
+   */
+  public Collection<String> getStoredHighlightFieldNames() {
+    if (storedHighlightFieldNames == null) {
+      storedHighlightFieldNames = new LinkedList<String>();
+      for (String fieldName : fieldNames) {
+        try {
+          SchemaField field = schema.getField(fieldName);
+          if (field.stored() &&
+                  ((field.getType() instanceof org.apache.solr.schema.TextField) ||
+                  (field.getType() instanceof org.apache.solr.schema.StrField))) {
+            storedHighlightFieldNames.add(fieldName);
+          }
+        } catch (RuntimeException e) { // getField() throws a SolrException, but it arrives as a RuntimeException
+            log.warn("Field \"" + fieldName + "\" found in index, but not defined in schema.");
+        }
+      }
+    }
+    return storedHighlightFieldNames;
+  }
   //
   // Set default regenerators on filter and query caches if they don't have any
   //
   public static void initRegenerators(SolrConfig solrConfig) {
+    if (solrConfig.fieldValueCacheConfig != null && solrConfig.fieldValueCacheConfig.getRegenerator() == null) {
+      solrConfig.fieldValueCacheConfig.setRegenerator(
+              new CacheRegenerator() {
+                public boolean regenerateItem(SolrIndexSearcher newSearcher, SolrCache newCache, SolrCache oldCache, Object oldKey, Object oldVal) throws IOException {
+                  if (oldVal instanceof UnInvertedField) {
+                    UnInvertedField.getUnInvertedField((String)oldKey, newSearcher);
+                  }
+                  return true;
+                }
+              }
+      );
+    }
+
     if (solrConfig.filterCacheConfig != null && solrConfig.filterCacheConfig.getRegenerator() == null) {
       solrConfig.filterCacheConfig.setRegenerator(
               new CacheRegenerator() {
@@ -277,38 +349,22 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
 
     if (optimizer==null || filter!=null || !(query instanceof BooleanQuery)
     ) {
-      return searcher.search(query,filter,sort);
+      return super.search(query,filter,sort);
     } else {
       Query[] newQuery = new Query[1];
       Filter[] newFilter = new Filter[1];
-      optimizer.optimize((BooleanQuery)query, searcher, 0, newQuery, newFilter);
+      optimizer.optimize((BooleanQuery)query, this, 0, newQuery, newFilter);
 
-      return searcher.search(newQuery[0], newFilter[0], sort);
+      return super.search(newQuery[0], newFilter[0], sort);
     }
   }
 
-  public Hits search(Query query, Filter filter) throws IOException {
-    return searcher.search(query, filter);
-  }
-
-  public Hits search(Query query, Sort sort) throws IOException {
-    return searcher.search(query, sort);
-  }
-
-  public void search(Query query, HitCollector results) throws IOException {
-    searcher.search(query, results);
-  }
-
-  public void setSimilarity(Similarity similarity) {
-    searcher.setSimilarity(similarity);
-  }
-
-  public Similarity getSimilarity() {
-    return searcher.getSimilarity();
-  }
-
-  public int docFreq(Term term) throws IOException {
-    return searcher.docFreq(term);
+  /**
+   * @return the indexDir on which this searcher is opened
+   * @see org.apache.solr.search.SolrIndexSearcher#SolrIndexSearcher(org.apache.solr.core.SolrCore, org.apache.solr.schema.IndexSchema, String, String, boolean)
+   */
+  public String getIndexDir() {
+    return indexDir;
   }
 
   /* ********************** Document retrieval *************************/
@@ -324,7 +380,7 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
    * FieldSelector which loads the specified fields, and load all other
    * field lazily.
    */
-  class SetNonLazyFieldSelector implements FieldSelector {
+  static class SetNonLazyFieldSelector implements FieldSelector {
     private Set<String> fieldsToLoad;
     SetNonLazyFieldSelector(Set<String> toLoad) {
       fieldsToLoad = toLoad;
@@ -349,7 +405,7 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
    * 
    * @see IndexReader#document(int, FieldSelector) */
   public Document doc(int n, FieldSelector fieldSelector) throws IOException {
-    return searcher.getIndexReader().document(n, fieldSelector);
+    return getIndexReader().document(n, fieldSelector);
   }
 
   /**
@@ -368,9 +424,9 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
     }
 
     if(!enableLazyFieldLoading || fields == null) {
-      d = searcher.getIndexReader().document(i);
+      d = getIndexReader().document(i);
     } else {
-      d = searcher.getIndexReader().document(i, 
+      d = getIndexReader().document(i, 
              new SetNonLazyFieldSelector(fields));
     }
 
@@ -401,33 +457,15 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
 
   /* ********************** end document retrieval *************************/
 
-  public int maxDoc() throws IOException {
-    return searcher.maxDoc();
-  }
-
-  public TopDocs search(Weight weight, Filter filter, int i) throws IOException {
-    return searcher.search(weight, filter, i);
-  }
-
-  public void search(Weight weight, Filter filter, HitCollector hitCollector) throws IOException {
-    searcher.search(weight, filter, hitCollector);
-  }
-
-  public Query rewrite(Query original) throws IOException {
-    return searcher.rewrite(original);
-  }
-
-  public Explanation explain(Weight weight, int i) throws IOException {
-    return searcher.explain(weight, i);
-  }
-
-  public TopFieldDocs search(Weight weight, Filter filter, int i, Sort sort) throws IOException {
-    return searcher.search(weight, filter, i, sort);
-  }
-
   ////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
+
+  /** expert: internal API, subject to change */
+  public SolrCache getFieldValueCache() {
+    return fieldValueCache;
+  }
+
 
   /**
    * Returns the first document number containing the term <code>t</code>
@@ -586,33 +624,38 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
 
   // query must be positive
   protected DocSet getDocSetNC(Query query, DocSet filter) throws IOException {
+    DocSetCollector collector = new DocSetCollector(maxDoc()>>6, maxDoc());
+
     if (filter==null) {
-      DocSetHitCollector hc = new DocSetHitCollector(HASHSET_INVERSE_LOAD_FACTOR, HASHDOCSET_MAXSIZE, maxDoc());
       if (query instanceof TermQuery) {
         Term t = ((TermQuery)query).getTerm();
-        TermDocs tdocs = null;
-        try {
-          tdocs = reader.termDocs(t);
-          while (tdocs.next()) hc.collect(tdocs.doc(),0.0f);
-        } finally {
-          if (tdocs!=null) tdocs.close();
+        SolrIndexReader[] readers = reader.getLeafReaders();
+        int[] offsets = reader.getLeafOffsets();
+        int[] arr = new int[256];
+        int[] freq = new int[256];
+        for (int i=0; i<readers.length; i++) {
+          SolrIndexReader sir = readers[i];
+          int offset = offsets[i];
+          collector.setNextReader(sir, offset);
+          TermDocs tdocs = sir.termDocs(t);
+          for(;;) {
+            int num = tdocs.read(arr, freq);
+            if (num==0) break;
+            for (int j=0; j<num; j++) {
+              collector.collect(arr[j]);
+            }
+          }
+          tdocs.close();
         }
       } else {
-        searcher.search(query,null,hc);
+        super.search(query,null,collector);
       }
-      return hc.getDocSet();
+      return collector.getDocSet();
 
     } else {
-      // FUTURE: if the filter is sorted by docid, could use skipTo (SkipQueryFilter)
-      final DocSetHitCollector hc = new DocSetHitCollector(HASHSET_INVERSE_LOAD_FACTOR, HASHDOCSET_MAXSIZE, maxDoc());
-      final DocSet filt = filter;
-      searcher.search(query, null, new HitCollector() {
-        public void collect(int doc, float score) {
-          if (filt.exists(doc)) hc.collect(doc,score);
-        }
-      }
-      );
-      return hc.getDocSet();
+      Filter luceneFilter = filter.getTopFilter();
+      super.search(query, luceneFilter, collector);
+      return collector.getDocSet();
     }
   }
 
@@ -813,6 +856,7 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
       }
     }
 
+    // disable useFilterCache optimization temporarily
     if (useFilterCache) {
       // now actually use the filter cache.
       // for large filters that match few documents, this may be
@@ -831,9 +875,11 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
       // do it the normal way...
       cmd.setSupersetMaxDoc(supersetMaxDoc);
       if ((cmd.getFlags() & GET_DOCSET)!=0) {
+        // this currently conflates returning the docset for the base query vs
+        // the base query and all filters.
         DocSet qDocSet = getDocListAndSetNC(qr,cmd);
         // cache the docSet matching the query w/o filtering
-        if (filterCache!=null && !qr.isPartialResults()) filterCache.put(cmd.getQuery(),qDocSet);
+        if (qDocSet!=null && filterCache!=null && !qr.isPartialResults()) filterCache.put(cmd.getQuery(),qDocSet);
       } else {
         getDocListNC(qr,cmd);
         //Parameters: cmd.getQuery(),theFilt,cmd.getSort(),0,supersetMaxDoc,cmd.getFlags(),cmd.getTimeAllowed(),responseHeader);
@@ -866,29 +912,59 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
     int[] ids;
     float[] scores;
 
+    boolean needScores = (cmd.getFlags() & GET_SCORES) != 0;
+
     Query query = QueryUtils.makeQueryable(cmd.getQuery());
+
+    final Filter luceneFilter = filter==null ? null : filter.getTopFilter();
 
     // handle zero case...
     if (lastDocRequested<=0) {
-      final DocSet filt = filter;
       final float[] topscore = new float[] { Float.NEGATIVE_INFINITY };
       final int[] numHits = new int[1];
 
-      HitCollector hc = new HitCollector() {
-        public void collect(int doc, float score) {
-          if (filt!=null && !filt.exists(doc)) return;
-          numHits[0]++;
-          if (score > topscore[0]) topscore[0]=score;
-        }
-      };
+      Collector collector;
+
+      if (!needScores) {
+        collector = new Collector () {
+          public void setScorer(Scorer scorer) throws IOException {
+          }
+          public void collect(int doc) throws IOException {
+            numHits[0]++;
+          }
+          public void setNextReader(IndexReader reader, int docBase) throws IOException {
+          }
+          public boolean acceptsDocsOutOfOrder() {
+            return true;
+          }
+        };
+      } else {
+        collector = new Collector() {
+          Scorer scorer;
+          public void setScorer(Scorer scorer) throws IOException {
+            this.scorer = scorer;
+          }
+          public void collect(int doc) throws IOException {
+            numHits[0]++;
+            float score = scorer.score();
+            if (score > topscore[0]) topscore[0]=score;            
+          }
+          public void setNextReader(IndexReader reader, int docBase) throws IOException {
+          }
+          public boolean acceptsDocsOutOfOrder() {
+            return true;
+          }
+        };
+      }
+      
       if( timeAllowed > 0 ) {
-        hc = new TimeLimitedCollector( hc, timeAllowed );
+        collector = new TimeLimitingCollector(collector, timeAllowed);
       }
       try {
-        searcher.search(query, hc );
+        super.search(query, luceneFilter, collector);
       }
-      catch( TimeLimitedCollector.TimeExceededException x ) {
-        log.warning( "Query: " + query + "; " + x.getMessage() );
+      catch( TimeLimitingCollector.TimeExceededException x ) {
+        log.warn( "Query: " + query + "; " + x.getMessage() );
         qr.setPartialResults(true);
       }
 
@@ -897,151 +973,46 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
       scores = new float[nDocsReturned];
       totalHits = numHits[0];
       maxScore = totalHits>0 ? topscore[0] : 0.0f;
-    } else if (cmd.getSort() != null) {
-      // can't use TopDocs if there is a sort since it
-      // will do automatic score normalization.
-      // NOTE: this changed late in Lucene 1.9
-
-      final DocSet filt = filter;
-      final int[] numHits = new int[1];
-      final FieldSortedHitQueue hq = new FieldSortedHitQueue(reader, cmd.getSort().getSort(), len);
-
-      HitCollector hc = new HitCollector() {
-        public void collect(int doc, float score) {
-          if (filt!=null && !filt.exists(doc)) return;
-          numHits[0]++;
-          hq.insert(new FieldDoc(doc, score));
-        }
-      };
-      if( timeAllowed > 0 ) {
-        hc = new TimeLimitedCollector( hc, timeAllowed );
-      }
-      try {
-        searcher.search(query, hc );
-      }
-      catch( TimeLimitedCollector.TimeExceededException x ) {
-        log.warning( "Query: " + query + "; " + x.getMessage() );
-        qr.setPartialResults(true);
-      }
-
-      totalHits = numHits[0];
-      maxScore = totalHits>0 ? hq.getMaxScore() : 0.0f;
-
-      nDocsReturned = hq.size();
-      ids = new int[nDocsReturned];
-      scores = (cmd.getFlags()&GET_SCORES)!=0 ? new float[nDocsReturned] : null;
-      for (int i = nDocsReturned -1; i >= 0; i--) {
-        FieldDoc fieldDoc = (FieldDoc)hq.pop();
-        // fillFields is the point where score normalization happens
-        // hq.fillFields(fieldDoc)
-        ids[i] = fieldDoc.doc;
-        if (scores != null) scores[i] = fieldDoc.score;
-      }
     } else {
-      // No Sort specified (sort by score descending)
-      // This case could be done with TopDocs, but would currently require
-      // getting a BitSet filter from a DocSet which may be inefficient.
-
-      final DocSet filt = filter;
-      final ScorePriorityQueue hq = new ScorePriorityQueue(lastDocRequested);
-      final int[] numHits = new int[1];
-      HitCollector hc = new HitCollector() {
-        float minScore=Float.NEGATIVE_INFINITY;  // minimum score in the priority queue
-        public void collect(int doc, float score) {
-          if (filt!=null && !filt.exists(doc)) return;
-          if (numHits[0]++ < lastDocRequested || score >= minScore) {
-            // TODO: if docs are always delivered in order, we could use "score>minScore"
-            // instead of "score>=minScore" and avoid tiebreaking scores
-            // in the priority queue.
-            // but might BooleanScorer14 might still be used and deliver docs out-of-order?
-            hq.insert(new ScoreDoc(doc, score));
-            minScore = ((ScoreDoc)hq.top()).score;
-          }
-        }
-      };
+      TopDocsCollector topCollector;
+      if (cmd.getSort() == null) {
+        topCollector = TopScoreDocCollector.create(len, true);
+      } else {
+        topCollector = TopFieldCollector.create(cmd.getSort(), len, false, needScores, needScores, true);
+      }
+      Collector collector = topCollector;
       if( timeAllowed > 0 ) {
-        hc = new TimeLimitedCollector( hc, timeAllowed );
+        collector = new TimeLimitingCollector(collector, timeAllowed);
       }
       try {
-        searcher.search(query, hc );
+        super.search(query, luceneFilter, collector);
       }
-      catch( TimeLimitedCollector.TimeExceededException x ) {
-        log.warning( "Query: " + query + "; " + x.getMessage() );
+      catch( TimeLimitingCollector.TimeExceededException x ) {
+        log.warn( "Query: " + query + "; " + x.getMessage() );
         qr.setPartialResults(true);
       }
 
-      totalHits = numHits[0];
-      nDocsReturned = hq.size();
+      totalHits = topCollector.getTotalHits();
+      TopDocs topDocs = topCollector.topDocs(0, len);
+      maxScore = totalHits>0 ? topDocs.getMaxScore() : 0.0f;
+      nDocsReturned = topDocs.scoreDocs.length;
+
       ids = new int[nDocsReturned];
       scores = (cmd.getFlags()&GET_SCORES)!=0 ? new float[nDocsReturned] : null;
-      ScoreDoc sdoc =null;
-      for (int i = nDocsReturned -1; i >= 0; i--) {
-        sdoc = (ScoreDoc)hq.pop();
-        ids[i] = sdoc.doc;
-        if (scores != null) scores[i] = sdoc.score;
+      for (int i=0; i<nDocsReturned; i++) {
+        ScoreDoc scoreDoc = topDocs.scoreDocs[i];
+        ids[i] = scoreDoc.doc;
+        if (scores != null) scores[i] = scoreDoc.score;
       }
-      maxScore = sdoc ==null ? 0.0f : sdoc.score;
     }
 
 
     int sliceLen = Math.min(lastDocRequested,nDocsReturned);
     if (sliceLen < 0) sliceLen=0;
     qr.setDocList(new DocSlice(0,sliceLen,ids,scores,totalHits,maxScore));
-
-
-
-    /**************** older implementation using TopDocs *******************
-
-
-      Filter lfilter=null;
-      if (filter != null) {
-        final BitSet bits = filter.getBits();   // avoid if possible
-        lfilter = new Filter() {
-          public BitSet bits(IndexReader reader)  {
-            return bits;
-          }
-        };
-      }
-
-      int lastDocRequested=offset+len;
-
-      // lucene doesn't allow 0 to be passed for nDocs
-      if (lastDocRequested==0) lastDocRequested=1;
-
-      // TopFieldDocs sortedDocs;  // use TopDocs so both versions can use it
-      TopDocs sortedDocs;
-      if (lsort!=null) {
-         sortedDocs = searcher.search(query, lfilter, lastDocRequested, lsort);
-      } else {
-         sortedDocs = searcher.search(query, lfilter, lastDocRequested);
-      }
-
-      int nDocsReturned = sortedDocs.scoreDocs.length;
-      int[] docs = new int[nDocsReturned];
-      for (int i=0; i<nDocsReturned; i++) {
-        docs[i] = sortedDocs.scoreDocs[i].doc;
-      }
-      float[] scores=null;
-      float maxScore=0.0f;
-      if ((flags & GET_SCORES) != 0) {
-        scores = new float[nDocsReturned];
-        for (int i=0; i<nDocsReturned; i++) {
-          scores[i] = sortedDocs.scoreDocs[i].score;
-        }
-        if (nDocsReturned>0) {
-          maxScore=sortedDocs.scoreDocs[0].score;
-        }
-      }
-      int sliceLen = Math.min(offset+len,nDocsReturned) - offset;
-      if (sliceLen < 0) sliceLen=0;
-      return new DocSlice(offset,sliceLen,docs,scores,sortedDocs.totalHits, maxScore);
-
-    **********************************************************************************/
-
   }
 
-
-  // the DocSet returned is for the query only, without any filtering... that way it may
+  // any DocSet returned is for the query only, without any filtering... that way it may
   // be cached if desired.
   private DocSet getDocListAndSetNC(QueryResult qr,QueryCommand cmd) throws IOException {
     int len = cmd.getSupersetMaxDoc();
@@ -1054,140 +1025,116 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
     float maxScore;
     int[] ids;
     float[] scores;
-    final DocSetHitCollector setHC = new DocSetHitCollector(HASHSET_INVERSE_LOAD_FACTOR, HASHDOCSET_MAXSIZE, maxDoc());
-    final HitCollector hitCollector = ( cmd.getTimeAllowed() > 0 ) ? new TimeLimitedCollector( setHC, cmd.getTimeAllowed() ) : setHC;
+    DocSet set;
+
+    boolean needScores = (cmd.getFlags() & GET_SCORES) != 0;
+    int maxDoc = maxDoc();
+    int smallSetSize = maxDoc>>6;
 
     Query query = QueryUtils.makeQueryable(cmd.getQuery());
+    final long timeAllowed = cmd.getTimeAllowed();
 
-    // TODO: perhaps unify getDocListAndSetNC and getDocListNC without imposing a significant performance hit
-
-    // Comment: gathering the set before the filter is applied allows one to cache
-    // the resulting DocSet under the query.  The drawback is that it requires an
-    // extra intersection with the filter at the end.  This will be a net win
-    // for expensive queries.
-
-    // Q: what if the final intersection results in a small set from two large
-    // sets... it won't be a HashDocSet or other small set.  One way around
-    // this would be to collect the resulting set as we go (the filter is
-    // checked anyway).
+    final Filter luceneFilter = filter==null ? null : filter.getTopFilter();
 
     // handle zero case...
     if (lastDocRequested<=0) {
-      final DocSet filt = filter;
       final float[] topscore = new float[] { Float.NEGATIVE_INFINITY };
-      final int[] numHits = new int[1];
 
-      try {
-        searcher.search(query, new HitCollector() {
-          public void collect(int doc, float score) {
-            hitCollector.collect(doc,score);
-            if (filt!=null && !filt.exists(doc)) return;
-            numHits[0]++;
-            if (score > topscore[0]) topscore[0]=score;
-          }
-        }
-        );
-      }
-      catch( TimeLimitedCollector.TimeExceededException x ) {
-        log.warning( "Query: " + query + "; " + x.getMessage() );
-        qr.setPartialResults(true);
-      }
+      Collector collector;
+      DocSetCollector setCollector;
 
-      nDocsReturned=0;
+       if (!needScores) {
+         collector = setCollector = new DocSetCollector(smallSetSize, maxDoc);
+       } else {
+         collector = setCollector = new DocSetDelegateCollector(smallSetSize, maxDoc, new Collector() {
+           Scorer scorer;
+           public void setScorer(Scorer scorer) throws IOException {
+             this.scorer = scorer;
+           }
+           public void collect(int doc) throws IOException {
+             float score = scorer.score();
+             if (score > topscore[0]) topscore[0]=score;
+           }
+           public void setNextReader(IndexReader reader, int docBase) throws IOException {
+           }
+           public boolean acceptsDocsOutOfOrder() {
+             return false;
+           }
+         });
+       }
+
+       if( timeAllowed > 0 ) {
+         collector = new TimeLimitingCollector(collector, timeAllowed);
+       }
+       try {
+         super.search(query, luceneFilter, collector);
+       }
+       catch( TimeLimitingCollector.TimeExceededException x ) {
+         log.warn( "Query: " + query + "; " + x.getMessage() );
+         qr.setPartialResults(true);
+       }
+
+      set = setCollector.getDocSet();
+
+      nDocsReturned = 0;
       ids = new int[nDocsReturned];
       scores = new float[nDocsReturned];
-      totalHits = numHits[0];
+      totalHits = set.size();
       maxScore = totalHits>0 ? topscore[0] : 0.0f;
-    } else if (cmd.getSort() != null) {
-      // can't use TopDocs if there is a sort since it
-      // will do automatic score normalization.
-      // NOTE: this changed late in Lucene 1.9
-
-      final DocSet filt = filter;
-      final int[] numHits = new int[1];
-      final FieldSortedHitQueue hq = new FieldSortedHitQueue(reader, cmd.getSort().getSort(), len);
-
-      try {
-        searcher.search(query, new HitCollector() {
-          public void collect(int doc, float score) {
-            hitCollector.collect(doc,score);
-            if (filt!=null && !filt.exists(doc)) return;
-            numHits[0]++;
-            hq.insert(new FieldDoc(doc, score));
-          }
-        }
-        );
-      }
-      catch( TimeLimitedCollector.TimeExceededException x ) {
-        log.warning( "Query: " + query + "; " + x.getMessage() );
-        qr.setPartialResults(true);
-      }
-
-      totalHits = numHits[0];
-      maxScore = totalHits>0 ? hq.getMaxScore() : 0.0f;
-
-      nDocsReturned = hq.size();
-      ids = new int[nDocsReturned];
-      scores = (cmd.getFlags()&GET_SCORES)!=0 ? new float[nDocsReturned] : null;
-      for (int i = nDocsReturned -1; i >= 0; i--) {
-        FieldDoc fieldDoc = (FieldDoc)hq.pop();
-        // fillFields is the point where score normalization happens
-        // hq.fillFields(fieldDoc)
-        ids[i] = fieldDoc.doc;
-        if (scores != null) scores[i] = fieldDoc.score;
-      }
     } else {
-      // No Sort specified (sort by score descending)
-      // This case could be done with TopDocs, but would currently require
-      // getting a BitSet filter from a DocSet which may be inefficient.
 
-      final DocSet filt = filter;
-      final ScorePriorityQueue hq = new ScorePriorityQueue(lastDocRequested);
-      final int[] numHits = new int[1];
-      try {
-        searcher.search(query, new HitCollector() {
-          float minScore=Float.NEGATIVE_INFINITY;  // minimum score in the priority queue
-          public void collect(int doc, float score) {
-            hitCollector.collect(doc,score);
-            if (filt!=null && !filt.exists(doc)) return;
-            if (numHits[0]++ < lastDocRequested || score >= minScore) {
-              // if docs are always delivered in order, we could use "score>minScore"
-              // but might BooleanScorer14 might still be used and deliver docs out-of-order?
-              hq.insert(new ScoreDoc(doc, score));
-              minScore = ((ScoreDoc)hq.top()).score;
-            }
-          }
-        }
-        );
+      TopDocsCollector topCollector;
+
+      if (cmd.getSort() == null) {
+        topCollector = TopScoreDocCollector.create(len, true);
+      } else {
+        topCollector = TopFieldCollector.create(cmd.getSort(), len, false, needScores, needScores, true);
       }
-      catch( TimeLimitedCollector.TimeExceededException x ) {
-        log.warning( "Query: " + query + "; " + x.getMessage() );
+
+      DocSetCollector setCollector = new DocSetDelegateCollector(maxDoc>>6, maxDoc, topCollector);
+      Collector collector = setCollector;
+
+      if( timeAllowed > 0 ) {
+        collector = new TimeLimitingCollector(collector, timeAllowed );
+      }
+      try {
+        super.search(query, luceneFilter, collector);
+      }
+      catch( TimeLimitingCollector.TimeExceededException x ) {
+        log.warn( "Query: " + query + "; " + x.getMessage() );
         qr.setPartialResults(true);
       }
 
-      totalHits = numHits[0];
-      nDocsReturned = hq.size();
+      set = setCollector.getDocSet();      
+
+      totalHits = topCollector.getTotalHits();
+      assert(totalHits == set.size());
+
+      TopDocs topDocs = topCollector.topDocs(0, len);
+      maxScore = totalHits>0 ? topDocs.getMaxScore() : 0.0f;
+      nDocsReturned = topDocs.scoreDocs.length;
+
       ids = new int[nDocsReturned];
       scores = (cmd.getFlags()&GET_SCORES)!=0 ? new float[nDocsReturned] : null;
-      ScoreDoc sdoc =null;
-      for (int i = nDocsReturned -1; i >= 0; i--) {
-        sdoc = (ScoreDoc)hq.pop();
-        ids[i] = sdoc.doc;
-        if (scores != null) scores[i] = sdoc.score;
+      for (int i=0; i<nDocsReturned; i++) {
+        ScoreDoc scoreDoc = topDocs.scoreDocs[i];
+        ids[i] = scoreDoc.doc;
+        if (scores != null) scores[i] = scoreDoc.score;
       }
-      maxScore = sdoc ==null ? 0.0f : sdoc.score;
     }
-
 
     int sliceLen = Math.min(lastDocRequested,nDocsReturned);
     if (sliceLen < 0) sliceLen=0;
-    
-    qr.setDocList(new DocSlice(0,sliceLen,ids,scores,totalHits,maxScore));
-    DocSet qDocSet = setHC.getDocSet();
-    qr.setDocSet(filter==null ? qDocSet : qDocSet.intersection(filter));
-    return qDocSet;
-  }
 
+    qr.setDocList(new DocSlice(0,sliceLen,ids,scores,totalHits,maxScore));
+    // TODO: if we collect results before the filter, we just need to intersect with
+    // that filter to generate the DocSet for qr.setDocSet()
+    qr.setDocSet(set);
+
+    // TODO: currently we don't generate the DocSet for the base query,
+    // but the QueryDocSet == CompleteDocSet if filter==null.
+    return filter==null ? qr.getDocSet() : null;
+  }
 
 
   /**
@@ -1420,25 +1367,41 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
   }
 
   protected DocList sortDocSet(DocSet set, Sort sort, int nDocs) throws IOException {
-    final FieldSortedHitQueue hq =
-            new FieldSortedHitQueue(reader, sort.getSort(), nDocs);
+    // bit of a hack to tell if a set is sorted - do it better in the futute.
+    boolean inOrder = set instanceof BitDocSet || set instanceof SortedIntDocSet;
+
+    TopDocsCollector topCollector = TopFieldCollector.create(sort, nDocs, false, false, false, inOrder);
+
     DocIterator iter = set.iterator();
-    int hits=0;
+    int base=0;
+    int end=0;
+    int readerIndex = -1;
+    SolrIndexReader r=null;
+
+
     while(iter.hasNext()) {
       int doc = iter.nextDoc();
-      hits++;   // could just use set.size(), but that would be slower for a bitset
-      hq.insert(new FieldDoc(doc,1.0f));
+      while (doc>=end) {
+        r = reader.getLeafReaders()[++readerIndex];
+        base = reader.getLeafOffsets()[readerIndex];
+        end = base + r.maxDoc();
+        topCollector.setNextReader(r, base);
+        // we should never need to set the scorer given the settings for the collector
+      }
+      topCollector.collect(doc-base);
     }
 
-    int numCollected = hq.size();
-    int[] ids = new int[numCollected];
-    for (int i = numCollected-1; i >= 0; i--) {
-      FieldDoc fieldDoc = (FieldDoc)hq.pop();
-      // hq.fillFields(fieldDoc)  // optional, if we need that info
-      ids[i] = fieldDoc.doc;
+    TopDocs topDocs = topCollector.topDocs(0, nDocs);
+
+    int nDocsReturned = topDocs.scoreDocs.length;
+    int[] ids = new int[nDocsReturned];
+
+    for (int i=0; i<nDocsReturned; i++) {
+      ScoreDoc scoreDoc = topDocs.scoreDocs[i];
+      ids[i] = scoreDoc.doc;
     }
 
-    return new DocSlice(0,numCollected,ids,null,hits,0.0f);
+    return new DocSlice(0,nDocsReturned,ids,null,topDocs.totalHits,0.0f);
   }
 
 
@@ -1510,7 +1473,7 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
    */
   public void warm(SolrIndexSearcher old) throws IOException {
     // Make sure this is first!  filters can help queryResults execute!
-    boolean logme = log.isLoggable(Level.INFO);
+    boolean logme = log.isInfoEnabled();
     long warmingStartTime = System.currentTimeMillis();
     // warm the caches in order...
     for (int i=0; i<cacheList.length; i++) {
@@ -1569,11 +1532,11 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
   }
 
   public String getSourceId() {
-    return "$Id: SolrIndexSearcher.java 689514 2008-08-27 16:27:26Z yonik $";
+    return "$Id: SolrIndexSearcher.java 794328 2009-07-15 17:21:04Z shalin $";
   }
 
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/search/SolrIndexSearcher.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/search/SolrIndexSearcher.java $";
   }
 
   public URL[] getDocs() {
@@ -1586,7 +1549,7 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
     lst.add("caching", cachingEnabled);
     lst.add("numDocs", reader.numDocs());
     lst.add("maxDoc", reader.maxDoc());
-    lst.add("readerImpl", reader.getClass().getSimpleName());
+    lst.add("reader", reader.toString());
     lst.add("readerDir", reader.directory());
     lst.add("indexVersion", reader.getVersion());
     lst.add("openedAt", new Date(openTime));
@@ -1609,7 +1572,6 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
     private int supersetMaxDoc;
     private int flags;
     private long timeAllowed = -1;
-    private boolean needDocSet;
 
     public Query getQuery() { return query; }
     public QueryCommand setQuery(Query query) {
@@ -1743,18 +1705,6 @@ public class SolrIndexSearcher extends Searcher implements SolrInfoMBean {
 
 }
 
-// Lucene's HitQueue isn't public, so here is our own.
-final class ScorePriorityQueue extends PriorityQueue {
-  ScorePriorityQueue(int size) {
-    initialize(size);
-  }
 
-  protected final boolean lessThan(Object o1, Object o2) {
-    ScoreDoc sd1 = (ScoreDoc)o1;
-    ScoreDoc sd2 = (ScoreDoc)o2;
-    // use index order as a tiebreaker to make sorts stable
-    return sd1.score < sd2.score || (sd1.score==sd2.score && sd1.doc > sd2.doc);
-  }
-}
 
 

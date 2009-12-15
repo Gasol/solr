@@ -100,9 +100,20 @@ public class TestFunctionQuery extends AbstractSolrTestCase {
     return sb.toString();
   }
 
-  void singleTest(String field, String funcTemplate, float... results) {
-    // lrf.args.put("version","2.0");
+  void singleTest(String field, String funcTemplate, List<String> args, float... results) {
     String parseableQuery = func(field, funcTemplate);
+
+    List<String> nargs = new ArrayList<String>(Arrays.asList("q", parseableQuery
+            ,"fl", "*,score"
+            ,"indent","on"
+            ,"rows","100"));
+
+    if (args != null) {
+      for (String arg : args) {
+        nargs.add(arg.replace("\0",field));
+      }
+    }
+
     List<String> tests = new ArrayList<String>();
 
     // Construct xpaths like the following:
@@ -115,11 +126,13 @@ public class TestFunctionQuery extends AbstractSolrTestCase {
       tests.add(xpath);
     }
 
-    assertQ(req("q", parseableQuery
-                ,"fl", "*,score","indent","on","rows","100"
-                )
-            , tests.toArray(new String[tests.size()])
-            );
+    assertQ(req(nargs.toArray(new String[]{}))
+            , tests.toArray(new String[]{})
+    );
+  }
+
+  void singleTest(String field, String funcTemplate, float... results) {
+    singleTest(field, funcTemplate, null, results);
   }
 
   void doTest(String field) {
@@ -128,6 +141,7 @@ public class TestFunctionQuery extends AbstractSolrTestCase {
       100,-4,0,10,25,5
     };
     createIndex(field,vals);
+    createIndex(null, 88);  // id with no value
 
     // test identity (straight field value)
     singleTest(field, "\0", 10,10);
@@ -139,6 +153,8 @@ public class TestFunctionQuery extends AbstractSolrTestCase {
     singleTest(field,"sum(\0,1)", 10, 11);
     singleTest(field,"sum(\0,\0)", 10, 20);
     singleTest(field,"sum(\0,\0,5)", 10, 25);
+
+    singleTest(field,"sub(\0,1)", 10, 9);
 
     singleTest(field,"product(\0,1)", 10, 10);
     singleTest(field,"product(\0,-2,-4)", 10, 80);
@@ -168,11 +184,24 @@ public class TestFunctionQuery extends AbstractSolrTestCase {
     
     // compose the ValueSourceParser plugin function with another function
     singleTest(field, "nvl(sum(0,\0),1)", 0, 1, 100, 100);
+
+    // test simple embedded query
+    singleTest(field,"query({!func v=\0})", 10, 10, 88, 0);
+    // test default value for embedded query
+    singleTest(field,"query({!lucene v='\0:[* TO *]'},8)", 88, 8);
+    singleTest(field,"sum(query({!func v=\0},7.1),query({!func v=\0}))", 10, 20, 100, 200);
+    // test with sub-queries specified by other request args
+    singleTest(field,"query({!func v=$vv})", Arrays.asList("vv","\0"), 10, 10, 88, 0);
+    singleTest(field,"query($vv)",Arrays.asList("vv","{!func}\0"), 10, 10, 88, 0);
+    singleTest(field,"sum(query($v1,5),query($v1,7))",
+            Arrays.asList("v1","\0:[* TO *]"),  88,12
+            );
   }
 
   public void testFunctions() {
     doTest("foo_pf");  // a plain float field
     doTest("foo_f");  // a sortable float field
+    doTest("foo_tf");  // a trie float field
   }
 
   public void testExternalField() {
@@ -194,6 +223,7 @@ public class TestFunctionQuery extends AbstractSolrTestCase {
     assertTrue(orig == FileFloatSource.onlyForTesting);
 
     makeExternalFile(field, "0=1","UTF-8");
+    assertU(adoc("id", "10000")); // will get same reader if no index change
     assertU(commit());
     assertTrue(orig != FileFloatSource.onlyForTesting);
 
@@ -229,6 +259,7 @@ public class TestFunctionQuery extends AbstractSolrTestCase {
       makeExternalFile(field, sb.toString(),"UTF-8");
 
       // make it visible
+      assertU(adoc("id", "10001")); // will get same reader if no index change
       assertU(commit());
 
       // test it
@@ -245,6 +276,55 @@ public class TestFunctionQuery extends AbstractSolrTestCase {
       singleTest(field, "\0", answers);
       System.out.println("Done test "+i);
     }
+  }
 
+  public void testGeneral() {
+    assertU(adoc("id","1", "a_tdt","2009-08-31T12:10:10.123Z", "b_tdt","2009-08-31T12:10:10.124Z"));
+    assertU(adoc("id","2"));
+    assertU(commit()); // create more than one segment
+    assertU(adoc("id","3"));
+    assertU(adoc("id","4"));
+    assertU(commit()); // create more than one segment
+    assertU(adoc("id","5"));
+    assertU(adoc("id","6"));
+    assertU(commit());
+
+    // test that ord and rord are working on a global index basis, not just
+    // at the segment level (since Lucene 2.9 has switched to per-segment searching)
+    assertQ(req("fl","*,score","q", "{!func}ord(id)", "fq","id:6"), "//float[@name='score']='6.0'");
+    assertQ(req("fl","*,score","q", "{!func}top(ord(id))", "fq","id:6"), "//float[@name='score']='6.0'");
+    assertQ(req("fl","*,score","q", "{!func}rord(id)", "fq","id:1"),"//float[@name='score']='6.0'");
+    assertQ(req("fl","*,score","q", "{!func}top(rord(id))", "fq","id:1"),"//float[@name='score']='6.0'");
+
+
+    // test that we can subtract dates to millisecond precision
+    assertQ(req("fl","*,score","q", "{!func}ms(a_tdt,b_tdt)", "fq","id:1"), "//float[@name='score']='-1.0'");
+    assertQ(req("fl","*,score","q", "{!func}ms(b_tdt,a_tdt)", "fq","id:1"), "//float[@name='score']='1.0'");
+    assertQ(req("fl","*,score","q", "{!func}ms(2009-08-31T12:10:10.125Z,2009-08-31T12:10:10.124Z)", "fq","id:1"), "//float[@name='score']='1.0'");
+    assertQ(req("fl","*,score","q", "{!func}ms(2009-08-31T12:10:10.124Z,a_tdt)", "fq","id:1"), "//float[@name='score']='1.0'");
+    assertQ(req("fl","*,score","q", "{!func}ms(2009-08-31T12:10:10.125Z,b_tdt)", "fq","id:1"), "//float[@name='score']='1.0'");
+
+    assertQ(req("fl","*,score","q", "{!func}ms(2009-08-31T12:10:10.125Z/SECOND,2009-08-31T12:10:10.124Z/SECOND)", "fq","id:1"), "//float[@name='score']='0.0'");
+
+    for (int i=100; i<112; i++) {
+      assertU(adoc("id",""+i, "text","batman"));
+    }
+    assertU(commit());
+    assertU(adoc("id","120", "text","batman superman"));   // in a segment by itself
+    assertU(commit());
+
+    // batman and superman have the same idf in single-doc segment, but very different in the complete index.
+    String q ="{!func}query($qq)";
+    String fq="id:120"; 
+    assertQ(req("fl","*,score","q", q, "qq","text:batman", "fq",fq), "//float[@name='score']<'1.0'");
+    assertQ(req("fl","*,score","q", q, "qq","text:superman", "fq",fq), "//float[@name='score']>'1.0'");
+
+    // test weighting through a function range query
+    assertQ(req("fl","*,score", "q", "{!frange l=1 u=10}query($qq)", "qq","text:superman"), "//*[@numFound='1']");
+
+    // test weighting through a complex function
+    q ="{!func}sub(div(sum(0.0,product(1,query($qq))),1),0)";
+    assertQ(req("fl","*,score","q", q, "qq","text:batman", "fq",fq), "//float[@name='score']<'1.0'");
+    assertQ(req("fl","*,score","q", q, "qq","text:superman", "fq",fq), "//float[@name='score']>'1.0'");
   }
 }

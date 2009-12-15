@@ -29,6 +29,7 @@ import org.apache.solr.common.util.DOMUtil;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.Config;
 import org.apache.solr.core.SolrResourceLoader;
+import org.apache.solr.analysis.CharFilterFactory;
 import org.apache.solr.analysis.TokenFilterFactory;
 import org.apache.solr.analysis.TokenizerChain;
 import org.apache.solr.analysis.TokenizerFactory;
@@ -45,22 +46,24 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.io.IOException;
 import java.util.*;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <code>IndexSchema</code> contains information about the valid fields in an index
  * and the types of those fields.
  *
- * @version $Id: IndexSchema.java 684908 2008-08-11 20:37:36Z gsingers $
+ * @version $Id: IndexSchema.java 805941 2009-08-19 19:25:16Z ehatcher $
  */
 public final class IndexSchema {
   public static final String DEFAULT_SCHEMA_FILE = "schema.xml";
 
-  final static Logger log = Logger.getLogger(IndexSchema.class.getName());
+  final static Logger log = LoggerFactory.getLogger(IndexSchema.class);
   private final SolrConfig solrConfig;
   private final String resourceName;
   private String name;
   private float version;
+  private final SolrResourceLoader loader;
 
   /**
    * Constructs a schema using the specified file name using the normal
@@ -85,7 +88,7 @@ public final class IndexSchema {
     if (name == null)
       name = DEFAULT_SCHEMA_FILE;
     this.resourceName = name;
-    SolrResourceLoader loader = solrConfig.getResourceLoader();
+    loader = solrConfig.getResourceLoader();
     InputStream lis = is;
     if (lis == null)
       lis = loader.openSchema(name);
@@ -96,14 +99,23 @@ public final class IndexSchema {
       }
       catch(IOException xio) {} // ignore
     }
-    
     loader.inform( loader );
   }
 
+  /**
+   * @deprecated -- get access to SolrConfig some other way...
+   */
   public SolrConfig getSolrConfig() {
     return solrConfig;
   }
   
+  /**
+   * @since solr 1.4
+   */
+  public SolrResourceLoader getResourceLoader()
+  {
+    return loader;
+  }
   
   /** Gets the name of the resource used to instantiate this schema. */
   public String getResourceName() {
@@ -127,7 +139,7 @@ public final class IndexSchema {
    */
   @Deprecated
   public InputStream getInputStream() {
-    return solrConfig.getResourceLoader().openResource(resourceName);
+    return loader.openResource(resourceName);
   }
 
   /** Gets the name of the schema file.
@@ -239,6 +251,7 @@ public final class IndexSchema {
    * &lt;solrQueryParser&gt; configuration for this IndexSchema.
    *
    * @param defaultField if non-null overrides the schema default
+   * @deprecated
    */
   public SolrQueryParser getSolrQueryParser(String defaultField) {
     SolrQueryParser qp = new SolrQueryParser(this,defaultField);
@@ -250,9 +263,7 @@ public final class IndexSchema {
   
   /**
    * Name of the default search field specified in the schema file
-   * @deprecated use getSolrQueryParser().getField()
    */
-  @Deprecated
   public String getDefaultSearchFieldName() {
     return defaultSearchFieldName;
   }
@@ -349,6 +360,11 @@ public final class IndexSchema {
     }
 
     @Override
+    public TokenStream reusableTokenStream(String fieldName, Reader reader) throws IOException {
+      return getAnalyzer(fieldName).reusableTokenStream(fieldName,reader);
+    }
+
+    @Override
     public int getPositionIncrementGap(String fieldName) {
       return getAnalyzer(fieldName).getPositionIncrementGap(fieldName);
     }
@@ -380,13 +396,13 @@ public final class IndexSchema {
     try {
       // pass the config resource loader to avoid building an empty one for no reason:
       // in the current case though, the stream is valid so we wont load the resource by name
-      Config schemaConf = new Config(solrConfig.getResourceLoader(), "schema", is, "/schema/");
+      Config schemaConf = new Config(loader, "schema", is, "/schema/");
       Document document = schemaConf.getDocument();
       final XPath xpath = schemaConf.getXPath();
 
       Node nd = (Node) xpath.evaluate("/schema/@name", document, XPathConstants.NODE);
       if (nd==null) {
-        log.warning("schema has no name!");
+        log.warn("schema has no name!");
       } else {
         name = nd.getNodeValue();
         log.info("Schema name=" + name);
@@ -395,7 +411,7 @@ public final class IndexSchema {
       version = schemaConf.getFloat("/schema/@version", 1.0f);
 
       final IndexSchema schema = this;
-      AbstractPluginLoader<FieldType> loader = new AbstractPluginLoader<FieldType>( "[schema.xml] fieldType", true, true) {
+      AbstractPluginLoader<FieldType> fieldLoader = new AbstractPluginLoader<FieldType>( "[schema.xml] fieldType", true, true) {
 
         @Override
         protected FieldType create( ResourceLoader loader, String name, String className, Node node ) throws Exception
@@ -429,7 +445,7 @@ public final class IndexSchema {
 
         @Override
         protected FieldType register(String name, FieldType plugin) throws Exception {
-          log.finest("fieldtype defined: " + plugin );
+          log.trace("fieldtype defined: " + plugin );
           return fieldTypes.put( name, plugin );
         }
       };
@@ -437,7 +453,7 @@ public final class IndexSchema {
 
       String expression = "/schema/types/fieldtype | /schema/types/fieldType";
       NodeList nodes = (NodeList) xpath.evaluate(expression, document, XPathConstants.NODESET);
-      loader.load( solrConfig.getResourceLoader(), nodes );
+      fieldLoader.load( loader, nodes );
 
       
 
@@ -453,7 +469,7 @@ public final class IndexSchema {
         NamedNodeMap attrs = node.getAttributes();
 
         String name = DOMUtil.getAttr(attrs,"name","field definition");
-        log.finest("reading field def "+name);
+        log.trace("reading field def "+name);
         String type = DOMUtil.getAttr(attrs,"type","field " + name);
 
         FieldType ft = fieldTypes.get(type);
@@ -479,13 +495,13 @@ public final class IndexSchema {
             SolrConfig.severeErrors.add( t );
           }
           
-          log.fine("field defined: " + f);
+          log.debug("field defined: " + f);
           if( f.getDefaultValue() != null ) {
-            log.fine(name+" contains default value: " + f.getDefaultValue());
+            log.debug(name+" contains default value: " + f.getDefaultValue());
             fieldsWithDefaultValue.add( f );
           }
           if (f.isRequired()) {
-            log.fine(name+" is required in this schema");
+            log.debug(name+" is required in this schema");
             requiredFields.add(f);
           }
         } else if (node.getNodeName().equals("dynamicField")) {
@@ -505,7 +521,7 @@ public final class IndexSchema {
           }
           if( !dup ) {
             dFields.add(new DynamicField(f));
-            log.fine("dynamic field defined: " + f);
+            log.debug("dynamic field defined: " + f);
           }
         } else {
           // we should never get here
@@ -523,7 +539,7 @@ public final class IndexSchema {
     // the largest string possible.
     Collections.sort(dFields);
 
-    log.finest("Dynamic Field Ordering:" + dFields);
+    log.trace("Dynamic Field Ordering:" + dFields);
 
     // stuff it in a normal array for faster access
     dynamicFields = (DynamicField[])dFields.toArray(new DynamicField[dFields.size()]);
@@ -536,28 +552,28 @@ public final class IndexSchema {
           return Similarity.getDefault();
         }
       };
-      log.fine("using default similarity");
+      log.debug("using default similarity");
     } else {
-      final Object obj = solrConfig.getResourceLoader().newInstance(((Element) node).getAttribute("class"));
+      final Object obj = loader.newInstance(((Element) node).getAttribute("class"));
       if (obj instanceof SimilarityFactory) {
         // configure a factory, get a similarity back
         SolrParams params = SolrParams.toSolrParams(DOMUtil.childNodesToNamedList(node));
         similarityFactory = (SimilarityFactory)obj;
         similarityFactory.init(params);
       } else {
-        // just like always, assume it's a Similarlity and get an ClassCastException - reasonable error handling
+        // just like always, assume it's a Similarlity and get a ClassCastException - reasonable error handling
         similarityFactory = new SimilarityFactory() {
           public Similarity getSimilarity() {
             return (Similarity) obj;
           }
         };
       }
-      log.fine("using similarity factory" + similarityFactory.getClass().getName());
+      log.debug("using similarity factory" + similarityFactory.getClass().getName());
     }
 
     node = (Node) xpath.evaluate("/schema/defaultSearchField/text()", document, XPathConstants.NODE);
     if (node==null) {
-      log.warning("no default search field specified in schema.");
+      log.warn("no default search field specified in schema.");
     } else {
       defaultSearchFieldName=node.getNodeValue().trim();
       // throw exception if specified, but not found or not indexed
@@ -573,7 +589,7 @@ public final class IndexSchema {
 
     node = (Node) xpath.evaluate("/schema/solrQueryParser/@defaultOperator", document, XPathConstants.NODE);
     if (node==null) {
-      log.fine("using default query parser operator (OR)");
+      log.debug("using default query parser operator (OR)");
     } else {
       queryParserDefaultOperator=node.getNodeValue().trim();
       log.info("query parser default operator is "+queryParserDefaultOperator);
@@ -581,7 +597,7 @@ public final class IndexSchema {
 
     node = (Node) xpath.evaluate("/schema/uniqueKey/text()", document, XPathConstants.NODE);
     if (node==null) {
-      log.warning("no uniqueKey specified in schema.");
+      log.warn("no uniqueKey specified in schema.");
     } else {
       uniqueKeyField=getIndexedField(node.getNodeValue().trim());
       uniqueKeyFieldName=uniqueKeyField.getName();
@@ -609,13 +625,23 @@ public final class IndexSchema {
 
         String source = DOMUtil.getAttr(attrs,"source","copyField definition");
         String dest   = DOMUtil.getAttr(attrs,"dest",  "copyField definition");
+        String maxChars = DOMUtil.getAttr(attrs, "maxChars");
+        int maxCharsInt = CopyField.UNLIMITED;
+        if (maxChars != null) {
+          try {
+            maxCharsInt = Integer.parseInt(maxChars);
+          } catch (NumberFormatException e) {
+            log.warn("Couldn't parse maxChars attribute for copyField from "
+                    + source + " to " + dest + " as integer. The whole field will be copied.");
+          }
+        }
 
-        registerCopyField(source, dest);
+        registerCopyField(source, dest, maxCharsInt);
      }
       
       for (Map.Entry<SchemaField, Integer> entry : copyFieldTargetCounts.entrySet())    {
         if (entry.getValue() > 1 && !entry.getKey().multiValued())  {
-          log.warning("Field " + entry.getKey().name + " is not multivalued "+
+          log.warn("Field " + entry.getKey().name + " is not multivalued "+
                       "and destination for multiple copyFields ("+
                       entry.getValue()+")");
         }
@@ -634,6 +660,11 @@ public final class IndexSchema {
     refreshAnalyzers();
   }
 
+  public void registerCopyField( String source, String dest )
+  {
+    registerCopyField(source, dest, CopyField.UNLIMITED);
+  }
+
   /**
    * <p>
    * NOTE: this function is not thread safe.  However, it is safe to use within the standard
@@ -643,13 +674,16 @@ public final class IndexSchema {
    * 
    * @see SolrCoreAware
    */
-  public void registerCopyField( String source, String dest )
+  public void registerCopyField( String source, String dest, int maxChars )
   {
     boolean sourceIsPattern = isWildCard(source);
     boolean destIsPattern   = isWildCard(dest);
 
-    log.fine("copyField source='"+source+"' dest='"+dest+"'");
-    SchemaField d = getField(dest);
+    log.debug("copyField source='"+source+"' dest='"+dest+"' maxChars='"+maxChars);
+    SchemaField d = getFieldOrNull(dest);
+    if(d == null){
+      throw new SolrException( SolrException.ErrorCode.SERVER_ERROR, "copyField destination :'"+dest+"' does not exist" );
+    }
 
     if(sourceIsPattern) {
       if( destIsPattern ) {
@@ -663,10 +697,10 @@ public final class IndexSchema {
         if( df == null ) {
           throw new SolrException( SolrException.ErrorCode.SERVER_ERROR, "copyField dynamic destination must match a dynamicField." );
         }
-        registerDynamicCopyField(new DynamicDestCopy(source, df ));
+        registerDynamicCopyField(new DynamicDestCopy(source, df, maxChars ));
       }
       else {
-        registerDynamicCopyField(new DynamicCopy(source, d));
+        registerDynamicCopyField(new DynamicCopy(source, d, maxChars));
       }
     } 
     else if( destIsPattern ) {
@@ -677,13 +711,12 @@ public final class IndexSchema {
       // retrieve the field to force an exception if it doesn't exist
       SchemaField f = getField(source);
 
-      SchemaField[] destArr = copyFields.get(source);
-      if (destArr==null) {
-        destArr=new SchemaField[]{d};
-      } else {
-        destArr = (SchemaField[])append(destArr,d);
+      List<CopyField> copyFieldList = copyFieldsMap.get(source);
+      if (copyFieldList == null) {
+        copyFieldList = new ArrayList<CopyField>();
+        copyFieldsMap.put(source, copyFieldList);
       }
-      copyFields.put(source,destArr);
+      copyFieldList.add(new CopyField(f, d, maxChars));
 
       copyFieldTargetCounts.put(d, (copyFieldTargetCounts.containsKey(d) ? copyFieldTargetCounts.get(d) + 1 : 1));
     }
@@ -700,7 +733,7 @@ public final class IndexSchema {
       temp[temp.length -1] = dcopy;
       dynamicCopyFields = temp;
     }
-    log.finest("Dynamic Copy Field:" + dcopy );
+    log.trace("Dynamic Copy Field:" + dcopy );
   }
 
   private static Object[] append(Object[] orig, Object item) {
@@ -723,17 +756,38 @@ public final class IndexSchema {
     NamedNodeMap attrs = node.getAttributes();
     String analyzerName = DOMUtil.getAttr(attrs,"class");
     if (analyzerName != null) {
-      return (Analyzer)solrConfig.getResourceLoader().newInstance(analyzerName);
+      return (Analyzer)loader.newInstance(analyzerName);
     }
 
     XPath xpath = XPathFactory.newInstance().newXPath();
 
+    // Load the CharFilters
+    // --------------------------------------------------------------------------------
+    final ArrayList<CharFilterFactory> charFilters = new ArrayList<CharFilterFactory>();
+    AbstractPluginLoader<CharFilterFactory> charFilterLoader =
+      new AbstractPluginLoader<CharFilterFactory>( "[schema.xml] analyzer/charFilter", false, false )
+    {
+      @Override
+      protected void init(CharFilterFactory plugin, Node node) throws Exception {
+        if( plugin != null ) {
+          plugin.init( DOMUtil.toMapExcept(node.getAttributes(),"class") );
+          charFilters.add( plugin );
+        }
+      }
+
+      @Override
+      protected CharFilterFactory register(String name, CharFilterFactory plugin) throws Exception {
+        return null; // used for map registration
+      }
+    };
+    charFilterLoader.load( solrConfig.getResourceLoader(), (NodeList)xpath.evaluate("./charFilter", node, XPathConstants.NODESET) );
+
     // Load the Tokenizer
-    // Although an analyzer only allows a single Tokenizer, we load a list to make sure 
+    // Although an analyzer only allows a single Tokenizer, we load a list to make sure
     // the configuration is ok
     // --------------------------------------------------------------------------------
     final ArrayList<TokenizerFactory> tokenizers = new ArrayList<TokenizerFactory>(1);
-    AbstractPluginLoader<TokenizerFactory> tokenizerLoader = 
+    AbstractPluginLoader<TokenizerFactory> tokenizerLoader =
       new AbstractPluginLoader<TokenizerFactory>( "[schema.xml] analyzer/tokenizer", false, false )
     {
       @Override
@@ -751,7 +805,7 @@ public final class IndexSchema {
         return null; // used for map registration
       }
     };
-    tokenizerLoader.load( solrConfig.getResourceLoader(), (NodeList)xpath.evaluate("./tokenizer", node, XPathConstants.NODESET) );
+    tokenizerLoader.load( loader, (NodeList)xpath.evaluate("./tokenizer", node, XPathConstants.NODESET) );
     
     // Make sure something was loaded
     if( tokenizers.isEmpty() ) {
@@ -778,9 +832,10 @@ public final class IndexSchema {
         return null; // used for map registration
       }
     };
-    filterLoader.load( solrConfig.getResourceLoader(), (NodeList)xpath.evaluate("./filter", node, XPathConstants.NODESET) );
-    
-    return new TokenizerChain(tokenizers.get(0), filters.toArray(new TokenFilterFactory[filters.size()]));
+    filterLoader.load( loader, (NodeList)xpath.evaluate("./filter", node, XPathConstants.NODESET) );
+
+    return new TokenizerChain(charFilters.toArray(new CharFilterFactory[charFilters.size()]),
+        tokenizers.get(0), filters.toArray(new TokenFilterFactory[filters.size()]));
   };
 
 
@@ -857,9 +912,16 @@ public final class IndexSchema {
 
   static class DynamicCopy extends DynamicReplacement {
     final SchemaField targetField;
+    final int maxChars;
+
     DynamicCopy(String regex, SchemaField targetField) {
+      this(regex, targetField, CopyField.UNLIMITED);
+    }
+
+    DynamicCopy(String regex, SchemaField targetField, int maxChars) {
       super(regex);
       this.targetField = targetField;
+      this.maxChars = maxChars;
     }
     
     public SchemaField getTargetField( String sourceField )
@@ -881,7 +943,11 @@ public final class IndexSchema {
     final String dstr;
     
     DynamicDestCopy(String source, DynamicField dynamic) {
-      super(source, dynamic.prototype );
+      this(source, dynamic, CopyField.UNLIMITED);
+    }
+      
+    DynamicDestCopy(String source, DynamicField dynamic, int maxChars) {
+      super(source, dynamic.prototype, maxChars);
       this.dynamic = dynamic;
       
       String dest = dynamic.regex;
@@ -951,6 +1017,23 @@ public final class IndexSchema {
     return false;
   }
 
+  /**
+   * Is the specified field dynamic or not.
+   * @param fieldName
+   * @return true if the specified field is dynamic
+   */
+  public boolean isDynamicField(String fieldName) {
+    if(fields.containsKey(fieldName)) {
+      return false;
+    }
+
+    for (DynamicField df : dynamicFields) {
+      if (df.matches(fieldName)) return true;
+    }
+
+    return false;
+  }
+  
   /**
    * Returns the SchemaField that should be used for the specified field name, or
    * null if none exists.
@@ -1061,7 +1144,7 @@ public final class IndexSchema {
   };
 
 
-  private final Map<String, SchemaField[]> copyFields = new HashMap<String,SchemaField[]>();
+  private final Map<String, List<CopyField>> copyFieldsMap = new HashMap<String, List<CopyField>>();
   private DynamicCopy[] dynamicCopyFields;
   /**
    * keys are all fields copied to, count is num of copyField
@@ -1082,46 +1165,69 @@ public final class IndexSchema {
       return new SchemaField[0];
     }
     List<SchemaField> sf = new ArrayList<SchemaField>();
-    for (Map.Entry<String, SchemaField[]> cfs : copyFields.entrySet()) {
-      for (SchemaField cf : cfs.getValue()) {
-        if (cf.getName().equals(destField)) {
-          sf.add(getField(cfs.getKey()));
+    for (Map.Entry<String, List<CopyField>> cfs : copyFieldsMap.entrySet()) {
+      for (CopyField copyField : cfs.getValue()) {
+        if (copyField.getDestination().getName().equals(destField)) {
+          sf.add(copyField.getSource());
         }
       }
     }
-    return sf.toArray(new SchemaField[1]);
+    return sf.toArray(new SchemaField[sf.size()]);
   }
   /**
    * Get all copy fields, both the static and the dynamic ones.
+   * 
    * @param sourceField
    * @return Array of fields to copy to.
+   * @deprecated Use {@link #getCopyFieldsList(String)} instead.
    */
+  @Deprecated
   public SchemaField[] getCopyFields(String sourceField) {
-    // Get the dynamic ones into a list.
+    // This is the List that holds all the results, dynamic or not.
     List<SchemaField> matchCopyFields = new ArrayList<SchemaField>();
 
+    // Get the dynamic results into the list.
     for(DynamicCopy dynamicCopy : dynamicCopyFields) {
       if(dynamicCopy.matches(sourceField)) {
         matchCopyFields.add(dynamicCopy.getTargetField(sourceField));
       }
     }
 
-    // Get the fixed ones, if there are any.
-    SchemaField[] fixedCopyFields = copyFields.get(sourceField);
-
-    boolean appendFixed = copyFields.containsKey(sourceField);
-
-    // Construct the results by concatenating dynamic and fixed into a results array.
-
-    SchemaField[] results = new SchemaField[matchCopyFields.size() + (appendFixed ? fixedCopyFields.length : 0)];
-
-    matchCopyFields.toArray(results);
-
-    if(appendFixed) {
-      System.arraycopy(fixedCopyFields, 0, results, matchCopyFields.size(), fixedCopyFields.length);
+    // Get the fixed ones, if there are any and add them.
+    final List<CopyField> copyFields = copyFieldsMap.get(sourceField);
+    if (copyFields!=null) {
+      final Iterator<CopyField> it = copyFields.iterator();
+      while (it.hasNext()) {
+        matchCopyFields.add(it.next().getDestination());
+      }
     }
 
-    return results;
+    // Construct the results by transforming the list into an array.
+    return matchCopyFields.toArray(new SchemaField[matchCopyFields.size()]);
+  }
+
+  /**
+   * Get all copy fields for a specified source field, both static
+   * and dynamic ones.
+   * @param sourceField
+   * @return List of CopyFields to copy to.
+   * @since solr 1.4
+   */
+  // This is useful when we need the maxSize param of each CopyField
+  public List<CopyField> getCopyFieldsList(final String sourceField){
+    final List<CopyField> result = new ArrayList<CopyField>();
+    for (DynamicCopy dynamicCopy : dynamicCopyFields) {
+      if (dynamicCopy.matches(sourceField)) {
+        result.add(new CopyField(getField(sourceField), dynamicCopy.getTargetField(sourceField), dynamicCopy.maxChars));
+      }
+    }
+    List<CopyField> fixedCopyFields = copyFieldsMap.get(sourceField);
+    if (fixedCopyFields != null)
+    {
+      result.addAll(fixedCopyFields);
+    }
+
+    return result;
   }
   
   /**

@@ -60,6 +60,6 @@ public class HtmlFormatter extends HighlightingPluginBase implements SolrFormatt
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/highlight/HtmlFormatter.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/highlight/HtmlFormatter.java $";
   }
 }

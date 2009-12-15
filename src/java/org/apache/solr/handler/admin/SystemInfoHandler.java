@@ -26,22 +26,21 @@ import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
+import java.text.DecimalFormat;
 import java.util.Date;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.lucene.LucenePackage;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.common.util.XML;
-import org.apache.solr.core.Config;
 import org.apache.solr.core.SolrCore;
-import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.handler.RequestHandlerBase;
-import org.apache.solr.handler.RequestHandlerUtils;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
 import org.apache.solr.schema.IndexSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -51,11 +50,13 @@ import org.apache.solr.schema.IndexSchema;
  * that it works nicely with an XSLT transformation.  Until we have a nice
  * XSLT front end for /admin, the format is still open to change.
  * 
- * @version $Id: SystemInfoHandler.java 690026 2008-08-28 22:20:00Z yonik $
+ * @version $Id: SystemInfoHandler.java 790580 2009-07-02 13:20:22Z markrmiller $
  * @since solr 1.2
  */
 public class SystemInfoHandler extends RequestHandlerBase 
 {
+  private static Logger log = LoggerFactory.getLogger(SystemInfoHandler.class);
+  
   @Override
   public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception
   {
@@ -63,6 +64,7 @@ public class SystemInfoHandler extends RequestHandlerBase
     rsp.add( "lucene", getLuceneInfo() );
     rsp.add( "jvm", getJvmInfo() );
     rsp.add( "system", getSystemInfo() );
+    rsp.setHttpCaching(false);
   }
   
   /**
@@ -73,7 +75,7 @@ public class SystemInfoHandler extends RequestHandlerBase
     SimpleOrderedMap<Object> info = new SimpleOrderedMap<Object>();
     
     IndexSchema schema = core.getSchema();
-    info.add( "schema", schema != null ? schema.getName():"no schema!" );
+    info.add( "schema", schema != null ? schema.getSchemaName():"no schema!" );
     
     // Host
     InetAddress addr = InetAddress.getLocalHost();
@@ -169,7 +171,7 @@ public class SystemInfoHandler extends RequestHandlerBase
       return IOUtils.toString( in );
     }
     catch( Exception ex ) {
-      ex.printStackTrace();
+      // ignore - log.warn("Error executing command", ex);
       return "(error executing: " + cmd + ")";
     }
     finally {
@@ -191,15 +193,16 @@ public class SystemInfoHandler extends RequestHandlerBase
     jvm.add( "processors", runtime.availableProcessors() );
     
     long used = runtime.totalMemory() - runtime.freeMemory();
-    int percentUsed = (int)(((double)(used)/(double)runtime.maxMemory())*100);
+    // not thread safe, but could be thread local
+    DecimalFormat df = new DecimalFormat("#.#");
+    double percentUsed = ((double)(used)/(double)runtime.maxMemory())*100;
 
-    
     SimpleOrderedMap<Object> mem = new SimpleOrderedMap<Object>();
-    mem.add( "free",  FileUtils.byteCountToDisplaySize( runtime.freeMemory()  ) );
-    mem.add( "total", FileUtils.byteCountToDisplaySize( runtime.totalMemory() ) );
-    mem.add( "max",   FileUtils.byteCountToDisplaySize( runtime.maxMemory()   ) );
-    mem.add( "used",  FileUtils.byteCountToDisplaySize( used ) + " (%"+percentUsed+")");
-    jvm.add( "memory", mem );
+    mem.add("free", humanReadableUnits(runtime.freeMemory(), df));
+    mem.add("total", humanReadableUnits(runtime.totalMemory(), df));
+    mem.add("max", humanReadableUnits(runtime.maxMemory(), df));
+    mem.add("used", humanReadableUnits(used, df) + " (%" + df.format(percentUsed) + ")");
+    jvm.add("memory", mem);
 
     // JMX properties -- probably should be moved to a different handler
     SimpleOrderedMap<Object> jmx = new SimpleOrderedMap<Object>();
@@ -218,7 +221,7 @@ public class SystemInfoHandler extends RequestHandlerBase
       jmx.add( "upTimeMS",  mx.getUptime() );
     }
     catch (Exception e) {
-      e.printStackTrace();
+      log.warn("Error getting JMX properties", e);
     }
     jvm.add( "jmx", jmx );
     return jvm;
@@ -279,18 +282,42 @@ public class SystemInfoHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-    return "$Revision: 690026 $";
+    return "$Revision: 790580 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: SystemInfoHandler.java 690026 2008-08-28 22:20:00Z yonik $";
+    return "$Id: SystemInfoHandler.java 790580 2009-07-02 13:20:22Z markrmiller $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/admin/SystemInfoHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/admin/SystemInfoHandler.java $";
   }
+  
+  private static final long ONE_KB = 1024;
+  private static final long ONE_MB = ONE_KB * ONE_KB;
+  private static final long ONE_GB = ONE_KB * ONE_MB;
+
+  /**
+   * Return good default units based on byte size.
+   */
+  private static String humanReadableUnits(long bytes, DecimalFormat df) {
+    String newSizeAndUnits;
+
+    if (bytes / ONE_GB > 0) {
+      newSizeAndUnits = String.valueOf(df.format((float)bytes / ONE_GB)) + " GB";
+    } else if (bytes / ONE_MB > 0) {
+      newSizeAndUnits = String.valueOf(df.format((float)bytes / ONE_MB)) + " MB";
+    } else if (bytes / ONE_KB > 0) {
+      newSizeAndUnits = String.valueOf(df.format((float)bytes / ONE_KB)) + " KB";
+    } else {
+      newSizeAndUnits = String.valueOf(bytes) + " bytes";
+    }
+
+    return newSizeAndUnits;
+  }
+  
 }
 
 
