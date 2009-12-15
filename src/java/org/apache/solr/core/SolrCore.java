@@ -275,6 +275,7 @@ public final class SolrCore implements SolrInfoMBean {
   // currently only called with SolrCore.class lock held
   void initIndex() {
     try {
+      System.setProperty( "org.apache.lucene.lockDir", dataDir );
       File dirFile = new File(getIndexDir());
       boolean indexExists = dirFile.canRead();
       boolean firstTime = dirs.add(dirFile.getCanonicalPath());

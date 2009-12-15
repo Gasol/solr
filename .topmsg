@@ -1,0 +1,9 @@
+From: Jan-Pascal van Best <janpascal@vanbest.org>
+Subject: [PATCH] debian/fix-lucene-lock-directory
+
+Fix FilePermission security exceptions because the default lucene
+lock dir is the system temp dir, which under Tomcat is
+/var/lib/tomcat5.5/temp. Move it to the dataDir (/var/lib/solr/data)
+instead.
+
+Signed-off-by: Thomas Koch <thomas.koch@ymc.ch>
