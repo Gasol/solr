@@ -20,9 +20,16 @@
 
 package org.apache.solr.update;
 
+import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.store.Directory;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -34,11 +41,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 import java.io.IOException;
 import java.net.URL;
 
-import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.QueryParsing;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
@@ -112,7 +117,7 @@ import org.apache.solr.core.SolrCore;
   be batched and executed together so they may share the same index reader.
 
  *
- * @version $Id: DirectUpdateHandler2.java 672297 2008-06-27 15:28:44Z yonik $
+ * @version $Id: DirectUpdateHandler2.java 824380 2009-10-12 15:18:08Z koji $
  * @since solr 0.9
  */
 
@@ -125,8 +130,11 @@ public class DirectUpdateHandler2 extends UpdateHandler {
   AtomicLong deleteByIdCommandsCumulative= new AtomicLong();
   AtomicLong deleteByQueryCommands= new AtomicLong();
   AtomicLong deleteByQueryCommandsCumulative= new AtomicLong();
+  AtomicLong expungeDeleteCommands = new AtomicLong();
+  AtomicLong mergeIndexesCommands = new AtomicLong();
   AtomicLong commitCommands= new AtomicLong();
   AtomicLong optimizeCommands= new AtomicLong();
+  AtomicLong rollbackCommands= new AtomicLong();
   AtomicLong numDocsPending= new AtomicLong();
   AtomicLong numErrors = new AtomicLong();
   AtomicLong numErrorsCumulative = new AtomicLong();
@@ -141,7 +149,6 @@ public class DirectUpdateHandler2 extends UpdateHandler {
   protected final Lock iwAccess, iwCommit;
 
   protected IndexWriter writer;
-  protected SolrIndexSearcher searcher;
 
   public DirectUpdateHandler2(SolrCore core) throws IOException {
     super(core);
@@ -157,7 +164,6 @@ public class DirectUpdateHandler2 extends UpdateHandler {
   private void deleteAll() throws IOException {
     core.log.info(core.getLogId()+"REMOVING ALL DOCUMENTS FROM INDEX");
     closeWriter();
-    closeSearcher();
     writer = createMainIndexWriter("DirectUpdateHandler2", true);
   }
 
@@ -180,19 +186,13 @@ public class DirectUpdateHandler2 extends UpdateHandler {
     }
   }
 
-  protected void openSearcher() throws IOException {
-    if (searcher==null) {
-      searcher = core.newSearcher("DirectUpdateHandler2");
-    }
-  }
-
-  protected void closeSearcher() throws IOException {
+  // must only be called when iwCommit lock held
+  protected void rollbackWriter() throws IOException {
     try {
-      if (searcher!=null) searcher.close();
+      numDocsPending.set(0);
+      if (writer!=null) writer.rollback();
     } finally {
-      // if an exception causes a lock to not be
-      // released, we could try to delete it.
-      searcher=null;
+      writer = null;
     }
   }
 
@@ -200,7 +200,7 @@ public class DirectUpdateHandler2 extends UpdateHandler {
     addCommands.incrementAndGet();
     addCommandsCumulative.incrementAndGet();
     int rc=-1;
-    
+
     // if there is no ID field, use allowDups
     if( idField == null ) {
       cmd.allowDups = true;
@@ -217,19 +217,34 @@ public class DirectUpdateHandler2 extends UpdateHandler {
       // protected with iwCommit (which iwAccess excludes from this block).
       synchronized (this) {
         // adding document -- prep writer
-        closeSearcher();
         openWriter();
-        tracker.addedDocument();
+        tracker.addedDocument( cmd.commitWithin );
       } // end synchronized block
 
       // this is the only unsynchronized code in the iwAccess block, which
       // should account for most of the time
+			Term updateTerm = null;
 
       if (cmd.overwriteCommitted || cmd.overwritePending) {
         if (cmd.indexedId == null) {
           cmd.indexedId = getIndexedId(cmd.doc);
         }
-        writer.updateDocument(idTerm.createTerm(cmd.indexedId), cmd.getLuceneDocument(schema));
+        Term idTerm = this.idTerm.createTerm(cmd.indexedId);
+        boolean del = false;
+        if (cmd.updateTerm == null) {
+          updateTerm = idTerm;
+        } else {
+          del = true;
+        	updateTerm = cmd.updateTerm;
+        }
+
+        writer.updateDocument(updateTerm, cmd.getLuceneDocument(schema));
+        if(del) { // ensure id remains unique
+          BooleanQuery bq = new BooleanQuery();
+          bq.add(new BooleanClause(new TermQuery(updateTerm), Occur.MUST_NOT));
+          bq.add(new BooleanClause(new TermQuery(idTerm), Occur.MUST));
+          writer.deleteDocuments(bq);
+        }
       } else {
         // allow duplicates
         writer.addDocument(cmd.getLuceneDocument(schema));
@@ -268,13 +283,12 @@ public class DirectUpdateHandler2 extends UpdateHandler {
 
     iwCommit.lock();
     try {
-      closeSearcher();
       openWriter();
       writer.deleteDocuments(idTerm.createTerm(idFieldType.toInternal(cmd.id)));
     } finally {
       iwCommit.unlock();
     }
-    
+
     if( tracker.timeUpperBound > 0 ) {
       tracker.scheduleCommitWithin( tracker.timeUpperBound );
     }
@@ -308,9 +322,8 @@ public class DirectUpdateHandler2 extends UpdateHandler {
        if (delAll) {
          deleteAll();
        } else {
-        closeSearcher();
         openWriter();
-        writer.deleteDocuments(q);         
+        writer.deleteDocuments(q);
        }
      } finally {
        iwCommit.unlock();
@@ -329,7 +342,42 @@ public class DirectUpdateHandler2 extends UpdateHandler {
     }
   }
 
+  public int mergeIndexes(MergeIndexesCommand cmd) throws IOException {
+    mergeIndexesCommands.incrementAndGet();
+    int rc = -1;
 
+    iwCommit.lock();
+    try {
+      log.info("start " + cmd);
+
+      Directory[] dirs = cmd.dirs;
+      if (dirs != null && dirs.length > 0) {
+        openWriter();
+        writer.addIndexesNoOptimize(dirs);
+        rc = 1;
+      } else {
+        rc = 0;
+      }
+      log.info("end_mergeIndexes");
+    } finally {
+      iwCommit.unlock();
+    }
+
+    if (rc == 1 && tracker.timeUpperBound > 0) {
+      tracker.scheduleCommitWithin(tracker.timeUpperBound);
+    }
+
+    return rc;
+  }
+
+   public void forceOpenWriter() throws IOException  {
+    iwCommit.lock();
+    try {
+      openWriter();
+    } finally {
+      iwCommit.unlock();
+    }
+  }
 
   public void commit(CommitUpdateCommand cmd) throws IOException {
 
@@ -337,6 +385,7 @@ public class DirectUpdateHandler2 extends UpdateHandler {
       optimizeCommands.incrementAndGet();
     } else {
       commitCommands.incrementAndGet();
+      if (cmd.expungeDeletes) expungeDeleteCommands.incrementAndGet();
     }
 
     Future[] waitSearcher = null;
@@ -350,12 +399,13 @@ public class DirectUpdateHandler2 extends UpdateHandler {
       log.info("start "+cmd);
 
       if (cmd.optimize) {
-        closeSearcher();
         openWriter();
         writer.optimize(cmd.maxOptimizeSegments);
+      } else if (cmd.expungeDeletes) {
+        openWriter();
+        writer.expungeDeletes();
       }
-
-      closeSearcher();
+      
       closeWriter();
 
       callPostCommitCallbacks();
@@ -395,6 +445,41 @@ public class DirectUpdateHandler2 extends UpdateHandler {
     }
   }
 
+  /**
+   * @since Solr 1.4
+   */
+  public void rollback(RollbackUpdateCommand cmd) throws IOException {
+
+    rollbackCommands.incrementAndGet();
+
+    boolean error=true;
+    iwCommit.lock();
+    try {
+      log.info("start "+cmd);
+
+      rollbackWriter();
+
+      //callPostRollbackCallbacks();
+
+      // reset commit tracking
+      tracker.didRollback();
+
+      log.info("end_rollback");
+
+      error=false;
+    }
+    finally {
+      iwCommit.unlock();
+      addCommandsCumulative.set(
+          addCommandsCumulative.get() - addCommands.getAndSet( 0 ) );
+      deleteByIdCommandsCumulative.set(
+          deleteByIdCommandsCumulative.get() - deleteByIdCommands.getAndSet( 0 ) );
+      deleteByQueryCommandsCumulative.set(
+          deleteByQueryCommandsCumulative.get() - deleteByQueryCommands.getAndSet( 0 ) );
+      numErrors.set(error ? 1 : 0);
+    }
+  }
+
 
   public void close() throws IOException {
     log.info("closing " + this);
@@ -405,15 +490,14 @@ public class DirectUpdateHandler2 extends UpdateHandler {
         tracker.pending.cancel( true );
         tracker.pending = null;
       }
-      tracker.scheduler.shutdown(); 
-      closeSearcher();
+      tracker.scheduler.shutdown();
       closeWriter();
     } finally {
       iwCommit.unlock();
     }
     log.info("closed " + this);
   }
-    
+
   /** Helper class for tracking autoCommit state.
    *
    * Note: This is purely an implementation detail of autoCommit and will
@@ -422,8 +506,8 @@ public class DirectUpdateHandler2 extends UpdateHandler {
    *
    * Note: all access must be synchronized.
    */
-  class CommitTracker implements Runnable 
-  {  
+  class CommitTracker implements Runnable
+  {
     // scheduler delay for maxDoc-triggered autocommits
     public final int DOC_COMMIT_DELAY_MS = 250;
 
@@ -434,69 +518,72 @@ public class DirectUpdateHandler2 extends UpdateHandler {
     private final ScheduledExecutorService scheduler =
        Executors.newScheduledThreadPool(1);
     private ScheduledFuture pending;
-    
+
     // state
-    long docsSinceCommit;    
+    long docsSinceCommit;
     int autoCommitCount = 0;
     long lastAddedTime = -1;
-    
+
     public CommitTracker() {
       docsSinceCommit = 0;
       pending = null;
 
-      docsUpperBound = core.getSolrConfig().getInt("updateHandler/autoCommit/maxDocs", -1);
-      timeUpperBound = core.getSolrConfig().getInt("updateHandler/autoCommit/maxTime", -1);
+      docsUpperBound = core.getSolrConfig().getUpdateHandlerInfo().autoCommmitMaxDocs;   //getInt("updateHandler/autoCommit/maxDocs", -1);
+      timeUpperBound = core.getSolrConfig().getUpdateHandlerInfo().autoCommmitMaxTime;    //getInt("updateHandler/autoCommit/maxTime", -1);
 
       SolrCore.log.info("AutoCommit: " + this);
     }
 
-    /** schedeule individual commits */
-    public synchronized void scheduleCommitWithin(long commitMaxTime) 
+    /** schedule individual commits */
+    public synchronized void scheduleCommitWithin(long commitMaxTime)
+    {
+      _scheduleCommitWithin( commitMaxTime );
+    }
+
+    private void _scheduleCommitWithin(long commitMaxTime)
     {
       // Check if there is a commit already scheduled for longer then this time
-      if( pending != null && 
-          pending.getDelay(TimeUnit.MILLISECONDS) >= commitMaxTime ) 
+      if( pending != null &&
+          pending.getDelay(TimeUnit.MILLISECONDS) >= commitMaxTime )
       {
         pending.cancel(false);
         pending = null;
       }
-      
+
       // schedule a new commit
       if( pending == null ) {
         pending = scheduler.schedule( this, commitMaxTime, TimeUnit.MILLISECONDS );
       }
     }
-    
+
     /** Indicate that documents have been added
      */
-    public void addedDocument() {
+    public void addedDocument( int commitWithin ) {
       docsSinceCommit++;
       lastAddedTime = System.currentTimeMillis();
       // maxDocs-triggered autoCommit
       if( docsUpperBound > 0 && (docsSinceCommit > docsUpperBound) ) {
-        if (pending != null && 
-            pending.getDelay(TimeUnit.MILLISECONDS) > DOC_COMMIT_DELAY_MS) {
-          // another commit is pending, but too far away (probably due to
-          // maxTime)
-          pending.cancel(false);
-          pending = null;
-        }
-        if (pending == null) {
-          // 1/4 second seems fast enough for anyone using maxDocs
-          pending = scheduler.schedule(this, DOC_COMMIT_DELAY_MS, 
-                                       TimeUnit.MILLISECONDS);
-        }
+        _scheduleCommitWithin( DOC_COMMIT_DELAY_MS );
       }
+
       // maxTime-triggered autoCommit
-      if( pending == null && timeUpperBound > 0 ) { 
-        // Don't start a new event if one is already waiting 
-        pending = scheduler.schedule( this, timeUpperBound, TimeUnit.MILLISECONDS );
+      long ctime = (commitWithin>0) ? commitWithin : timeUpperBound;
+      if( ctime > 0 ) {
+        _scheduleCommitWithin( ctime );
       }
-      
     }
 
     /** Inform tracker that a commit has occurred, cancel any pending commits */
     public void didCommit() {
+      if( pending != null ) {
+        pending.cancel(false);
+        pending = null; // let it start another one
+      }
+      docsSinceCommit = 0;
+    }
+
+    /** Inform tracker that a rollback has occurred, cancel any pending commits */
+    public void didRollback() {
       if( pending != null ) {
         pending.cancel(false);
         pending = null; // let it start another one
@@ -514,9 +601,9 @@ public class DirectUpdateHandler2 extends UpdateHandler {
         //no need for command.maxOptimizeSegments = 1;  since it is not optimizing
         commit( command );
         autoCommitCount++;
-      } 
+      }
       catch (Exception e) {
-        log.severe( "auto commit error..." );
+        log.error( "auto commit error..." );
         e.printStackTrace();
       }
       finally {
@@ -539,7 +626,7 @@ public class DirectUpdateHandler2 extends UpdateHandler {
 
     public String toString() {
       if(timeUpperBound > 0 || docsUpperBound > 0) {
-        return 
+        return
           (timeUpperBound > 0 ? ("if uncommited for " + timeUpperBound + "ms; ") : "") +
           (docsUpperBound > 0 ? ("if " + docsUpperBound + " uncommited docs ") : "");
 
@@ -548,8 +635,8 @@ public class DirectUpdateHandler2 extends UpdateHandler {
       }
     }
   }
-      
-  
+
+
   /////////////////////////////////////////////////////////////////////
   // SolrInfoMBean stuff: Statistics and Module Info
   /////////////////////////////////////////////////////////////////////
@@ -571,11 +658,11 @@ public class DirectUpdateHandler2 extends UpdateHandler {
   }
 
   public String getSourceId() {
-    return "$Id: DirectUpdateHandler2.java 672297 2008-06-27 15:28:44Z yonik $";
+    return "$Id: DirectUpdateHandler2.java 824380 2009-10-12 15:18:08Z koji $";
   }
 
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/update/DirectUpdateHandler2.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/update/DirectUpdateHandler2.java $";
   }
 
   public URL[] getDocs() {
@@ -593,6 +680,8 @@ public class DirectUpdateHandler2 extends UpdateHandler {
     }
     lst.add("autocommits", tracker.autoCommitCount);
     lst.add("optimizes", optimizeCommands.get());
+    lst.add("rollbacks", rollbackCommands.get());
+    lst.add("expungeDeletes", expungeDeleteCommands.get());
     lst.add("docsPending", numDocsPending.get());
     // pset.size() not synchronized, but it should be fine to access.
     // lst.add("deletesPending", pset.size());

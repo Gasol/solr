@@ -20,7 +20,7 @@ package org.apache.solr.search;
 /**
  * <code>DocSlice</code> implements DocList as an array of docids and optional scores.
  *
- * @version $Id: DocSlice.java 689349 2008-08-27 03:23:46Z yonik $
+ * @version $Id: DocSlice.java 790938 2009-07-03 15:09:21Z yonik $
  * @since solr 0.9
  */
 public class DocSlice extends DocSetBase implements DocList {
@@ -85,8 +85,9 @@ public class DocSlice extends DocSetBase implements DocList {
 
 
   public boolean exists(int doc) {
-    for (int i: docs) {
-      if (i==doc) return true;
+    int end = offset+len;
+    for (int i=offset; i<end; i++) {
+      if (docs[i]==doc) return true;
     }
     return false;
   }
@@ -120,5 +121,24 @@ public class DocSlice extends DocSetBase implements DocList {
         return scores[pos-1];
       }
     };
+  }
+
+
+  @Override
+  public DocSet intersection(DocSet other) {
+    if (other instanceof SortedIntDocSet || other instanceof HashDocSet) {
+      return other.intersection(this);
+    }
+    HashDocSet h = new HashDocSet(docs,offset,len);
+    return h.intersection(other);
+  }
+
+  @Override
+  public int intersectionSize(DocSet other) {
+    if (other instanceof SortedIntDocSet || other instanceof HashDocSet) {
+      return other.intersectionSize(this);
+    }
+    HashDocSet h = new HashDocSet(docs,offset,len);
+    return h.intersectionSize(other);  
   }
 }

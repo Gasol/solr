@@ -29,7 +29,7 @@ import java.util.BitSet;
 import java.io.IOException;
 
 /**
- * @version $Id: PrefixFilter.java 690336 2008-08-29 16:58:33Z yonik $
+ * @version $Id: PrefixFilter.java 690332 2008-08-29 16:54:41Z yonik $
  */
 public class PrefixFilter extends Filter {
   protected final Term prefix;

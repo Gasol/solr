@@ -29,23 +29,22 @@ import org.apache.solr.search.QParser;
 import org.apache.solr.search.SortSpec;
 import org.apache.solr.search.SolrIndexSearcher;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * This class is experimental and will be changing in the future.
- * 
- * @version $Id: ResponseBuilder.java 674249 2008-07-06 01:16:12Z yonik $
+ *
+ * @version $Id: ResponseBuilder.java 812246 2009-09-07 18:28:16Z yonik $
  * @since solr 1.3
  */
-public class ResponseBuilder 
+public class ResponseBuilder
 {
   public SolrQueryRequest req;
   public SolrQueryResponse rsp;
   public boolean doHighlights;
   public boolean doFacets;
+  public boolean doStats;
 
   private boolean needDocList = false;
   private boolean needDocSet = false;
@@ -57,11 +56,11 @@ public class ResponseBuilder
   private Query query = null;
   private List<Query> filters = null;
   private SortSpec sortSpec = null;
-  
+
   private DocListAndSet results = null;
   private NamedList<Object> debugInfo = null;
   private RTimer timer = null;
-  
+
   private Query highlightQuery = null;
 
   public List<SearchComponent> components;
@@ -93,8 +92,10 @@ public class ResponseBuilder
 
   public int stage;  // What stage is this current request at?
 
-
+  //The address of the Shard
   public String[] shards;
+  public int shards_rows = -1;
+  public int shards_start = -1;
   public List<ShardRequest> outgoing;  // requests to be sent
   public List<ShardRequest> finished;  // requests that have received responses from all shards
 
@@ -127,12 +128,13 @@ public class ResponseBuilder
   // Only valid after STAGE_EXECUTE_QUERY has completed.
 
 
+  public FacetComponent.FacetInfo _facetInfo;
   /* private... components that don't own these shouldn't use them */
   SolrDocumentList _responseDocs;
-  FacetInfo _facetInfo;
+  StatsInfo _statsInfo;
 
   /**
-   * Utility function to add debugging info.  This will make sure a valid 
+   * Utility function to add debugging info.  This will make sure a valid
    * debugInfo exists before adding to it.
    */
   public void addDebugInfo( String name, Object val )

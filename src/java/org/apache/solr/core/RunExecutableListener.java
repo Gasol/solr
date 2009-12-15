@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.logging.Level;
 
 /**
  */
@@ -62,13 +61,21 @@ class RunExecutableListener extends AbstractSolrEventListener {
     if ("false".equals(args.get("wait")) || Boolean.FALSE.equals(args.get("wait"))) wait=false;
   }
 
+  /**
+   * External executable listener.
+   * 
+   * @param callback Unused (As of solr 1.4-dev)
+   * @return Error code indicating if the command has executed successfully. <br />
+   *  0 , indicates normal termination.<br />
+   *  non-zero , otherwise.
+   */
   protected int exec(String callback) {
     int ret = 0;
 
     try {
-      boolean doLog = log.isLoggable(Level.FINE);
+      boolean doLog = log.isDebugEnabled();
       if (doLog) {
-        log.fine("About to exec " + cmd[0]);
+        log.debug("About to exec " + cmd[0]);
       }
       Process proc = Runtime.getRuntime().exec(cmd, envp ,dir);
 
@@ -77,16 +84,18 @@ class RunExecutableListener extends AbstractSolrEventListener {
           ret = proc.waitFor();
         } catch (InterruptedException e) {
           SolrException.log(log,e);
+          ret = INVALID_PROCESS_RETURN_CODE;
         }
       }
 
       if (wait && doLog) {
-        log.fine("Executable " + cmd[0] + " returned " + ret);
+        log.debug("Executable " + cmd[0] + " returned " + ret);
       }
 
     } catch (IOException e) {
       // don't throw exception, just log it...
       SolrException.log(log,e);
+      ret = INVALID_PROCESS_RETURN_CODE;
     }
 
     return ret;
@@ -103,5 +112,8 @@ class RunExecutableListener extends AbstractSolrEventListener {
   public void newSearcher(SolrIndexSearcher newSearcher, SolrIndexSearcher currentSearcher) {
     exec("newSearcher");
   }
+
+  /** Non-zero value for an invalid return code **/
+  private static int INVALID_PROCESS_RETURN_CODE = -1;
 
 }

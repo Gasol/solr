@@ -17,6 +17,7 @@
 
 package org.apache.solr.util;
 
+import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.XML;
 import org.apache.solr.core.SolrConfig;
@@ -32,6 +33,7 @@ import org.apache.solr.request.SolrQueryResponse;
 import org.apache.solr.schema.IndexSchema;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
+import org.apache.solr.common.util.NamedList.NamedListEntry;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -46,8 +48,10 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -117,7 +121,7 @@ public class TestHarness {
       public TestHarness( String dataDirectory,
                           SolrConfig solrConfig,
                           String schemaFile) {
-     this( dataDirectory, solrConfig, new IndexSchema(solrConfig, schemaFile));
+     this( dataDirectory, solrConfig, new IndexSchema(solrConfig, schemaFile, null));
    }
    /**
     * @param dataDirectory path for index data, will not be cleaned up
@@ -171,7 +175,7 @@ public class TestHarness {
     }
     @Override
     public CoreContainer initialize() {
-      CoreContainer container = new CoreContainer(new SolrResourceLoader(SolrResourceLoader.locateInstanceDir()));
+      CoreContainer container = new CoreContainer(new SolrResourceLoader(SolrResourceLoader.locateSolrHome()));
       CoreDescriptor dcore = new CoreDescriptor(container, coreName, solrConfig.getResourceLoader().getInstanceDir());
       dcore.setConfigName(solrConfig.getResourceName());
       dcore.setSchemaName(indexSchema.getResourceName());
@@ -262,7 +266,7 @@ public class TestHarness {
   public String validateAddDoc(String... fieldsAndValues)
     throws XPathExpressionException, SAXException, IOException {
 
-    StringBuffer buf = new StringBuffer();
+    StringBuilder buf = new StringBuilder();
     buf.append("<add>");
     appendSimpleDoc(buf, fieldsAndValues);
     buf.append("</add>");
@@ -300,7 +304,7 @@ public class TestHarness {
    * @see LocalSolrQueryRequest
    */
   public String query(SolrQueryRequest req) throws IOException, Exception {
-    return query(req.getQueryType(), req);
+    return query(req.getParams().get(CommonParams.QT), req);
   }
 
   /**
@@ -314,11 +318,7 @@ public class TestHarness {
    * @see LocalSolrQueryRequest
    */
   public String query(String handler, SolrQueryRequest req) throws IOException, Exception {
-    SolrQueryResponse rsp = new SolrQueryResponse();
-    core.execute(core.getRequestHandler(handler),req,rsp);
-    if (rsp.getException() != null) {
-      throw rsp.getException();
-    }
+    SolrQueryResponse rsp = queryAndResponse(handler, req);
 
     StringWriter sw = new StringWriter(32000);
     QueryResponseWriter responseWriter = core.getQueryResponseWriter(req);
@@ -327,6 +327,15 @@ public class TestHarness {
     req.close();
 
     return sw.toString();
+  }
+
+  public SolrQueryResponse queryAndResponse(String handler, SolrQueryRequest req) throws Exception {
+    SolrQueryResponse rsp = new SolrQueryResponse();
+    core.execute(core.getRequestHandler(handler),req,rsp);
+    if (rsp.getException() != null) {
+      throw rsp.getException();
+    }
+    return rsp;
   }
 
 
@@ -386,7 +395,19 @@ public class TestHarness {
   /**
    * A helper that adds an xml &lt;doc&gt; containing all of the
    * fields and values specified (odds are fields, evens are values)
+   * to a StringBuilder
+   */
+  public void appendSimpleDoc(StringBuilder buf, String... fieldsAndValues)
+    throws IOException {
+
+    buf.append(makeSimpleDoc(fieldsAndValues));
+  }
+
+  /**
+   * A helper that adds an xml &lt;doc&gt; containing all of the
+   * fields and values specified (odds are fields, evens are values)
    * to a StringBuffer.
+   * @deprecated see {@link #appendSimpleDoc(StringBuilder, String...)}
    */
   public void appendSimpleDoc(StringBuffer buf, String... fieldsAndValues)
     throws IOException {
@@ -468,7 +489,7 @@ public class TestHarness {
       if (null == args || 0 == args.length) {
         XML.writeXML(r, tag, null);
       } else {
-        XML.writeXML(r, tag, null, (Object)args);
+        XML.writeXML(r, tag, null, (Object[])args);
       }
       return r.getBuffer().toString();
     } catch (IOException e) {
@@ -536,8 +557,14 @@ public class TestHarness {
         return new LocalSolrQueryRequest(TestHarness.this.getCore(),
                                        q[0], qtype, start, limit, args);
       }
-
-      return new LocalSolrQueryRequest(TestHarness.this.getCore(),new NamedList(Arrays.asList(q)));
+      if (q.length%2 != 0) { 
+        throw new RuntimeException("The length of the string array (query arguments) needs to be even");
+      }
+      Map.Entry<String, String> [] entries = new NamedListEntry[q.length / 2];
+      for (int i = 0; i < q.length; i += 2) {
+        entries[i/2] = new NamedListEntry<String>(q[i], q[i+1]);
+      }
+      return new LocalSolrQueryRequest(TestHarness.this.getCore(), new NamedList(entries));
     }
   }
 }

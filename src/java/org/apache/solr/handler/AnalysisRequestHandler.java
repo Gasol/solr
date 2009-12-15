@@ -16,7 +16,6 @@ package org.apache.solr.handler;
  * limitations under the License.
  */
 
-import javanet.staxutils.BaseXMLInputFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.Token;
@@ -32,6 +31,8 @@ import org.apache.solr.request.SolrQueryResponse;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
@@ -40,18 +41,15 @@ import javax.xml.stream.XMLStreamReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
-import java.util.logging.Logger;
 
 /**
  *
- *
+ * @deprecated Use {@link org.apache.solr.handler.DocumentAnalysisRequestHandler} instead.
  **/
 public class AnalysisRequestHandler extends RequestHandlerBase {
 
-  public static Logger log = Logger.getLogger(AnalysisRequestHandler.class.getName());
+  public static Logger log = LoggerFactory.getLogger(AnalysisRequestHandler.class);
 
   private XMLInputFactory inputFactory;
 
@@ -59,7 +57,7 @@ public class AnalysisRequestHandler extends RequestHandlerBase {
   public void init(NamedList args) {
     super.init(args);
 
-    inputFactory = BaseXMLInputFactory.newInstance();
+    inputFactory = XMLInputFactory.newInstance();
     try {
       // The java 1.6 bundled stax parser (sjsxp) does not currently have a thread-safe
       // XMLInputFactory, as that implementation tries to cache and reuse the
@@ -72,7 +70,7 @@ public class AnalysisRequestHandler extends RequestHandlerBase {
     catch (IllegalArgumentException ex) {
       // Other implementations will likely throw this exception since "reuse-instance"
       // isimplementation specific.
-      log.fine("Unable to set the 'reuse-instance' property for the input factory: " + inputFactory);
+      log.debug("Unable to set the 'reuse-instance' property for the input factory: " + inputFactory);
     }
   }
 
@@ -107,7 +105,7 @@ public class AnalysisRequestHandler extends RequestHandlerBase {
         case XMLStreamConstants.START_ELEMENT: {
           String currTag = parser.getLocalName();
           if ("doc".equals(currTag)) {
-            log.finest("Tokenizing doc...");
+            log.trace("Tokenizing doc...");
 
             SolrInputDocument doc = readDoc(parser);
             SchemaField uniq = schema.getUniqueKeyField();
@@ -181,7 +179,7 @@ public class AnalysisRequestHandler extends RequestHandlerBase {
           text.setLength(0);
           String localName = parser.getLocalName();
           if (!"field".equals(localName)) {
-            log.warning("unexpected XML tag doc/" + localName);
+            log.warn("unexpected XML tag doc/" + localName);
             throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
                     "unexpected XML tag doc/" + localName);
           }

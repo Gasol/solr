@@ -18,32 +18,20 @@
 package org.apache.solr.search.function;
 
 import org.apache.lucene.search.FieldCache;
-import org.apache.lucene.search.ExtendedFieldCache;
 
 /**
  * A base class for ValueSource implementations that retrieve values for
  * a single field from the {@link org.apache.lucene.search.FieldCache}.
  *
- * @version $Id: FieldCacheSource.java 629334 2008-02-20 03:36:49Z gsingers $
+ * @version $Id: FieldCacheSource.java 794328 2009-07-15 17:21:04Z shalin $
  */
 public abstract class FieldCacheSource extends ValueSource {
   protected String field;
-  protected FieldCache cache = ExtendedFieldCache.EXT_DEFAULT;
+  protected FieldCache cache = FieldCache.DEFAULT;
 
   public FieldCacheSource(String field) {
     this.field=field;
   }
-
-  /**
-   * If you are using longs or doubles, this needs to be a {@link org.apache.lucene.search.ExtendedFieldCache}.
-   *
-   * @param cache The {@link org.apache.lucene.search.FieldCache}
-   */
-  public void setFieldCache(FieldCache cache) {
-    this.cache = cache;
-  }
-
-
 
   public FieldCache getFieldCache() {
     return cache;

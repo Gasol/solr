@@ -21,6 +21,8 @@ import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Token;
 import org.apache.lucene.analysis.CharArraySet;
+import org.apache.lucene.analysis.tokenattributes.TermAttribute;
+import org.tartarus.snowball.SnowballProgram;
 
 import java.io.IOException;
 import java.util.Set;
@@ -29,25 +31,24 @@ import java.util.Set;
  * A TokenFilter that only keeps tokens with text contained in the
  * required words.  This filter behaves like the inverse of StopFilter.
  * 
- * @version $Id: KeepWordFilter.java 643465 2008-04-01 16:10:19Z gsingers $
+ * @version $Id: KeepWordFilter.java 804726 2009-08-16 17:28:58Z yonik $
  * @since solr 1.3
  */
 public final class KeepWordFilter extends TokenFilter {
-  final CharArraySet words;
+  private final CharArraySet words;
+  private final TermAttribute termAtt;
 
-  
   public KeepWordFilter(TokenStream in, Set<String> words, boolean ignoreCase ) {
     super(in);
     this.words = new CharArraySet(words, ignoreCase);
+    this.termAtt = (TermAttribute)addAttribute(TermAttribute.class);
   }
 
   @Override
-  public final Token next(Token in) throws IOException {
-    for (Token token=input.next(in); token!=null; token=input.next()) {
-      if( words.contains( token.termBuffer(), 0, token.termLength() ) ) {
-        return token;
-      }
+  public boolean incrementToken() throws IOException {
+    while (input.incrementToken()) {
+      if (words.contains(termAtt.termBuffer(), 0, termAtt.termLength())) return true;
     }
-    return null;
+    return false;
   }
 }

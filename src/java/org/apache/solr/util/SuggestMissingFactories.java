@@ -35,7 +35,7 @@ import java.util.jar.*;
 /**
  * Given a list of Jar files, suggest missing analysis factories.
  *
- * @version $Id: SuggestMissingFactories.java 593359 2007-11-08 23:40:12Z hossman $
+ * @version $Id: SuggestMissingFactories.java 701485 2008-10-03 18:43:57Z ryan $
  */
 public class SuggestMissingFactories {
 
@@ -131,7 +131,7 @@ class FindClasses {
     try {
       for (int i =0; i < jars.length; i++) {
         jarFiles[i] = new JarFile(jars[i]);
-        urls[i] = jars[i].toURL();
+        urls[i] = jars[i].toURI().toURL();
       }
     } catch (MalformedURLException e) {
       throw new RuntimeException

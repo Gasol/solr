@@ -17,11 +17,15 @@
 
 package org.apache.solr.handler.component;
 
-import org.apache.lucene.document.Fieldable;
+import org.apache.lucene.document.Field;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.*;
-import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.search.FieldCache.DoubleParser;
+import org.apache.lucene.search.FieldCache.LongParser;
+import org.apache.lucene.search.FieldCache.FloatParser;
+import org.apache.lucene.search.FieldCache.IntParser;
+import org.apache.lucene.search.FieldCache.Parser;
 import org.apache.lucene.queryParser.ParseException;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -40,7 +44,6 @@ import org.apache.solr.search.*;
 import org.apache.solr.util.SolrPluginUtils;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.net.URL;
 import java.util.*;
 import java.text.Collator;
@@ -48,7 +51,7 @@ import java.text.Collator;
 /**
  * TODO!
  * 
- * @version $Id: QueryComponent.java 694446 2008-09-11 20:03:34Z yonik $
+ * @version $Id: QueryComponent.java 812246 2009-09-07 18:28:16Z yonik $
  * @since solr 1.3
  */
 public class QueryComponent extends SearchComponent
@@ -58,9 +61,13 @@ public class QueryComponent extends SearchComponent
   @Override
   public void prepare(ResponseBuilder rb) throws IOException
   {
+
     SolrQueryRequest req = rb.req;
-    SolrQueryResponse rsp = rb.rsp;
     SolrParams params = req.getParams();
+    if (!params.getBool(COMPONENT_NAME, true)) {
+      return;
+    }
+    SolrQueryResponse rsp = rb.rsp;
 
     // Set field flags
     String fl = params.get(CommonParams.FL);
@@ -71,7 +78,7 @@ public class QueryComponent extends SearchComponent
     rb.setFieldFlags( fieldFlags );
 
     String defType = params.get(QueryParsing.DEFTYPE);
-    defType = defType==null ? OldLuceneQParserPlugin.NAME : defType;
+    defType = defType==null ? QParserPlugin.DEFAULT_QTYPE : defType;
 
     if (rb.getQueryString() == null) {
       rb.setQueryString( params.get( CommonParams.Q ) );
@@ -107,6 +114,14 @@ public class QueryComponent extends SearchComponent
       List<String> lst = StrUtils.splitSmart(shards, ",", true);
       rb.shards = lst.toArray(new String[lst.size()]);
     }
+    String shards_rows = params.get(ShardParams.SHARDS_ROWS);
+    if(shards_rows != null) {
+      rb.shards_rows = Integer.parseInt(shards_rows);
+    }
+    String shards_start = params.get(ShardParams.SHARDS_START);
+    if(shards_start != null) {
+      rb.shards_start = Integer.parseInt(shards_start);
+    }
   }
 
   /**
@@ -117,8 +132,15 @@ public class QueryComponent extends SearchComponent
   {
     SolrQueryRequest req = rb.req;
     SolrQueryResponse rsp = rb.rsp;
-    SolrIndexSearcher searcher = req.getSearcher();
     SolrParams params = req.getParams();
+    if (!params.getBool(COMPONENT_NAME, true)) {
+      return;
+    }
+    SolrIndexSearcher searcher = req.getSearcher();
+
+    if (rb.getQueryCommand().getOffset() < 0) {
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "'start' parameter cannot be negative");
+    }
 
     // -1 as flag if not set.
     long timeAllowed = (long)params.getInt( CommonParams.TIME_ALLOWED, -1 );
@@ -163,54 +185,64 @@ public class QueryComponent extends SearchComponent
     rsp.add("response",rb.getResults().docList);
     rsp.getToLog().add("hits", rb.getResults().docList.matches());
 
+
+    // The query cache doesn't currently store sort field values, and SolrIndexSearcher doesn't
+    // currently have an option to return sort field values.  Because of this, we
+    // take the documents given and re-derive the sort values.
     boolean fsv = req.getParams().getBool(ResponseBuilder.FIELD_SORT_VALUES,false);
     if(fsv){
       Sort sort = rb.getSortSpec().getSort();
       SortField[] sortFields = sort==null ? new SortField[]{SortField.FIELD_SCORE} : sort.getSort();
-      ScoreDoc sd = new ScoreDoc(0,1.0f); // won't work for comparators that look at the score
       NamedList sortVals = new NamedList(); // order is important for the sort fields
-      StringFieldable field = new StringFieldable();
+      Field field = new Field("dummy", "", Field.Store.YES, Field.Index.NO); // a dummy Field
+
+      SolrIndexReader reader = searcher.getReader();
+      SolrIndexReader[] readers = reader.getLeafReaders();
+      SolrIndexReader subReader = reader;
+      if (readers.length==1) {
+        // if there is a single segment, use that subReader and avoid looking up each time
+        subReader = readers[0];
+        readers=null;
+      }
+      int[] offsets = reader.getLeafOffsets();
 
       for (SortField sortField: sortFields) {
         int type = sortField.getType();
         if (type==SortField.SCORE || type==SortField.DOC) continue;
 
-        ScoreDocComparator comparator = null;
-        IndexReader reader = searcher.getReader();
+        FieldComparator comparator = null;
+        FieldComparator comparators[] = (readers==null) ? null : new FieldComparator[readers.length];
+
         String fieldname = sortField.getField();
         FieldType ft = fieldname==null ? null : req.getSchema().getFieldTypeNoEx(fieldname);
-
-
-        switch (type) {
-          case SortField.INT:
-            comparator = comparatorInt (reader, fieldname);
-            break;
-          case SortField.FLOAT:
-            comparator = comparatorFloat (reader, fieldname);
-            break;
-          case SortField.LONG:
-            comparator = comparatorLong(reader, fieldname);
-            break;
-          case SortField.DOUBLE:
-            comparator = comparatorDouble(reader, fieldname);
-            break;
-          case SortField.STRING:
-            if (sortField.getLocale() != null) comparator = comparatorStringLocale (reader, fieldname, sortField.getLocale());
-            else comparator = comparatorString (reader, fieldname);
-            break;
-          case SortField.CUSTOM:
-            comparator = sortField.getFactory().newComparator (reader, fieldname);
-            break;
-          default:
-            throw new RuntimeException ("unknown field type: "+type);
-        }
 
         DocList docList = rb.getResults().docList;
         ArrayList<Object> vals = new ArrayList<Object>(docList.size());
         DocIterator it = rb.getResults().docList.iterator();
+
+        int offset = 0;
+        int idx = 0;
+
         while(it.hasNext()) {
-          sd.doc = it.nextDoc();
-          Object val = comparator.sortValue(sd);
+          int doc = it.nextDoc();
+          if (readers != null) {
+            idx = SolrIndexReader.readerIndex(doc, offsets);
+            subReader = readers[idx];
+            offset = offsets[idx];
+            comparator = comparators[idx];
+          }
+
+          if (comparator == null) {
+            comparator = sortField.getComparator(1,0);
+            comparator.setNextReader(subReader, offset);
+            if (comparators != null)
+              comparators[idx] = comparator;
+          }
+
+          doc -= offset;  // adjust for what segment this is in
+          comparator.copy(0, doc);
+          Object val = comparator.value(0);
+
           // Sortable float, double, int, long types all just use a string
           // comparator. For these, we need to put the type into a readable
           // format.  One reason for this is that XML can't represent all
@@ -218,9 +250,10 @@ public class QueryComponent extends SearchComponent
           // indexedToReadable() should be a no-op and should
           // thus be harmless anyway (for all current ways anyway)
           if (val instanceof String) {
-            field.val = (String)val;
+            field.setValue((String)val);
             val = ft.toObject(field);
           }
+
           vals.add(val);
         }
 
@@ -305,14 +338,22 @@ public class QueryComponent extends SearchComponent
 
     // set the start (offset) to 0 for each shard request so we can properly merge
     // results from the start.
-    sreq.params.set(CommonParams.START, "0");
-
+    if(rb.shards_start > -1) {
+      // if the client set shards.start set this explicitly
+      sreq.params.set(CommonParams.START,rb.shards_start);
+    } else {
+      sreq.params.set(CommonParams.START, "0");
+    }
     // TODO: should we even use the SortSpec?  That's obtained from the QParser, and
     // perhaps we shouldn't attempt to parse the query at this level?
     // Alternate Idea: instead of specifying all these things at the upper level,
     // we could just specify that this is a shard request.
-    sreq.params.set(CommonParams.ROWS, rb.getSortSpec().getOffset() + rb.getSortSpec().getCount());
-
+    if(rb.shards_rows > -1) {
+      // if the client set shards.rows set this explicity
+      sreq.params.set(CommonParams.ROWS,rb.shards_rows);
+    } else {
+      sreq.params.set(CommonParams.ROWS, rb.getSortSpec().getOffset() + rb.getSortSpec().getCount());
+    }
 
     // in this first phase, request only the unique key field
     // and any fields needed for merging.
@@ -517,304 +558,6 @@ public class QueryComponent extends SearchComponent
     }
   }
 
-
-
-  /////////////////////////////////////////////
-  ///  Comparators copied from Lucene
-  /////////////////////////////////////////////
-
-  /**
-   * Returns a comparator for sorting hits according to a field containing integers.
-   * @param reader  Index to use.
-   * @param fieldname  Fieldable containg integer values.
-   * @return  Comparator for sorting hits.
-   * @throws IOException If an error occurs reading the index.
-   */
-  static ScoreDocComparator comparatorInt (final IndexReader reader, final String fieldname)
-  throws IOException {
-    final String field = fieldname.intern();
-    final int[] fieldOrder = FieldCache.DEFAULT.getInts (reader, field);
-    return new ScoreDocComparator() {
-
-      public final int compare (final ScoreDoc i, final ScoreDoc j) {
-        final int fi = fieldOrder[i.doc];
-        final int fj = fieldOrder[j.doc];
-        if (fi < fj) return -1;
-        if (fi > fj) return 1;
-        return 0;
-      }
-
-      public Comparable sortValue (final ScoreDoc i) {
-        return new Integer (fieldOrder[i.doc]);
-      }
-
-      public int sortType() {
-        return SortField.INT;
-      }
-    };
-  }
-
-  /**
-   * Returns a comparator for sorting hits according to a field containing integers.
-   * @param reader  Index to use.
-   * @param fieldname  Fieldable containg integer values.
-   * @return  Comparator for sorting hits.
-   * @throws IOException If an error occurs reading the index.
-   */
-  static ScoreDocComparator comparatorLong (final IndexReader reader, final String fieldname)
-  throws IOException {
-    final String field = fieldname.intern();
-    final long[] fieldOrder = ExtendedFieldCache.EXT_DEFAULT.getLongs (reader, field);
-    return new ScoreDocComparator() {
-
-      public final int compare (final ScoreDoc i, final ScoreDoc j) {
-        final long li = fieldOrder[i.doc];
-        final long lj = fieldOrder[j.doc];
-        if (li < lj) return -1;
-        if (li > lj) return 1;
-        return 0;
-      }
-
-      public Comparable sortValue (final ScoreDoc i) {
-        return new Long(fieldOrder[i.doc]);
-      }
-
-      public int sortType() {
-        return SortField.LONG;
-      }
-    };
-  }
-
-  /**
-   * Returns a comparator for sorting hits according to a field containing floats.
-   * @param reader  Index to use.
-   * @param fieldname  Fieldable containg float values.
-   * @return  Comparator for sorting hits.
-   * @throws IOException If an error occurs reading the index.
-   */
-  static ScoreDocComparator comparatorFloat (final IndexReader reader, final String fieldname)
-  throws IOException {
-    final String field = fieldname.intern();
-    final float[] fieldOrder = FieldCache.DEFAULT.getFloats (reader, field);
-    return new ScoreDocComparator () {
-
-      public final int compare (final ScoreDoc i, final ScoreDoc j) {
-        final float fi = fieldOrder[i.doc];
-        final float fj = fieldOrder[j.doc];
-        if (fi < fj) return -1;
-        if (fi > fj) return 1;
-        return 0;
-      }
-
-      public Comparable sortValue (final ScoreDoc i) {
-        return new Float (fieldOrder[i.doc]);
-      }
-
-      public int sortType() {
-        return SortField.FLOAT;
-      }
-    };
-  }
-
-
-  /**
-   * Returns a comparator for sorting hits according to a field containing doubles.
-   * @param reader  Index to use.
-   * @param fieldname  Fieldable containg float values.
-   * @return  Comparator for sorting hits.
-   * @throws IOException If an error occurs reading the index.
-   */
-  static ScoreDocComparator comparatorDouble(final IndexReader reader, final String fieldname)
-  throws IOException {
-    final String field = fieldname.intern();
-    final double[] fieldOrder = ExtendedFieldCache.EXT_DEFAULT.getDoubles (reader, field);
-    return new ScoreDocComparator () {
-
-      public final int compare (final ScoreDoc i, final ScoreDoc j) {
-        final double di = fieldOrder[i.doc];
-        final double dj = fieldOrder[j.doc];
-        if (di < dj) return -1;
-        if (di > dj) return 1;
-        return 0;
-      }
-
-      public Comparable sortValue (final ScoreDoc i) {
-        return new Double (fieldOrder[i.doc]);
-      }
-
-      public int sortType() {
-        return SortField.DOUBLE;
-      }
-    };
-  }
-
-  /**
-   * Returns a comparator for sorting hits according to a field containing strings.
-   * @param reader  Index to use.
-   * @param fieldname  Fieldable containg string values.
-   * @return  Comparator for sorting hits.
-   * @throws IOException If an error occurs reading the index.
-   */
-  static ScoreDocComparator comparatorString (final IndexReader reader, final String fieldname)
-  throws IOException {
-    final String field = fieldname.intern();
-    final FieldCache.StringIndex index = FieldCache.DEFAULT.getStringIndex (reader, field);
-    return new ScoreDocComparator () {
-
-      public final int compare (final ScoreDoc i, final ScoreDoc j) {
-        final int fi = index.order[i.doc];
-        final int fj = index.order[j.doc];
-        if (fi < fj) return -1;
-        if (fi > fj) return 1;
-        return 0;
-      }
-
-      public Comparable sortValue (final ScoreDoc i) {
-        return index.lookup[index.order[i.doc]];
-      }
-
-      public int sortType() {
-        return SortField.STRING;
-      }
-    };
-  }
-
-  /**
-   * Returns a comparator for sorting hits according to a field containing strings.
-   * @param reader  Index to use.
-   * @param fieldname  Fieldable containg string values.
-   * @return  Comparator for sorting hits.
-   * @throws IOException If an error occurs reading the index.
-   */
-  static ScoreDocComparator comparatorStringLocale (final IndexReader reader, final String fieldname, final Locale locale)
-  throws IOException {
-    final Collator collator = Collator.getInstance (locale);
-    final String field = fieldname.intern();
-    final String[] index = FieldCache.DEFAULT.getStrings (reader, field);
-    return new ScoreDocComparator() {
-
-    	public final int compare(final ScoreDoc i, final ScoreDoc j) {
-			String is = index[i.doc];
-			String js = index[j.doc];
-			if (is == js) {
-				return 0;
-			} else if (is == null) {
-				return -1;
-			} else if (js == null) {
-				return 1;
-			} else {
-				return collator.compare(is, js);
-			}
-		}
-
-      public Comparable sortValue (final ScoreDoc i) {
-        return index[i.doc];
-      }
-
-      public int sortType() {
-        return SortField.STRING;
-      }
-    };
-  }
-
-  static class StringFieldable implements Fieldable {
-    public String val;
-
-    public void setBoost(float boost) {
-    }
-
-    public float getBoost() {
-      return 0;
-    }
-
-    public String name() {
-      return null;
-    }
-
-    public String stringValue() {
-      return val;
-    }
-
-    public Reader readerValue() {
-      return null;
-    }
-
-    public byte[] binaryValue() {
-      return new byte[0];
-    }
-
-    public TokenStream tokenStreamValue() {
-      return null;
-    }
-
-    public boolean isStored() {
-      return true;
-    }
-
-    public boolean isIndexed() {
-      return true;
-    }
-
-    public boolean isTokenized() {
-      return true;
-    }
-
-    public boolean isCompressed() {
-      return false;
-    }
-
-    public boolean isTermVectorStored() {
-      return false;
-    }
-
-    public boolean isStoreOffsetWithTermVector() {
-      return false;
-    }
-
-    public boolean isStorePositionWithTermVector() {
-      return false;
-    }
-
-    public boolean isBinary() {
-      return false;
-    }
-
-    public boolean getOmitNorms() {
-      return false;
-    }
-
-    public void setOmitNorms(boolean omitNorms) {
-    }
-
-    public void setOmitTf(boolean omitTf) {
-    }
-
-    public boolean getOmitTf() {
-      return false;
-    }
-
-    public boolean isLazy() {
-      return false;
-    }
-
-    public int getBinaryOffset() {
-      return 0;
-    }
-
-    public int getBinaryLength() {
-      return 0;
-    }
-
-    public byte[] getBinaryValue() {
-      return new byte[0];
-    }
-
-    public byte[] getBinaryValue(byte[] result) {
-      return new byte[0];
-    }
-  }
-
-
   /////////////////////////////////////////////
   ///  SolrInfoMBean
   ////////////////////////////////////////////
@@ -826,17 +569,17 @@ public class QueryComponent extends SearchComponent
 
   @Override
   public String getVersion() {
-    return "$Revision: 694446 $";
+    return "$Revision: 812246 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: QueryComponent.java 694446 2008-09-11 20:03:34Z yonik $";
+    return "$Id: QueryComponent.java 812246 2009-09-07 18:28:16Z yonik $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/component/QueryComponent.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/component/QueryComponent.java $";
   }
 
   @Override

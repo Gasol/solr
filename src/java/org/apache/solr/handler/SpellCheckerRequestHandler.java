@@ -39,7 +39,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Takes a string (e.g. a query string) as the value of the "q" parameter
@@ -196,7 +197,7 @@ pre.code
 @Deprecated
 public class SpellCheckerRequestHandler extends RequestHandlerBase implements SolrCoreAware {
 
-  private static Logger log = Logger.getLogger(SpellCheckerRequestHandler.class.getName());
+  private static Logger log = LoggerFactory.getLogger(SpellCheckerRequestHandler.class);
   
   private SpellChecker spellChecker;
   
@@ -415,7 +416,7 @@ public class SpellCheckerRequestHandler extends RequestHandlerBase implements So
   //////////////////////// SolrInfoMBeans methods //////////////////////
 
   public String getVersion() {
-    return "$Revision: 683254 $";
+    return "$Revision: 696539 $";
   }
 
   public String getDescription() {
@@ -423,11 +424,11 @@ public class SpellCheckerRequestHandler extends RequestHandlerBase implements So
   }
 
   public String getSourceId() {
-    return "$Id: SpellCheckerRequestHandler.java 683254 2008-08-06 13:05:46Z gsingers $";
+    return "$Id: SpellCheckerRequestHandler.java 696539 2008-09-18 02:16:26Z ryan $";
   }
 
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/SpellCheckerRequestHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/SpellCheckerRequestHandler.java $";
   }
 
   public URL[] getDocs() {

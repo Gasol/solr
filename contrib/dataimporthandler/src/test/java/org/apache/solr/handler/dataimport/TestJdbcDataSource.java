@@ -16,11 +16,16 @@
  */
 package org.apache.solr.handler.dataimport;
 
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
 import java.util.*;
+
+import javax.sql.DataSource;
+
+import org.easymock.EasyMock;
+import org.easymock.IMocksControl;
+import org.junit.*;
 
 /**
  * <p>
@@ -31,10 +36,110 @@ import java.util.*;
  * Note: The tests are ignored for the lack of DB support for testing
  * </p>
  *
- * @version $Id: TestJdbcDataSource.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TestJdbcDataSource.java 823429 2009-10-09 07:11:34Z noble $
  * @since solr 1.3
  */
 public class TestJdbcDataSource {
+  Driver driver;
+  DataSource dataSource;
+  Connection connection;
+  IMocksControl mockControl;
+  JdbcDataSource jdbcDataSource = new JdbcDataSource();
+  List<Map<String, String>> fields = new ArrayList<Map<String, String>>();
+
+  Context context = AbstractDataImportHandlerTest.getContext(null, null,
+          jdbcDataSource, Context.FULL_DUMP, fields, null);
+
+  Properties props = new Properties();
+
+  String sysProp = System.getProperty("java.naming.factory.initial");
+
+  @Before
+  public void SetUp() throws ClassNotFoundException {
+    System.setProperty("java.naming.factory.initial",
+            MockInitialContextFactory.class.getName());
+
+    mockControl = EasyMock.createStrictControl();
+    driver = mockControl.createMock(Driver.class);
+    dataSource = mockControl.createMock(DataSource.class);
+    connection = mockControl.createMock(Connection.class);
+  }
+
+  @After
+  public void tearDown() {
+    if (sysProp == null) {
+      System.getProperties().remove("java.naming.factory.initial");
+    } else {
+      System.setProperty("java.naming.factory.initial", sysProp);
+    }
+  }
+
+  @Test
+  public void retrieveFromJndi() throws Exception {
+    MockInitialContextFactory.bind("java:comp/env/jdbc/JndiDB", dataSource);
+
+    props.put(JdbcDataSource.JNDI_NAME, "java:comp/env/jdbc/JndiDB");
+
+    EasyMock.expect(dataSource.getConnection()).andReturn(connection);
+    connection.setAutoCommit(false);
+//    connection.setHoldability(1);
+
+    mockControl.replay();
+
+    Connection conn = jdbcDataSource.createConnectionFactory(context, props)
+            .call();
+
+    mockControl.verify();
+
+    Assert.assertSame("connection", conn, connection);
+  }
+
+  @Test
+  public void retrieveFromJndiWithCredentials() throws Exception {
+    MockInitialContextFactory.bind("java:comp/env/jdbc/JndiDB", dataSource);
+
+    props.put(JdbcDataSource.JNDI_NAME, "java:comp/env/jdbc/JndiDB");
+    props.put("user", "Fred");
+    props.put("password", "4r3d");
+    props.put("holdability", "HOLD_CURSORS_OVER_COMMIT");
+
+    EasyMock.expect(dataSource.getConnection("Fred", "4r3d")).andReturn(
+            connection);
+    connection.setAutoCommit(false);
+    connection.setHoldability(1);
+
+    mockControl.replay();
+
+    Connection conn = jdbcDataSource.createConnectionFactory(context, props)
+            .call();
+
+    mockControl.verify();
+
+    Assert.assertSame("connection", conn, connection);
+  }
+
+  @Test
+  public void retrieveFromDriverManager() throws Exception {
+    DriverManager.registerDriver(driver);
+
+    EasyMock.expect(
+            driver.connect((String) EasyMock.notNull(), (Properties) EasyMock
+                    .notNull())).andReturn(connection);
+    connection.setAutoCommit(false);
+    connection.setHoldability(1);
+
+    props.put(JdbcDataSource.DRIVER, driver.getClass().getName());
+    props.put(JdbcDataSource.URL, "jdbc:fakedb");
+    props.put("holdability", "HOLD_CURSORS_OVER_COMMIT");
+    mockControl.replay();
+
+    Connection conn = jdbcDataSource.createConnectionFactory(context, props)
+            .call();
+
+    mockControl.verify();
+
+    Assert.assertSame("connection", conn, connection);
+  }
 
   @Test
   @Ignore
@@ -57,7 +162,7 @@ public class TestJdbcDataSource {
     flds.add(f);
 
     Context c = AbstractDataImportHandlerTest.getContext(null, null,
-            dataSource, 0, flds, null);
+            dataSource, Context.FULL_DUMP, flds, null);
     dataSource.init(c, p);
     Iterator<Map<String, Object>> i = dataSource
             .getData("select make,model,year,msrp,trim_id from atrimlisting where make='Acura'");
@@ -74,5 +179,4 @@ public class TestJdbcDataSource {
     Assert.assertEquals(Float.class, msrp.getClass());
     Assert.assertEquals(Long.class, trim_id.getClass());
   }
-
 }

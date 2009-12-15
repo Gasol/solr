@@ -50,17 +50,58 @@ import java.util.regex.Pattern;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: FileListEntityProcessor.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: FileListEntityProcessor.java 812122 2009-09-07 13:12:01Z shalin $
  * @since solr 1.3
  */
 public class FileListEntityProcessor extends EntityProcessorBase {
-  private String fileName, baseDir, excludes;
+  /**
+   * A regex pattern to identify files given in data-config.xml after resolving any variables 
+   */
+  protected String fileName;
 
-  private Date newerThan, olderThan;
+  /**
+   * The baseDir given in data-config.xml after resolving any variables
+   */
+  protected String baseDir;
 
-  private long biggerThan = -1, smallerThan = -1;
+  /**
+   * A Regex pattern of excluded file names as given in data-config.xml after resolving any variables
+   */
+  protected String excludes;
 
-  private boolean recursive = false;
+  /**
+   * The newerThan given in data-config as a {@link java.util.Date}
+   * <p>
+   * <b>Note: </b> This variable is resolved just-in-time in the {@link #nextRow()} method.
+   * </p>
+   */
+  protected Date newerThan;
+
+  /**
+   * The newerThan given in data-config as a {@link java.util.Date}
+   */
+  protected Date olderThan;
+
+  /**
+   * The biggerThan given in data-config as a long value
+   * <p>
+   * <b>Note: </b> This variable is resolved just-in-time in the {@link #nextRow()} method.
+   * </p>
+   */
+  protected long biggerThan = -1;
+
+  /**
+   * The smallerThan given in data-config as a long value
+   * <p>
+   * <b>Note: </b> This variable is resolved just-in-time in the {@link #nextRow()} method.
+   * </p>
+   */
+  protected long smallerThan = -1;
+
+  /**
+   * The recursive given in data-config. Default value is false.
+   */
+  protected boolean recursive = false;
 
   private Pattern fileNamePattern, excludesPattern;
 
@@ -79,25 +120,35 @@ public class FileListEntityProcessor extends EntityProcessorBase {
     File dir = new File(baseDir);
     if (!dir.isDirectory())
       throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
-              "'baseDir' should point to a directory");
+              "'baseDir' value: " + baseDir + " is not a directory");
+
     String r = context.getEntityAttribute(RECURSIVE);
     if (r != null)
       recursive = Boolean.parseBoolean(r);
     excludes = context.getEntityAttribute(EXCLUDES);
-    if (excludes != null)
+    if (excludes != null) {
       excludes = resolver.replaceTokens(excludes);
-    if (excludes != null)
       excludesPattern = Pattern.compile(excludes);
-
+    }
   }
 
+  /**
+   * Get the Date object corresponding to the given string.
+   *
+   * @param dateStr the date string. It can be a DateMath string or it may have a evaluator function
+   * @return a Date instance corresponding to the input string
+   */
   private Date getDate(String dateStr) {
     if (dateStr == null)
       return null;
 
     Matcher m = PLACE_HOLDER_PATTERN.matcher(dateStr);
     if (m.find()) {
-      return (Date) resolver.resolve(dateStr);
+      Object o = resolver.resolve(m.group(1));
+      if (o instanceof Date)  return (Date)o;
+      dateStr = (String) o;
+    } else  {
+      dateStr = resolver.replaceTokens(dateStr);
     }
     m = EvaluatorBag.IN_SINGLE_QUOTES.matcher(dateStr);
     if (m.find()) {
@@ -111,16 +162,41 @@ public class FileListEntityProcessor extends EntityProcessorBase {
       }
     }
     try {
-      return DataImporter.DATE_TIME_FORMAT.parse(dateStr);
+      return DataImporter.DATE_TIME_FORMAT.get().parse(dateStr);
     } catch (ParseException exp) {
       throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
               "Invalid expression for date", exp);
     }
   }
 
+  /**
+   * Get the Long value for the given string after resolving any evaluator or variable.
+   *
+   * @param sizeStr the size as a string
+   * @return the Long value corresponding to the given string
+   */
+  private Long getSize(String sizeStr)  {
+    if (sizeStr == null)
+      return null;
+
+    Matcher m = PLACE_HOLDER_PATTERN.matcher(sizeStr);
+    if (m.find()) {
+      Object o = resolver.resolve(m.group(1));
+      if (o instanceof Number) {
+        Number number = (Number) o;
+        return number.longValue();
+      }
+      sizeStr = (String) o;
+    } else  {
+      sizeStr = resolver.replaceTokens(sizeStr);
+    }
+
+    return Long.parseLong(sizeStr);
+  }
+
   public Map<String, Object> nextRow() {
     if (rowIterator != null)
-      return getAndApplyTrans();
+      return getNext();
     List<Map<String, Object>> fileDetails = new ArrayList<Map<String, Object>>();
     File dir = new File(baseDir);
 
@@ -128,39 +204,35 @@ public class FileListEntityProcessor extends EntityProcessorBase {
     newerThan = getDate(dateStr);
     dateStr = context.getEntityAttribute(OLDER_THAN);
     olderThan = getDate(dateStr);
+    String biggerThanStr = context.getEntityAttribute(BIGGER_THAN);
+    if (biggerThanStr != null)
+      biggerThan = getSize(biggerThanStr);
+    String smallerThanStr = context.getEntityAttribute(SMALLER_THAN);
+    if (smallerThanStr != null)
+      smallerThan = getSize(smallerThanStr);
 
     getFolderFiles(dir, fileDetails);
     rowIterator = fileDetails.iterator();
-    return getAndApplyTrans();
+    return getNext();
   }
 
-  private Map<String, Object> getAndApplyTrans() {
-    if (rowcache != null)
-      return getFromRowCache();
-    while (true) {
-      Map<String, Object> r = getNext();
-      if (r == null)
-        return null;
-      r = applyTransformer(r);
-      if (r != null)
-        return r;
-    }
-  }
-
-  private void getFolderFiles(File dir,
-                              final List<Map<String, Object>> fileDetails) {
+  private void getFolderFiles(File dir, final List<Map<String, Object>> fileDetails) {
+    // Fetch an array of file objects that pass the filter, however the
+    // returned array is never populated; accept() always returns false.
+    // Rather we make use of the fileDetails array which is populated as
+    // a side affect of the accept method.
     dir.list(new FilenameFilter() {
       public boolean accept(File dir, String name) {
-        if (fileNamePattern == null) {
+        File fileObj = new File(dir, name);
+        if (fileObj.isDirectory()) {
+          if (recursive) getFolderFiles(fileObj, fileDetails);
+        } else if (fileNamePattern == null) {
           addDetails(fileDetails, dir, name);
-          return false;
-        }
-        if (fileNamePattern.matcher(name).find()) {
+        } else if (fileNamePattern.matcher(name).find()) {
           if (excludesPattern != null && excludesPattern.matcher(name).find())
             return false;
           addDetails(fileDetails, dir, name);
         }
-
         return false;
       }
     });
@@ -169,12 +241,7 @@ public class FileListEntityProcessor extends EntityProcessorBase {
   private void addDetails(List<Map<String, Object>> files, File dir, String name) {
     Map<String, Object> details = new HashMap<String, Object>();
     File aFile = new File(dir, name);
-    if (aFile.isDirectory()) {
-      if (!recursive)
-        return;
-      getFolderFiles(aFile, files);
-      return;
-    }
+    if (aFile.isDirectory()) return;
     long sz = aFile.length();
     Date lastModified = new Date(aFile.lastModified());
     if (biggerThan != -1 && sz <= biggerThan)
@@ -194,7 +261,7 @@ public class FileListEntityProcessor extends EntityProcessorBase {
   }
 
   public static final Pattern PLACE_HOLDER_PATTERN = Pattern
-          .compile("\\$\\{.*?\\}");
+          .compile("\\$\\{(.*?)\\}");
 
   public static final String DIR = "fileDir";
 

@@ -20,7 +20,6 @@ package org.apache.solr.update.processor;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
 
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
@@ -30,6 +29,8 @@ import org.apache.solr.request.SolrQueryResponse;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.CommitUpdateCommand;
 import org.apache.solr.update.DeleteUpdateCommand;
+import org.apache.solr.update.MergeIndexesCommand;
+import org.apache.solr.update.RollbackUpdateCommand;
 
 /**
  * A logging processor.  This keeps track of all commands that have passed through
@@ -53,8 +54,8 @@ public class LogUpdateProcessorFactory extends UpdateRequestProcessorFactory {
 
   @Override
   public UpdateRequestProcessor getInstance(SolrQueryRequest req, SolrQueryResponse rsp, UpdateRequestProcessor next) {
-    boolean doLog = LogUpdateProcessor.log.isLoggable(Level.INFO);
-    // LogUpdateProcessor.log.severe("Will Log=" + doLog);
+    boolean doLog = LogUpdateProcessor.log.isInfoEnabled();
+    // LogUpdateProcessor.log.error("Will Log=" + doLog);
     if( doLog ) {
       // only create the log processor if we will use it
       return new LogUpdateProcessor(req, rsp, this, next);
@@ -126,10 +127,27 @@ class LogUpdateProcessor extends UpdateRequestProcessor {
   }
 
   @Override
+  public void processMergeIndexes(MergeIndexesCommand cmd) throws IOException {
+    if (next != null) next.processMergeIndexes(cmd);
+
+    toLog.add("mergeIndexes", cmd.toString());
+  }
+
+  @Override
   public void processCommit( CommitUpdateCommand cmd ) throws IOException {
     if (next != null) next.processCommit(cmd);
     
     toLog.add(cmd.optimize ? "optimize" : "commit", "");
+  }
+
+  /**
+   * @since Solr 1.4
+   */
+  @Override
+  public void processRollback( RollbackUpdateCommand cmd ) throws IOException {
+    if (next != null) next.processRollback(cmd);
+    
+    toLog.add("rollback", "");
   }
 
 
@@ -143,11 +161,11 @@ class LogUpdateProcessor extends UpdateRequestProcessor {
     // be logged by SolrCore
     
     // if id lists were truncated, show how many more there were
-    if (numAdds > maxNumToLog) {
-      adds.add("...(" + (numAdds-adds.size()) + " more)");
+    if (adds != null && numAdds > maxNumToLog) {
+      adds.add("... (" + adds.size() + " added)");
     }
-    if (numDeletes > maxNumToLog) {
-      deletes.add("...(" + (numDeletes-deletes.size()) + " more)");
+    if (deletes != null && numDeletes > maxNumToLog) {
+      deletes.add("... (" + deletes.size() + " removed)");
     }
     long elapsed = rsp.getEndTime() - req.getStartTime();
     log.info( ""+toLog + " 0 " + (elapsed) );

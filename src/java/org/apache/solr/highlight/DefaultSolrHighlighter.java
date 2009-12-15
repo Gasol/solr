@@ -21,78 +21,85 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Map;
 import java.util.Set;
 
-import javax.xml.xpath.XPathConstants;
 
-import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CachingTokenFilter;
 import org.apache.lucene.analysis.Token;
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.highlight.Formatter;
-import org.apache.lucene.search.highlight.Fragmenter;
-import org.apache.lucene.search.highlight.Highlighter;
-import org.apache.lucene.search.highlight.QueryScorer;
-import org.apache.lucene.search.highlight.SpanScorer;
-import org.apache.lucene.search.highlight.TextFragment;
-import org.apache.lucene.search.highlight.TokenSources;
+import org.apache.lucene.search.highlight.*;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.ResourceLoader;
 import org.apache.solr.common.params.HighlightParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
-import org.apache.solr.core.Config;
+import org.apache.solr.core.SolrConfig;
+import org.apache.solr.core.PluginInfo;
+import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.DocIterator;
 import org.apache.solr.search.DocList;
 import org.apache.solr.search.SolrIndexSearcher;
-import org.apache.solr.util.plugin.NamedListPluginLoader;
-import org.w3c.dom.NodeList;
+import org.apache.solr.util.plugin.PluginInfoInitialized;
 
 /**
  * 
  * @since solr 1.3
  */
-public class DefaultSolrHighlighter extends SolrHighlighter
+public class DefaultSolrHighlighter extends SolrHighlighter implements PluginInfoInitialized
 {
-  
-  public void initalize( final Config config )
-  {
+
+  private SolrCore solrCore;
+
+  public DefaultSolrHighlighter() {
+  }
+
+  public DefaultSolrHighlighter(SolrCore solrCore) {
+    this.solrCore = solrCore;
+  }
+
+  public void init(PluginInfo info) {
     formatters.clear();
     fragmenters.clear();
-    
-    // Load the fragmenters
-    String xpath = "highlighting/fragmenter";
-    NamedListPluginLoader<SolrFragmenter> fragloader = new NamedListPluginLoader<SolrFragmenter>( xpath, fragmenters );
-    SolrFragmenter frag = fragloader.load( config.getResourceLoader(), (NodeList)config.evaluate( xpath, XPathConstants.NODESET ) );
-    if( frag == null ) {
-      frag = new GapFragmenter();
-    }
-    fragmenters.put( "", frag );
-    fragmenters.put( null, frag );
-    
+
+    SolrFragmenter frag = solrCore.initPlugins(info.getChildren("fragmenter") , fragmenters,SolrFragmenter.class,null);
+    if (frag == null) frag = new GapFragmenter();
+    fragmenters.put("", frag);
+    fragmenters.put(null, frag);
     // Load the formatters
-    xpath = "highlighting/formatter";
-    NamedListPluginLoader<SolrFormatter> fmtloader = new NamedListPluginLoader<SolrFormatter>( xpath, formatters );
-    SolrFormatter fmt = fmtloader.load( config.getResourceLoader(), (NodeList)config.evaluate( xpath, XPathConstants.NODESET ) );
-    if( fmt == null ) {
-      fmt = new HtmlFormatter();
-    }
-    formatters.put( "", fmt );
-    formatters.put( null, fmt );
+    SolrFormatter fmt = solrCore.initPlugins(info.getChildren("formatter"), formatters,SolrFormatter.class,null);
+    if (fmt == null) fmt = new HtmlFormatter();
+    formatters.put("", fmt);
+    formatters.put(null, fmt);
+    initialized = true;
+
   }
-  
+  //just for back-compat with the deprecated method
+  private boolean initialized = false;
+  @Deprecated
+  public void initalize( SolrConfig config) {
+    if (initialized) return;
+    SolrFragmenter frag = new GapFragmenter();
+    fragmenters.put("", frag);
+    fragmenters.put(null, frag);
+
+    SolrFormatter fmt = new HtmlFormatter();
+    formatters.put("", fmt);
+    formatters.put(null, fmt);    
+
+
+  }
+
   /**
    * Return a phrase Highlighter appropriate for this field.
    * @param query The current Query
@@ -135,14 +142,21 @@ public class DefaultSolrHighlighter extends SolrHighlighter
    * @param request The SolrQueryRequest
    * @throws IOException 
    */
-  private SpanScorer getSpanQueryScorer(Query query, String fieldName, CachingTokenFilter tokenStream, SolrQueryRequest request) throws IOException {
+  private QueryScorer getSpanQueryScorer(Query query, String fieldName, TokenStream tokenStream, SolrQueryRequest request) throws IOException {
     boolean reqFieldMatch = request.getParams().getFieldBool(fieldName, HighlightParams.FIELD_MATCH, false);
+    Boolean highlightMultiTerm = request.getParams().getBool(HighlightParams.HIGHLIGHT_MULTI_TERM, true);
+    if(highlightMultiTerm == null) {
+      highlightMultiTerm = false;
+    }
+    QueryScorer scorer;
     if (reqFieldMatch) {
-      return new SpanScorer(query, fieldName, tokenStream);
+      scorer = new QueryScorer(query, fieldName);
     }
     else {
-      return new SpanScorer(query, null, tokenStream);
+      scorer = new QueryScorer(query, null);
     }
+    scorer.setExpandMultiTermQuery(highlightMultiTerm);
+    return scorer;
   }
 
   /**
@@ -151,13 +165,13 @@ public class DefaultSolrHighlighter extends SolrHighlighter
    * @param fieldName The name of the field
    * @param request The SolrQueryRequest
    */
-  protected QueryScorer getQueryScorer(Query query, String fieldName, SolrQueryRequest request) {
+  private Scorer getQueryScorer(Query query, String fieldName, SolrQueryRequest request) {
      boolean reqFieldMatch = request.getParams().getFieldBool(fieldName, HighlightParams.FIELD_MATCH, false);
      if (reqFieldMatch) {
-        return new QueryScorer(query, request.getSearcher().getReader(), fieldName);
+        return new QueryTermScorer(query, request.getSearcher().getReader(), fieldName);
      }
      else {
-        return new QueryScorer(query);
+        return new QueryTermScorer(query);
      }
   }
   
@@ -241,16 +255,15 @@ public class DefaultSolrHighlighter extends SolrHighlighter
      IndexSchema schema = searcher.getSchema();
      NamedList fragments = new SimpleOrderedMap();
      String[] fieldNames = getHighlightFields(query, req, defaultFields);
-     Document[] readDocs = new Document[docs.size()];
+     Set<String> fset = new HashSet<String>();
+     
      {
        // pre-fetch documents using the Searcher's doc cache
-       Set<String> fset = new HashSet<String>();
        for(String f : fieldNames) { fset.add(f); }
        // fetch unique key if one exists.
        SchemaField keyField = schema.getUniqueKeyField();
        if(null != keyField)
          fset.add(keyField.getName());  
-       searcher.readDocs(readDocs, docs, fset);
      }
 
 
@@ -258,7 +271,7 @@ public class DefaultSolrHighlighter extends SolrHighlighter
     DocIterator iterator = docs.iterator();
     for (int i = 0; i < docs.size(); i++) {
        int docId = iterator.nextDoc();
-       Document doc = readDocs[i];
+       Document doc = searcher.doc(docId, fset);
        NamedList docSummaries = new SimpleOrderedMap();
        for (String fieldName : fieldNames) {
           fieldName = fieldName.trim();
@@ -271,20 +284,31 @@ public class DefaultSolrHighlighter extends SolrHighlighter
 
           String[] summaries = null;
           List<TextFragment> frags = new ArrayList<TextFragment>();
+          TermOffsetsTokenStream tots = null;
           for (int j = 0; j < docTexts.length; j++) {
             // create TokenStream
             try {
               // attempt term vectors
-              tstream = TokenSources.getTokenStream(searcher.getReader(), docId, fieldName);
+              if( tots == null ) {
+                TokenStream tvStream = TokenSources.getTokenStream(searcher.getReader(), docId, fieldName);
+                if (tvStream != null) {
+                  tots = new TermOffsetsTokenStream(tvStream);
+                  tstream = tots.getMultiValuedTokenStream( docTexts[j].length() );
+                } else {
+                  // fall back to analyzer
+                  tstream = createAnalyzerTStream(schema, fieldName, docTexts[j]);
+                }
+              }
             }
             catch (IllegalArgumentException e) {
-              // fall back to anaylzer
-              tstream = new TokenOrderingFilter(schema.getAnalyzer().tokenStream(fieldName, new StringReader(docTexts[j])), 10);
+              // fall back to analyzer
+              tstream = createAnalyzerTStream(schema, fieldName, docTexts[j]);
             }
-             
+                         
             Highlighter highlighter;
-            if (Boolean.valueOf(req.getParams().get(HighlightParams.USE_PHRASE_HIGHLIGHTER))) {
-              // wrap CachingTokenFilter around TokenStream for reuse
+            if (Boolean.valueOf(req.getParams().get(HighlightParams.USE_PHRASE_HIGHLIGHTER, "true"))) {
+              // TODO: this is not always necessary - eventually we would like to avoid this wrap
+              //       when it is not needed.
               tstream = new CachingTokenFilter(tstream);
               
               // get highlighter
@@ -306,12 +330,16 @@ public class DefaultSolrHighlighter extends SolrHighlighter
             } else {
               highlighter.setMaxDocCharsToAnalyze(maxCharsToAnalyze);
             }
-            
-            TextFragment[] bestTextFragments = highlighter.getBestTextFragments(tstream, docTexts[j], mergeContiguousFragments, numFragments);
-            for (int k = 0; k < bestTextFragments.length; k++) {
-              if ((bestTextFragments[k] != null) && (bestTextFragments[k].getScore() > 0)) {
-                frags.add(bestTextFragments[k]);
+
+            try {
+              TextFragment[] bestTextFragments = highlighter.getBestTextFragments(tstream, docTexts[j], mergeContiguousFragments, numFragments);
+              for (int k = 0; k < bestTextFragments.length; k++) {
+                if ((bestTextFragments[k] != null) && (bestTextFragments[k].getScore() > 0)) {
+                  frags.add(bestTextFragments[k]);
+                }
               }
+            } catch (InvalidTokenOffsetsException e) {
+              throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
             }
           }
           // sort such that the fragments with the highest score come first
@@ -350,7 +378,7 @@ public class DefaultSolrHighlighter extends SolrHighlighter
                     int len = 0;
                     for( String altText: altTexts ){
                       altList.add( len + altText.length() > alternateFieldLen ?
-                                   altText.substring( 0, alternateFieldLen - len ) : altText );
+                                   new String(altText.substring( 0, alternateFieldLen - len )) : altText );
                       len += altText.length();
                       if( len >= alternateFieldLen ) break;
                     }
@@ -365,6 +393,15 @@ public class DefaultSolrHighlighter extends SolrHighlighter
         fragments.add(printId == null ? null : printId, docSummaries);
      }
      return fragments;
+  }
+
+  private TokenStream createAnalyzerTStream(IndexSchema schema, String fieldName, String docText) throws IOException {
+
+    TokenStream tstream;
+    TokenStream ts = schema.getAnalyzer().reusableTokenStream(fieldName, new StringReader(docText));
+    ts.reset();
+    tstream = new TokenOrderingFilter(ts, 10);
+    return tstream;
   }
 }
 
@@ -408,5 +445,46 @@ class TokenOrderingFilter extends TokenFilter {
     }
 
     return queue.isEmpty() ? null : queue.removeFirst();
+  }
+}
+
+class TermOffsetsTokenStream {
+
+  TokenStream bufferedTokenStream = null;
+  Token bufferedToken;
+  int startOffset;
+  int endOffset;
+
+  public TermOffsetsTokenStream( TokenStream tstream ){
+    bufferedTokenStream = tstream;
+    startOffset = 0;
+    bufferedToken = null;
+  }
+
+  public TokenStream getMultiValuedTokenStream( final int length ){
+    endOffset = startOffset + length;
+    return new TokenStream(){
+      Token token;
+      public Token next() throws IOException {
+        while( true ){
+          if( bufferedToken == null )
+            bufferedToken = bufferedTokenStream.next();
+          if( bufferedToken == null ) return null;
+          if( startOffset <= bufferedToken.startOffset() &&
+              bufferedToken.endOffset() <= endOffset ){
+            token = bufferedToken;
+            bufferedToken = null;
+            token.setStartOffset( token.startOffset() - startOffset );
+            token.setEndOffset( token.endOffset() - startOffset );
+            return token;
+          }
+          else if( bufferedToken.endOffset() > endOffset ){
+            startOffset += length + 1;
+            return null;
+          }
+          bufferedToken = null;
+        }
+      }
+    };
   }
 }

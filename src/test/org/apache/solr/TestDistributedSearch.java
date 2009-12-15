@@ -18,23 +18,20 @@
 package org.apache.solr;
 
 import org.apache.solr.client.solrj.SolrServer;
-import org.apache.solr.client.solrj.SolrRequest;
-import org.apache.solr.client.solrj.SolrResponse;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.response.QueryResponse;
-import org.apache.solr.client.solrj.request.QueryRequest;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CommonsHttpSolrServer;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.util.NamedList;
-import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
-import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.util.AbstractSolrTestCase;
+import org.apache.solr.schema.TrieDateField;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 import junit.framework.TestCase;
@@ -44,11 +41,19 @@ import junit.framework.TestCase;
  *  http://docs.codehaus.org/display/JETTY/ServletTester
  * rather then open a real connection?
  *
- * @version $Id: TestDistributedSearch.java 692551 2008-09-05 21:02:35Z yonik $
+ * @version $Id: TestDistributedSearch.java 819420 2009-09-27 22:43:50Z yonik $
  * @since solr 1.3
  */
-public class TestDistributedSearch extends TestCase {
-  Random r = new Random(0);
+public class TestDistributedSearch extends AbstractSolrTestCase {
+  public String getSchemaFile() {
+    return null;
+  }
+
+  public String getSolrConfigFile() {
+    return null;
+  }
+
+  static Random r = new Random(0);
   File testDir;
   
   SolrServer controlClient;
@@ -62,26 +67,40 @@ public class TestDistributedSearch extends TestCase {
 
   String id="id";
   String t1="a_t";
-  String i1="a_i";
+  String i1="a_si";
+  String nint = "n_i";
+  String tint = "n_ti";
+  String nfloat = "n_f";
+  String tfloat = "n_tf";
+  String ndouble = "n_d";
+  String tdouble = "n_td";
+  String nlong = "n_l";
+  String tlong = "n_tl";
+  String ndate = "n_dt";
+  String tdate = "n_tdt";
+  
   String oddField="oddField_s";
   String missingField="missing_but_valid_field_t";
   String invalidField="invalid_field_not_in_schema";
 
-
   @Override public void setUp() throws Exception
   {
+    super.setUp();
     System.setProperty("solr.test.sys.prop1", "propone");
     System.setProperty("solr.test.sys.prop2", "proptwo");
     testDir = new File(System.getProperty("java.io.tmpdir")
         + System.getProperty("file.separator")
         + getClass().getName() + "-" + System.currentTimeMillis());
     testDir.mkdirs();
+    super.postSetUp();
   }
 
   @Override public void tearDown() throws Exception
   {
+    super.preTearDown();
     destroyServers();
     AbstractSolrTestCase.recurseDelete(testDir);
+    super.tearDown();
   }
 
 
@@ -135,18 +154,36 @@ public class TestDistributedSearch extends TestCase {
     }
   }
 
-
-  void index(Object... fields) throws Exception {
-    SolrInputDocument doc = new SolrInputDocument();
+  void addFields(SolrInputDocument doc, Object... fields) {
     for (int i=0; i<fields.length; i+=2) {
       doc.addField((String)(fields[i]), fields[i+1]);
-    }
+    }   
+  }
+
+  // add random fields to the documet before indexing
+  void indexr(Object ... fields) throws Exception {
+    SolrInputDocument doc = new SolrInputDocument();
+    addFields(doc, fields);
+    addFields(doc, "rnd_b", true);
+    addFields(doc, getRandFields(fieldNames, randVals));
+    indexDoc(doc);
+  }
+  
+  void index(Object... fields) throws Exception {
+    SolrInputDocument doc = new SolrInputDocument();
+    addFields(doc, fields);
+    indexDoc(doc);
+  }
+
+  void indexDoc(SolrInputDocument doc) throws IOException, SolrServerException {
     controlClient.add(doc);
 
     int which = (doc.getField(id).toString().hashCode() &0x7fffffff) % clients.size();
     SolrServer client = clients.get(which);
     client.add(doc);
   }
+
+
 
   void index_specific(int serverNumber, Object... fields) throws Exception {
     SolrInputDocument doc = new SolrInputDocument();
@@ -200,7 +237,7 @@ public class TestDistributedSearch extends TestCase {
     compareResponses(rsp, controlRsp);
 
     if (stress>0) {
-      System.out.println("starting stress...");
+      log.info("starting stress...");
       Thread[] threads = new Thread[nThreads];
       for (int i=0; i<threads.length; i++) {
         threads[i] = new Thread() {
@@ -451,8 +488,7 @@ public class TestDistributedSearch extends TestCase {
     String cmp;    
     cmp = compare(a.getResponse(), b.getResponse(), flags, handle);
     if (cmp != null) {
-      System.out.println(a);
-      System.out.println(b);
+      log.info("Mismatched responses:\n"+a+"\n"+b);
       TestCase.fail(cmp);
     }
   }
@@ -468,22 +504,103 @@ public class TestDistributedSearch extends TestCase {
     }
   }
 
+
+
+  public static abstract class RandVal {
+    public static Random r = new Random();
+    public static Set uniqueValues = new HashSet();
+    public abstract Object val();
+    public Object uval() {
+      for(;;) {
+        Object v = val();
+        if (uniqueValues.add(v)) return v;
+      }
+    }
+  }
+
+  public static RandVal rint = new RandVal() {
+    public Object val() {
+      return r.nextInt();
+    }
+  };
+
+  public static RandVal rlong = new RandVal() {
+    public Object val() {
+      return r.nextLong();
+    }
+  };
+
+  public static RandVal rfloat = new RandVal() {
+    public Object val() {
+      return r.nextFloat();
+    }
+  };
+
+  public static RandVal rdouble = new RandVal() {
+    public Object val() {
+      return r.nextDouble();
+    }
+  };
+
+  public static class RandDate extends RandVal {
+    public static TrieDateField df = new TrieDateField();
+
+    public Object val() {
+      long v = r.nextLong();
+        Date d = new Date(v);
+        return df.toExternal(d);
+      }
+  }
+
+  public static RandVal rdate = new RandDate();
+
+  public static String[] fieldNames = new String[]     {"n_ti", "n_f", "n_tf", "n_d", "n_td", "n_l", "n_tl", "n_dt", "n_tdt"};
+  public static RandVal[] randVals = new RandVal[] {rint,   rfloat,rfloat, rdouble,rdouble,rlong,rlong,  rdate,  rdate};
+
+  public static Object[] getRandFields(String[] fields, RandVal[] randVals) {
+    Object[] o = new Object[fields.length*2];
+    for (int i=0; i<fields.length; i++) {
+     o[i*2] = fields[i];
+     o[i*2+1] = randVals[i].uval();
+    }
+    return o;
+  }
+
   public void doTest() throws Exception {
+    RandVal.uniqueValues = new HashSet();   // reset unique random values
+
     del("*:*");
-    index(id,1, i1, 100,t1,"now is the time for all good men"
+    indexr(id,1, i1, 100, tlong, 100,t1,"now is the time for all good men"
             ,"foo_f", 1.414f, "foo_b", "true", "foo_d", 1.414d);
-    index(id,2, i1, 50 ,t1,"to come to the aid of their country.");
-    index(id,3, i1, 2 ,t1,"how now brown cow");
-    index(id,4, i1, -100 ,t1,"the quick fox jumped over the lazy dog");
-    index(id,5, i1, 500 ,t1,"the quick fox jumped way over the lazy dog");
-    index(id,6, i1, -600 ,t1,"humpty dumpy sat on a wall");
-    index(id,7, i1, 123 ,t1,"humpty dumpy had a great fall");
-    index(id,8, i1, 876 ,t1,"all the kings horses and all the kings men");
-    index(id,9, i1, 7 ,t1,"couldn't put humpty together again");
-    index(id,10, i1, 4321 ,t1,"this too shall pass");
-    index(id,11, i1, -987 ,t1,"An eye for eye only ends up making the whole world blind.");
-    index(id,12, i1, 379 ,t1,"Great works are performed, not by strength, but by perseverance.");
-    index(id,13, i1, 232 ,t1,"no eggs on wall, lesson learned", oddField, "odd man out");
+    indexr(id,2, i1, 50 , tlong, 50,t1,"to come to the aid of their country."
+    );
+    indexr(id,3, i1, 2, tlong, 2,t1,"how now brown cow"
+    );
+    indexr(id,4, i1, -100 ,tlong, 101,t1,"the quick fox jumped over the lazy dog"
+    );
+    indexr(id,5, i1, 500, tlong, 500 ,t1,"the quick fox jumped way over the lazy dog"
+    );
+    indexr(id,6, i1, -600, tlong, 600 ,t1,"humpty dumpy sat on a wall");
+    indexr(id,7, i1, 123, tlong, 123 ,t1,"humpty dumpy had a great fall");
+    indexr(id,8, i1, 876, tlong, 876,t1,"all the kings horses and all the kings men");
+    indexr(id,9, i1, 7, tlong, 7,t1,"couldn't put humpty together again");
+    indexr(id,10, i1, 4321, tlong, 4321,t1,"this too shall pass");
+    indexr(id,11, i1, -987, tlong, 987,t1,"An eye for eye only ends up making the whole world blind.");
+    indexr(id,12, i1, 379, tlong, 379,t1,"Great works are performed, not by strength, but by perseverance.");
+    indexr(id,13, i1, 232, tlong, 232,t1,"no eggs on wall, lesson learned", oddField, "odd man out");
+
+    indexr(id, 14, "SubjectTerms_mfacet", new String[]  {"mathematical models", "mathematical analysis"});
+    indexr(id, 15, "SubjectTerms_mfacet", new String[]  {"test 1", "test 2", "test3"});
+    indexr(id, 16, "SubjectTerms_mfacet", new String[]  {"test 1", "test 2", "test3"});
+    String[] vals = new String[100];
+    for (int i=0; i<100; i++) {
+      vals[i] = "test " + i;
+    }
+    indexr(id, 17, "SubjectTerms_mfacet", vals);
+
+    for (int i=100; i<150; i++) {
+      indexr(id, i);      
+    }
 
     commit();
 
@@ -491,11 +608,20 @@ public class TestDistributedSearch extends TestCase {
     handle.put("QTime", SKIPVAL);
     handle.put("timestamp", SKIPVAL);
 
+    // random value sort
+    for (String f : fieldNames) {
+      query("q","*:*", "sort",f+" desc");
+      query("q","*:*", "sort",f+" asc");
+    }
+
+
     // these queries should be exactly ordered and scores should exactly match
     query("q","*:*", "sort",i1+" desc");
+    query("q","*:*", "sort",i1+" asc");
     query("q","*:*", "sort",i1+" desc", "fl","*,score");
+    query("q","*:*", "sort",tlong+" desc");
     handle.put("maxScore", SKIPVAL);
-    query("q","{!func}"+i1);// does not expect maxScore. So if it comes ,ignore it. NamedListCodec.writeSolrDocumentList()
+    query("q","{!func}"+i1);// does not expect maxScore. So if it comes ,ignore it. JavaBinCodec.writeSolrDocumentList()
     //is agnostic of request params.
     handle.remove("maxScore");
     query("q","{!func}"+i1, "fl","*,score");  // even scores should match exactly here
@@ -537,7 +663,10 @@ public class TestDistributedSearch extends TestCase {
 
 
     query("q","*:*", "rows",100, "facet","true", "facet.field",t1);
-    query("q","*:*", "rows",100, "facet","true", "facet.field",t1, "facet.limit",-1, "facet.sort",true);
+    query("q","*:*", "rows",100, "facet","true", "facet.field",t1, "facet.limit",-1, "facet.sort","count");
+    query("q","*:*", "rows",100, "facet","true", "facet.field",t1, "facet.limit",-1, "facet.sort","count", "facet.mincount",2);
+    query("q","*:*", "rows",100, "facet","true", "facet.field",t1, "facet.limit",-1, "facet.sort","index");
+    query("q","*:*", "rows",100, "facet","true", "facet.field",t1, "facet.limit",-1, "facet.sort","index", "facet.mincount",2);
     query("q","*:*", "rows",100, "facet","true", "facet.field",t1,"facet.limit",1);
     query("q","*:*", "rows",100, "facet","true", "facet.query","quick", "facet.query","all", "facet.query","*:*");
     query("q","*:*", "rows",100, "facet","true", "facet.field",t1, "facet.offset",1);
@@ -547,10 +676,22 @@ public class TestDistributedSearch extends TestCase {
     query("q","*:*", "rows",100, "facet","true", "facet.query","quick", "facet.query","all", "facet.query","*:*"
     ,"facet.field",t1);
 
+    // test filter tagging, facet exclusion, and naming (multi-select facet support)
+    query("q","*:*", "rows",100, "facet","true", "facet.query","{!key=myquick}quick", "facet.query","{!key=myall ex=a}all", "facet.query","*:*"
+    ,"facet.field","{!key=mykey ex=a}"+t1
+    ,"facet.field","{!key=other ex=b}"+t1
+    ,"facet.field","{!key=again ex=a,b}"+t1
+    ,"facet.field",t1
+    ,"fq","{!tag=a}id:[1 TO 7]", "fq","{!tag=b}id:[3 TO 9]"
+    );
+    query("q", "*:*", "facet", "true", "facet.field", "{!ex=t1}SubjectTerms_mfacet", "fq", "{!tag=t1}SubjectTerms_mfacet:(test 1)", "facet.limit", "10", "facet.mincount", "1");
+
     // test field that is valid in schema but missing in all shards
     query("q","*:*", "rows",100, "facet","true", "facet.field",missingField, "facet.mincount",2);
     // test field that is valid in schema and missing in some shards
     query("q","*:*", "rows",100, "facet","true", "facet.field",oddField, "facet.mincount",2);
+
+    query("q","*:*", "sort",i1+" desc", "stats", "true", "stats.field", i1);
 
     try {
       // test error produced for field that is invalid for schema
@@ -578,8 +719,4 @@ public class TestDistributedSearch extends TestCase {
     destroyServers();
   }
 
-
 }
-
-
-

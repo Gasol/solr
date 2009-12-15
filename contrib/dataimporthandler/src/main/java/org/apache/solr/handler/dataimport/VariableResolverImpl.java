@@ -27,17 +27,27 @@ import java.util.regex.Pattern;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: VariableResolverImpl.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: VariableResolverImpl.java 788291 2009-06-25 08:39:25Z noble $
  * @see VariableResolver
  * @since solr 1.3
  */
 public class VariableResolverImpl extends VariableResolver {
   private Map<String, Object> container = new HashMap<String, Object>();
 
-  private static final TemplateString TEMPLATE_STRING = new TemplateString();
+  /**
+   * Used for creating Evaluators
+   */
+  Context context;
+
+  private final TemplateString templateString = new TemplateString();
 
   public VariableResolverImpl() {
   }
+
+  /**
+   * The current resolver instance
+   */
+  static final ThreadLocal<VariableResolverImpl> CURRENT_VARIABLE_RESOLVER = new ThreadLocal<VariableResolverImpl>();
 
   @SuppressWarnings("unchecked")
   public VariableResolverImpl addNamespace(String name, Map<String, Object> map) {
@@ -74,7 +84,7 @@ public class VariableResolverImpl extends VariableResolver {
   }
 
   public String replaceTokens(String template) {
-    return TEMPLATE_STRING.replaceTokens(template, this);
+    return templateString.replaceTokens(template, this);
   }
 
   @SuppressWarnings("unchecked")
@@ -84,22 +94,27 @@ public class VariableResolverImpl extends VariableResolver {
     if ("".equals(name))
       return null;
     String[] parts = DOT_SPLIT.split(name, 0);
-    Map<String, Object> namespace = container;
-    for (int i = 0; i < parts.length; i++) {
-      String thePart = parts[i];
-      if (i == parts.length - 1) {
-        return namespace.get(thePart);
-      }
-      Object temp = namespace.get(thePart);
-      if (temp == null) {
-        return namespace.get(mergeAll(parts, i));
-      } else {
-        if (temp instanceof Map) {
-          namespace = (Map) temp;
+    CURRENT_VARIABLE_RESOLVER.set(this);
+    try {
+      Map<String, Object> namespace = container;
+      for (int i = 0; i < parts.length; i++) {
+        String thePart = parts[i];
+        if (i == parts.length - 1) {
+          return namespace.get(thePart);
+        }
+        Object temp = namespace.get(thePart);
+        if (temp == null) {
+          return namespace.get(mergeAll(parts, i));
         } else {
-          return null;
+          if (temp instanceof Map) {
+            namespace = (Map) temp;
+          } else {
+            return null;
+          }
         }
       }
+    } finally {
+      CURRENT_VARIABLE_RESOLVER.set(null);
     }
     return null;
   }
@@ -107,7 +122,7 @@ public class VariableResolverImpl extends VariableResolver {
   private String mergeAll(String[] parts, int i) {
     if (i == parts.length - 1)
       return parts[parts.length - 1];
-    StringBuffer sb = new StringBuffer();
+    StringBuilder sb = new StringBuilder();
     for (int j = i; j < parts.length; j++) {
       sb.append(parts[j]);
       if (j < parts.length - 1)

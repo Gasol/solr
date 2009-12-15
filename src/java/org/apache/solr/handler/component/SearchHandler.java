@@ -39,7 +39,8 @@ import org.apache.lucene.queryParser.ParseException;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.HttpClient;
 
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -54,17 +55,30 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware
   static final String INIT_FIRST_COMPONENTS = "first-components";
   static final String INIT_LAST_COMPONENTS = "last-components";
 
-  protected static Logger log = Logger.getLogger(SearchHandler.class.getName());
+  // socket timeout measured in ms, closes a socket if read
+  // takes longer than x ms to complete. throws
+  // java.net.SocketTimeoutException: Read timed out exception
+  static final String INIT_SO_TIMEOUT = "shard-socket-timeout";
+
+  // connection timeout measures in ms, closes a socket if connection
+  // cannot be established within x ms. with a
+  // java.net.SocketTimeoutException: Connection timed out
+  static final String INIT_CONNECTION_TIMEOUT = "shard-connection-timeout";
+  static int soTimeout = 0; //current default values
+  static int connectionTimeout = 0; //current default values
+
+  protected static Logger log = LoggerFactory.getLogger(SearchHandler.class);
 
   protected List<SearchComponent> components = null;
 
   protected List<String> getDefaultComponents()
   {
-    ArrayList<String> names = new ArrayList<String>(5);
+    ArrayList<String> names = new ArrayList<String>(6);
     names.add( QueryComponent.COMPONENT_NAME );
     names.add( FacetComponent.COMPONENT_NAME );
     names.add( MoreLikeThisComponent.COMPONENT_NAME );
     names.add( HighlightComponent.COMPONENT_NAME );
+    names.add( StatsComponent.COMPONENT_NAME );
     names.add( DebugComponent.COMPONENT_NAME );
     return names;
   }
@@ -122,6 +136,18 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware
       components.add(dbgCmp);
       log.info("Adding  debug component:" + dbgCmp);
     }
+
+    Object co = initArgs.get(INIT_CONNECTION_TIMEOUT);
+    if (co != null) {
+      connectionTimeout = (Integer) co;
+      log.info("Setting shard-connection-timeout to: " + connectionTimeout);
+    }
+
+    Object so = initArgs.get(INIT_SO_TIMEOUT);
+    if (so != null) {
+      soTimeout = (Integer) so;
+      log.info("Setting shard-socket-timeout to: " + soTimeout);
+    }
   }
 
   public List<SearchComponent> getComponents() {
@@ -133,7 +159,7 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware
   public void handleRequestBody(SolrQueryRequest req, SolrQueryResponse rsp) throws Exception, ParseException, InstantiationException, IllegalAccessException
   {
     // int sleep = req.getParams().getInt("sleep",0);
-    // if (sleep > 0) {log.severe("SLEEPING for " + sleep);  Thread.sleep(sleep);}
+    // if (sleep > 0) {log.error("SLEEPING for " + sleep);  Thread.sleep(sleep);}
     ResponseBuilder rb = new ResponseBuilder();
     rb.req = req;
     rb.rsp = rsp;
@@ -292,17 +318,17 @@ public class SearchHandler extends RequestHandlerBase implements SolrCoreAware
 
   @Override
   public String getVersion() {
-    return "$Revision: 686274 $";
+    return "$Revision: 766412 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: SearchHandler.java 686274 2008-08-15 16:21:04Z yonik $";
+    return "$Id: SearchHandler.java 766412 2009-04-19 01:31:02Z koji $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/component/SearchHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/component/SearchHandler.java $";
   }
 }
 
@@ -332,6 +358,8 @@ class HttpCommComponent {
     MultiThreadedHttpConnectionManager mgr = new MultiThreadedHttpConnectionManager();
     mgr.getParams().setDefaultMaxConnectionsPerHost(20);
     mgr.getParams().setMaxTotalConnections(10000);
+    mgr.getParams().setConnectionTimeout(SearchHandler.connectionTimeout);
+    mgr.getParams().setSoTimeout(SearchHandler.soTimeout);
     // mgr.getParams().setStaleCheckingEnabled(false);
     client = new HttpClient(mgr);    
   }
@@ -377,7 +405,7 @@ class HttpCommComponent {
           // String url = "http://" + shard + "/select";
           String url = "http://" + shard;
 
-          params.remove(CommonParams.WT); // use default (or should we explicitly set it?)
+          params.remove(CommonParams.WT); // use default (currently javabin)
           params.remove(CommonParams.VERSION);
 
           SolrServer server = new CommonsHttpSolrServer(url, client);
@@ -385,7 +413,9 @@ class HttpCommComponent {
           // use generic request to avoid extra processing of queries
           QueryRequest req = new QueryRequest(params);
           req.setMethod(SolrRequest.METHOD.POST);
-          req.setResponseParser(new BinaryResponseParser());  // this sets the wt param
+
+          // no need to set the response parser as binary is the default
+          // req.setResponseParser(new BinaryResponseParser());
           // srsp.rsp = server.request(req);
           // srsp.rsp = server.query(sreq.params);
 

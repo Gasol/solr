@@ -18,12 +18,15 @@
 package org.apache.solr.analysis;
 
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.solr.analysis.TokenizerFactory;
+import org.apache.lucene.analysis.CharStream;
+import org.apache.lucene.analysis.CharReader;
+import org.apache.lucene.analysis.Tokenizer;
 
 import java.io.Reader;
+import java.io.IOException;
 
 /**
- * @version $Id: TokenizerChain.java 565144 2007-08-12 20:47:42Z ryan $
+ * @version $Id: TokenizerChain.java 805263 2009-08-18 02:50:49Z yonik $
  */
 
 //
@@ -31,27 +34,52 @@ import java.io.Reader;
 // create a TokenStream.
 //
 public class TokenizerChain extends SolrAnalyzer {
+  final private CharFilterFactory[] charFilters;
   final private TokenizerFactory tokenizer;
   final private TokenFilterFactory[] filters;
 
   public TokenizerChain(TokenizerFactory tokenizer, TokenFilterFactory[] filters) {
+    this(null,tokenizer,filters);
+  }
+
+  public TokenizerChain(CharFilterFactory[] charFilters, TokenizerFactory tokenizer, TokenFilterFactory[] filters) {
+    this.charFilters = charFilters;
     this.tokenizer = tokenizer;
     this.filters = filters;
   }
 
+  public CharFilterFactory[] getCharFilterFactories() { return charFilters; }
   public TokenizerFactory getTokenizerFactory() { return tokenizer; }
   public TokenFilterFactory[] getTokenFilterFactories() { return filters; }
 
-  public TokenStream tokenStream(String fieldName, Reader reader) {
-    TokenStream ts = tokenizer.create(reader);
+  @Override
+  public Reader charStream(Reader reader){
+    if( charFilters != null && charFilters.length > 0 ){
+      CharStream cs = CharReader.get( reader );
+      for (int i=0; i<charFilters.length; i++) {
+        cs = charFilters[i].create(cs);
+      }
+      reader = cs;
+    }
+    return reader;
+  }
+
+  @Override
+  public TokenStreamInfo getStream(String fieldName, Reader reader) {
+    Tokenizer tk = (Tokenizer)tokenizer.create(charStream(reader));
+    TokenStream ts = tk;
     for (int i=0; i<filters.length; i++) {
       ts = filters[i].create(ts);
     }
-    return ts;
+    return new TokenStreamInfo(tk,ts);
   }
 
   public String toString() {
     StringBuilder sb = new StringBuilder("TokenizerChain(");
+    for (CharFilterFactory filter: charFilters) {
+      sb.append(filter);
+      sb.append(", ");
+    }
     sb.append(tokenizer);
     for (TokenFilterFactory filter: filters) {
       sb.append(", ");

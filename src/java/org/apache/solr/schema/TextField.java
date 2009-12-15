@@ -27,11 +27,13 @@ import java.io.IOException;
 
 /** <code>TextField</code> is the basic type for configurable text analysis.
  * Analyzers for field types using this implementation should be defined in the schema.
- * @version $Id: TextField.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: TextField.java 764291 2009-04-12 11:03:09Z shalin $
  */
 public class TextField extends CompressableField {
   protected void init(IndexSchema schema, Map<String,String> args) {
     properties |= TOKENIZED;
+    if (schema.getVersion()> 1.1f) properties &= ~OMIT_TF_POSITIONS;
+    
     super.init(schema, args);    
   }
 

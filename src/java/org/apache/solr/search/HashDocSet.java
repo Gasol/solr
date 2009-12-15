@@ -17,7 +17,7 @@
 
 package org.apache.solr.search;
 
-import org.apache.solr.util.BitUtil;
+import org.apache.lucene.util.BitUtil;
 
 
 /**
@@ -26,7 +26,7 @@ import org.apache.solr.util.BitUtil;
  * in the set because it takes up less memory and is faster to iterate and take
  * set intersections.
  *
- * @version $Id: HashDocSet.java 588352 2007-10-25 20:54:41Z hossman $
+ * @version $Id: HashDocSet.java 790938 2009-07-03 15:09:21Z yonik $
  * @since solr 0.9
  */
 public final class HashDocSet extends DocSetBase {
@@ -67,7 +67,8 @@ public final class HashDocSet extends DocSetBase {
     // https://issues.apache.org/jira/browse/SOLR-390
     for (int i=tsize-1; i>=0; i--) table[i]=EMPTY;
 
-    for (int i=offset; i<len; i++) {
+    int end = offset + len;
+    for (int i=offset; i<end; i++) {
       put(docs[i]);
     }
 

@@ -22,7 +22,11 @@ import junit.framework.TestCase;
 import java.util.Random;
 import java.util.BitSet;
 
+import org.apache.lucene.util.OpenBitSetIterator;
+import org.apache.lucene.search.DocIdSetIterator;
+
 /**
+ * @deprecated
  * @version $Id$
  */
 public class TestOpenBitSet extends TestCase {
@@ -49,14 +53,17 @@ public class TestOpenBitSet extends TestCase {
   // test interleaving different BitSetIterator.next()
   void doIterate(BitSet a, OpenBitSet b) {
     int aa=-1,bb=-1;
-    BitSetIterator iterator = new BitSetIterator(b);
+    OpenBitSetIterator iterator = new OpenBitSetIterator(b);
     do {
       aa = a.nextSetBit(aa+1);
-      if (rand.nextBoolean())
-        bb = iterator.next();
-      else
-        bb = iterator.next(bb+1);
-      assertEquals(aa,bb);
+      if (rand.nextBoolean()) {
+        iterator.next();
+        bb = iterator.doc();
+      } else {
+        iterator.skipTo(bb+1);
+        bb = iterator.doc();
+      }
+      assertEquals(aa == -1 ? DocIdSetIterator.NO_MORE_DOCS : aa, bb);
     } while (aa>=0);
   }
 

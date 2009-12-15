@@ -162,7 +162,7 @@ public class DisMaxRequestHandler extends StandardRequestHandler
 
 	@Override
 	public String getSource() {
-	  return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/DisMaxRequestHandler.java $";
+	  return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/DisMaxRequestHandler.java $";
 	}
   
   @Override
