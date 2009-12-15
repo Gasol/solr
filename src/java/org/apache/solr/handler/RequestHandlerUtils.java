@@ -26,12 +26,13 @@ import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
 import org.apache.solr.update.CommitUpdateCommand;
+import org.apache.solr.update.RollbackUpdateCommand;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 
 /**
  * Common helper functions for RequestHandlers
  * 
- * @version $Id: RequestHandlerUtils.java 672031 2008-06-26 21:14:06Z gsingers $
+ * @version $Id: RequestHandlerUtils.java 805774 2009-08-19 12:21:22Z noble $
  * @since solr 1.2
  */
 public class RequestHandlerUtils
@@ -67,6 +68,7 @@ public class RequestHandlerUtils
       CommitUpdateCommand cmd = new CommitUpdateCommand( optimize );
       cmd.waitFlush    = params.getBool( UpdateParams.WAIT_FLUSH,    cmd.waitFlush    );
       cmd.waitSearcher = params.getBool( UpdateParams.WAIT_SEARCHER, cmd.waitSearcher );
+      cmd.expungeDeletes = params.getBool( UpdateParams.EXPUNGE_DELETES, cmd.expungeDeletes);
       cmd.maxOptimizeSegments = params.getInt(UpdateParams.MAX_OPTIMIZE_SEGMENTS, cmd.maxOptimizeSegments);
       req.getCore().getUpdateHandler().commit( cmd );
       
@@ -100,8 +102,28 @@ public class RequestHandlerUtils
       CommitUpdateCommand cmd = new CommitUpdateCommand( optimize );
       cmd.waitFlush    = params.getBool( UpdateParams.WAIT_FLUSH,    cmd.waitFlush    );
       cmd.waitSearcher = params.getBool( UpdateParams.WAIT_SEARCHER, cmd.waitSearcher );
+      cmd.expungeDeletes = params.getBool( UpdateParams.EXPUNGE_DELETES, cmd.expungeDeletes);      
       cmd.maxOptimizeSegments = params.getInt(UpdateParams.MAX_OPTIMIZE_SEGMENTS, cmd.maxOptimizeSegments);
       processor.processCommit( cmd );
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * @since Solr 1.4
+   */
+  public static boolean handleRollback( UpdateRequestProcessor processor, SolrParams params, boolean force ) throws IOException
+  {
+    if( params == null ) {
+      params = new MapSolrParams( new HashMap<String, String>() ); 
+    }
+    
+    boolean rollback = params.getBool( UpdateParams.ROLLBACK, false );
+    
+    if( rollback || force ) {
+      RollbackUpdateCommand cmd = new RollbackUpdateCommand();
+      processor.processRollback( cmd );
       return true;
     }
     return false;

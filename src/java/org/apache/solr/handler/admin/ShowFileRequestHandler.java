@@ -71,7 +71,7 @@ import org.apache.solr.request.SolrQueryResponse;
  *   http://localhost:8983/solr/admin/file?file=schema.xml&contentType=text/plain
  * </pre>
  * 
- * @version $Id: ShowFileRequestHandler.java 690026 2008-08-28 22:20:00Z yonik $
+ * @version $Id: ShowFileRequestHandler.java 790580 2009-07-02 13:20:22Z markrmiller $
  * @since solr 1.3
  */
 public class ShowFileRequestHandler extends RequestHandlerBase
@@ -183,6 +183,7 @@ public class ShowFileRequestHandler extends RequestHandlerBase
   
       rsp.add( RawResponseWriter.CONTENT, content );
     }
+    rsp.setHttpCaching(false);
   }
   
   /**
@@ -220,16 +221,16 @@ public class ShowFileRequestHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-      return "$Revision: 690026 $";
+      return "$Revision: 790580 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: ShowFileRequestHandler.java 690026 2008-08-28 22:20:00Z yonik $";
+    return "$Id: ShowFileRequestHandler.java 790580 2009-07-02 13:20:22Z markrmiller $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/admin/ShowFileRequestHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/admin/ShowFileRequestHandler.java $";
   }
 }

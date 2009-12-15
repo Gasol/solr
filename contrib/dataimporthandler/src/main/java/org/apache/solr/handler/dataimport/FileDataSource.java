@@ -18,6 +18,8 @@ package org.apache.solr.handler.dataimport;
 
 import java.io.*;
 import java.util.Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -36,20 +38,28 @@ import java.util.Properties;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: FileDataSource.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: FileDataSource.java 812122 2009-09-07 13:12:01Z shalin $
  * @since solr 1.3
  */
 public class FileDataSource extends DataSource<Reader> {
   public static final String BASE_PATH = "basePath";
 
-  private String basePath;
+  /**
+   * The basePath for this data source
+   */
+  protected String basePath;
 
-  private String encoding = null;
+  /**
+   * The encoding using which the given file should be read
+   */
+  protected String encoding = null;
+
+  private static final Logger LOG = LoggerFactory.getLogger(FileDataSource.class);
 
   public void init(Context context, Properties initProps) {
     basePath = initProps.getProperty(BASE_PATH);
-    if (initProps.get(HttpDataSource.ENCODING) != null)
-      encoding = initProps.getProperty(HttpDataSource.ENCODING);
+    if (initProps.get(URLDataSource.ENCODING) != null)
+      encoding = initProps.getProperty(URLDataSource.ENCODING);
   }
 
   /**
@@ -75,10 +85,13 @@ public class FileDataSource extends DataSource<Reader> {
         file = new File(basePath + query);
 
       if (file.isFile() && file.canRead()) {
+        LOG.debug("Accessing File: " + file.toString());
         return openStream(file);
       } else if (file != file0)
-        if (file0.isFile() && file0.canRead())
+        if (file0.isFile() && file0.canRead()) {
+          LOG.debug("Accessing File0: " + file0.toString());
           return openStream(file0);
+        }
 
       throw new FileNotFoundException("Could not find file: " + query);
     } catch (UnsupportedEncodingException e) {
@@ -88,7 +101,16 @@ public class FileDataSource extends DataSource<Reader> {
     }
   }
 
-  private InputStreamReader openStream(File file) throws FileNotFoundException,
+  /**
+   * Open a {@link java.io.Reader} for the given file name
+   *
+   * @param file a {@link java.io.File} instance
+   * @return a Reader on the given file
+   * @throws FileNotFoundException if the File does not exist
+   * @throws UnsupportedEncodingException if the encoding is unsupported
+   * @since solr 1.4
+   */
+  protected Reader openStream(File file) throws FileNotFoundException,
           UnsupportedEncodingException {
     if (encoding == null) {
       return new InputStreamReader(new FileInputStream(file));

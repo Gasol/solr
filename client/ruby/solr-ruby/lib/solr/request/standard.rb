@@ -46,11 +46,11 @@ class Solr::Request::Standard < Solr::Request::Select
     hash = {}
     
     # standard request param processing
-    sort = @params[:sort].collect do |sort|
+    hash[:sort] = @params[:sort].collect do |sort|
       key = sort.keys[0]
       "#{key.to_s} #{sort[key] == :descending ? 'desc' : 'asc'}"
     end.join(',') if @params[:sort]
-    hash[:q] = sort ? "#{@params[:query]};#{sort}" : @params[:query]
+    hash[:q] = @params[:query]
     hash["q.op"] = @params[:operator]
     hash[:df] = @params[:default_field]
 
@@ -75,6 +75,7 @@ class Solr::Request::Standard < Solr::Request::Select
       hash["facet.mincount"] = @params[:facets][:mincount]
       hash["facet.prefix"] = @params[:facets][:prefix]
       hash["facet.offset"] = @params[:facets][:offset]
+      hash["facet.method"] = @params[:facets][:method] if @params[:facets][:method]
       if @params[:facets][:fields]  # facet fields are optional (could be facet.query only)
         @params[:facets][:fields].each do |f|
           if f.kind_of? Hash

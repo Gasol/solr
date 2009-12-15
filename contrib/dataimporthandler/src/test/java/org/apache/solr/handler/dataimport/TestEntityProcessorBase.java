@@ -29,7 +29,7 @@ import java.util.Map;
  * Test for EntityProcessorBase
  * </p>
  *
- * @version $Id: TestEntityProcessorBase.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TestEntityProcessorBase.java 766608 2009-04-20 07:36:55Z shalin $
  * @since solr 1.3
  */
 public class TestEntityProcessorBase {
@@ -43,12 +43,12 @@ public class TestEntityProcessorBase {
     fields.add(TestRegexTransformer.getField("A", null, null, null, null));
     fields.add(TestRegexTransformer.getField("B", null, null, null, null));
 
-    Context context = AbstractDataImportHandlerTest.getContext(null, null,
-            null, 0, fields, entity);
+    Context context = AbstractDataImportHandlerTest.getContext(null, null, new MockDataSource(), Context.FULL_DUMP,
+            fields, entity);
     Map<String, Object> src = new HashMap<String, Object>();
     src.put("A", "NA");
     src.put("B", "NA");
-    SqlEntityProcessor sep = new SqlEntityProcessor();
+    EntityProcessorWrapper sep = new EntityProcessorWrapper(new SqlEntityProcessor(), null);
     sep.init(context);
     Map<String, Object> res = sep.applyTransformer(src);
     Assert.assertNotNull(res.get("T1"));

@@ -16,34 +16,30 @@
  */
 package org.apache.solr.handler.dataimport;
 
-import org.apache.lucene.document.Document;
+import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.update.AddUpdateCommand;
 import org.apache.solr.update.CommitUpdateCommand;
 import org.apache.solr.update.DeleteUpdateCommand;
+import org.apache.solr.update.RollbackUpdateCommand;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
-import org.apache.solr.common.SolrInputDocument;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
- * <p>
- * Writes documents to SOLR as well as provides methods for loading and
- * persisting last index time.
- * </p>
+ * <p> Writes documents to SOLR as well as provides methods for loading and persisting last index time. </p>
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: SolrWriter.java 690134 2008-08-29 07:18:52Z shalin $
+ * @version $Id: SolrWriter.java 820235 2009-09-30 10:35:23Z shalin $
  * @since solr 1.3
  */
-public abstract class SolrWriter {
-  private static final Logger LOG = Logger
-          .getLogger(SolrWriter.class.getName());
+public class SolrWriter {
+  private static final Logger log = LoggerFactory.getLogger(SolrWriter.class);
 
   static final String IMPORTER_PROPERTIES = "dataimport.properties";
 
@@ -53,10 +49,20 @@ public abstract class SolrWriter {
 
   private final String configDir;
 
+  private String persistFilename = IMPORTER_PROPERTIES;
+
+  DebugLogger debugLogger;
+
   public SolrWriter(UpdateRequestProcessor processor, String confDir) {
     this.processor = processor;
     configDir = confDir;
-
+  }
+  public SolrWriter(UpdateRequestProcessor processor, String confDir, String filePrefix) {
+    this.processor = processor;
+    configDir = confDir;
+    if(filePrefix != null){
+      persistFilename = filePrefix+".properties";
+    }
   }
 
   public boolean upload(SolrInputDocument d) {
@@ -67,11 +73,8 @@ public abstract class SolrWriter {
       command.overwritePending = true;
       command.overwriteCommitted = true;
       processor.processAdd(command);
-    } catch (IOException e) {
-      LOG.log(Level.SEVERE, "Exception while adding: " + d, e);
-      return false;
     } catch (Exception e) {
-      LOG.log(Level.WARNING, "Error creating document : " + d, e);
+      log.warn("Error creating document : " + d, e);
       return false;
     }
 
@@ -80,47 +83,32 @@ public abstract class SolrWriter {
 
   public void deleteDoc(Object id) {
     try {
-      LOG.info("deleted from document to Solr: " + id);
+      log.info("Deleting document: " + id);
       DeleteUpdateCommand delCmd = new DeleteUpdateCommand();
       delCmd.id = id.toString();
       delCmd.fromPending = true;
       delCmd.fromCommitted = true;
       processor.processDelete(delCmd);
     } catch (IOException e) {
-      LOG.log(Level.SEVERE, "Exception while deleteing: " + id, e);
+      log.error("Exception while deleteing: " + id, e);
     }
   }
 
-  Date getStartTime() {
-    Properties props = readIndexerProperties();
-    String result = props.getProperty(SolrWriter.LAST_INDEX_KEY);
 
-    try {
-      if (result != null)
-        return DataImporter.DATE_TIME_FORMAT.parse(result);
-    } catch (ParseException e) {
-      throw new DataImportHandlerException(DataImportHandlerException.WARN,
-              "Unable to read last indexed time from: "
-                      + SolrWriter.IMPORTER_PROPERTIES, e);
-    }
-    return null;
-  }
-
-  private void persistStartTime(Date date) {
+  void persist(Properties p) {
     OutputStream propOutput = null;
 
     Properties props = readIndexerProperties();
 
     try {
-      props.put(SolrWriter.LAST_INDEX_KEY, DataImporter.DATE_TIME_FORMAT
-              .format(date));
+      props.putAll(p);
       String filePath = configDir;
       if (configDir != null && !configDir.endsWith(File.separator))
         filePath += File.separator;
-      filePath += SolrWriter.IMPORTER_PROPERTIES;
+      filePath += persistFilename;
       propOutput = new FileOutputStream(filePath);
       props.store(propOutput, null);
-      LOG.info("Wrote last indexed time to " + SolrWriter.IMPORTER_PROPERTIES);
+      log.info("Wrote last indexed time to " + persistFilename);
     } catch (FileNotFoundException e) {
       throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
               "Unable to persist Index Start Time", e);
@@ -137,18 +125,17 @@ public abstract class SolrWriter {
     }
   }
 
-  private Properties readIndexerProperties() {
+  Properties readIndexerProperties() {
     Properties props = new Properties();
     InputStream propInput = null;
 
     try {
       propInput = new FileInputStream(configDir
-              + SolrWriter.IMPORTER_PROPERTIES);
+              + persistFilename);
       props.load(propInput);
-      LOG.info("Read " + SolrWriter.IMPORTER_PROPERTIES);
+      log.info("Read " + persistFilename);
     } catch (Exception e) {
-      LOG.log(Level.WARNING, "Unable to read: "
-              + SolrWriter.IMPORTER_PROPERTIES);
+      log.warn("Unable to read: " + persistFilename);
     } finally {
       try {
         if (propInput != null)
@@ -163,14 +150,14 @@ public abstract class SolrWriter {
 
   public void deleteByQuery(String query) {
     try {
-      LOG.info("Deleting documents from Solr with query: " + query);
+      log.info("Deleting documents from Solr with query: " + query);
       DeleteUpdateCommand delCmd = new DeleteUpdateCommand();
       delCmd.query = query;
       delCmd.fromCommitted = true;
       delCmd.fromPending = true;
       processor.processDelete(delCmd);
     } catch (IOException e) {
-      LOG.log(Level.SEVERE, "Exception while deleting by query: " + query, e);
+      log.error("Exception while deleting by query: " + query, e);
     }
   }
 
@@ -178,8 +165,17 @@ public abstract class SolrWriter {
     try {
       CommitUpdateCommand commit = new CommitUpdateCommand(optimize);
       processor.processCommit(commit);
-    } catch (Exception e) {
-      LOG.log(Level.SEVERE, "Exception while solr commit.", e);
+    } catch (Throwable t) {
+      log.error("Exception while solr commit.", t);
+    }
+  }
+
+  public void rollback() {
+    try {
+      RollbackUpdateCommand rollback = new RollbackUpdateCommand();
+      processor.processRollback(rollback);
+    } catch (Throwable t) {
+      log.error("Exception while solr rollback.", t);
     }
   }
 
@@ -201,11 +197,8 @@ public abstract class SolrWriter {
     byte[] buf = new byte[1024];
     int sz = 0;
     try {
-      while (true) {
-        sz = in.read(buf);
+      while ((sz = in.read(buf)) != -1) {
         baos.write(buf, 0, sz);
-        if (sz < buf.length)
-          break;
       }
     } finally {
       try {
@@ -214,7 +207,7 @@ public abstract class SolrWriter {
 
       }
     }
-    return new String(baos.toByteArray());
+    return new String(baos.toByteArray(), "UTF-8");
   }
 
   static String getDocCount() {
@@ -222,38 +215,16 @@ public abstract class SolrWriter {
       return ""
               + (DocBuilder.INSTANCE.get().importStatistics.docCount.get() + 1);
     } else {
-      return "";
+      return null;
     }
   }
 
-  public Date loadIndexStartTime() {
-    return this.getStartTime();
+  public DebugLogger getDebugLogger() {
+    if (debugLogger == null) {
+      debugLogger = new DebugLogger(this);
+    }
+    return debugLogger;
   }
-
-  /**
-   * <p>
-   * Stores the last indexed time into the <code>IMPORTER_PROPERTIES</code>
-   * file. If any properties are already defined in the file, then they are
-   * preserved.
-   * </p>
-   *
-   * @param date the Date instance to be persisted
-   */
-  public void persistIndexStartTime(Date date) {
-    this.persistStartTime(date);
-  }
-
-  public abstract SolrDoc getSolrDocInstance();
-
-  /**
-   * <p>
-   * Write the document to the index
-   * </p>
-   *
-   * @param d . The Document warapper object
-   * @return a boolean value denoting success (true) or failure (false)
-   */
-  public abstract boolean upload(SolrDoc d);
 
   /**
    * This method is used for verbose debugging
@@ -262,20 +233,8 @@ public abstract class SolrWriter {
    * @param name  Name of the entity/transformer
    * @param row   The actual data . Can be a Map<String,object> or a List<Map<String,object>>
    */
-  public abstract void log(int event, String name, Object row);
-
-  /**
-   * The purpose of this interface to provide pluggable implementations for Solr
-   * 1.2 & 1.3 The implementation can choose to wrap appropriate Objects based
-   * on the version
-   */
-  public static interface SolrDoc {
-
-    public void addField(String name, Object value, float boost);
-
-    public Object getField(String field);
-
-    public void setDocumentBoost(float boost);
+  public void log(int event, String name, Object row) {
+    getDebugLogger().log(event, name, row);
   }
 
   public static final int START_ENTITY = 1, END_ENTITY = 2,

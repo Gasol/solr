@@ -32,7 +32,7 @@ import java.io.IOException;
 
 /**
  *
- * @version $Id: WildcardFilter.java 690336 2008-08-29 16:58:33Z yonik $
+ * @version $Id: WildcardFilter.java 690332 2008-08-29 16:54:41Z yonik $
  */
 public class WildcardFilter extends Filter {
   protected final Term term;

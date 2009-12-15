@@ -23,10 +23,9 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.search.HitCollector;
-import org.w3c.dom.NodeList;
-import org.w3c.dom.Node;
 
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.Vector;
 import java.io.IOException;
 
@@ -35,22 +34,19 @@ import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.common.SolrException;
-import org.apache.solr.common.util.DOMUtil;
 import org.apache.solr.util.plugin.SolrCoreAware;
 import org.apache.solr.core.*;
-
-import javax.xml.xpath.XPathConstants;
 
 /**
  * <code>UpdateHandler</code> handles requests to change the index
  * (adds, deletes, commits, optimizes, etc).
  *
- * @version $Id: UpdateHandler.java 680795 2008-07-29 18:13:57Z shalin $
+ * @version $Id: UpdateHandler.java 812035 2009-09-07 08:25:27Z noble $
  * @since solr 0.9
  */
 
 public abstract class UpdateHandler implements SolrInfoMBean {
-  protected final static Logger log = Logger.getLogger(UpdateHandler.class.getName());
+  protected final static Logger log = LoggerFactory.getLogger(UpdateHandler.class);
 
   protected final SolrCore core;
   protected final IndexSchema schema;
@@ -63,36 +59,16 @@ public abstract class UpdateHandler implements SolrInfoMBean {
   protected Vector<SolrEventListener> optimizeCallbacks = new Vector<SolrEventListener>();
 
   private void parseEventListeners() {
-    final SolrConfig solrConfig = core.getSolrConfig();
-    NodeList nodes = (NodeList) solrConfig.evaluate("updateHandler/listener[@event=\"postCommit\"]", XPathConstants.NODESET);
-    if (nodes!=null) {
-      for (int i=0; i<nodes.getLength(); i++) {
-        Node node = nodes.item(i);
-        try {
-          String className = DOMUtil.getAttr(node,"class");
-          SolrEventListener listener = core.createEventListener(className);
-          listener.init(DOMUtil.childNodesToNamedList(node));
-          // listener.init(DOMUtil.toMapExcept(node.getAttributes(),"class","synchronized"));
-          commitCallbacks.add(listener);
-          log.info("added SolrEventListener for postCommit: " + listener);
-        } catch (Exception e) {
-          throw new SolrException( SolrException.ErrorCode.SERVER_ERROR,"error parsing event listevers", e, false);
-        }
-      }
-    }
-    nodes = (NodeList) solrConfig.evaluate("updateHandler/listener[@event=\"postOptimize\"]", XPathConstants.NODESET);
-    if (nodes!=null) {
-      for (int i=0; i<nodes.getLength(); i++) {
-        Node node = nodes.item(i);
-        try {
-          String className = DOMUtil.getAttr(node,"class");
-          SolrEventListener listener = core.createEventListener(className);
-          listener.init(DOMUtil.childNodesToNamedList(node));
-          optimizeCallbacks.add(listener);
-          log.info("added SolarEventListener for postOptimize: " + listener);
-        } catch (Exception e) {
-          throw new SolrException( SolrException.ErrorCode.SERVER_ERROR,"error parsing event listeners", e, false);
-        }
+    for (PluginInfo pluginInfo : core.getSolrConfig().getPluginInfos(SolrEventListener.class.getName())) {
+      String event = pluginInfo.attributes.get("event");
+      SolrEventListener listener = core.createEventListener(pluginInfo.className);
+      listener.init(pluginInfo.initArgs);
+      if ("postCommit".equals(event)) {
+        commitCallbacks.add(listener);
+        log.info("added SolrEventListener for postCommit: " + listener);
+      } else if ("postOptimize".equals(event)) {
+        optimizeCallbacks.add(listener);
+        log.info("added SolrEventListener for postOptimize: " + listener);
       }
     }
   }
@@ -119,7 +95,7 @@ public abstract class UpdateHandler implements SolrInfoMBean {
   }
 
   protected SolrIndexWriter createMainIndexWriter(String name, boolean removeAllExisting) throws IOException {
-    return new SolrIndexWriter(name,core.getIndexDir(), removeAllExisting, schema, core.getSolrConfig().mainIndexConfig);
+    return new SolrIndexWriter(name,core.getNewIndexDir(), core.getDirectoryFactory(), removeAllExisting, schema, core.getSolrConfig().mainIndexConfig, core.getDeletionPolicy());
   }
 
   protected final Term idTerm(String readableId) {
@@ -129,17 +105,17 @@ public abstract class UpdateHandler implements SolrInfoMBean {
   }
 
   protected final String getIndexedId(Document doc) {
-    if (idField == null) 
+    if (idField == null)
       throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"Operation requires schema to have a unique key field");
-    
+
     // Right now, single valued fields that require value transformation from external to internal (indexed)
     // form have that transformation already performed and stored as the field value.
     Fieldable[] id = doc.getFieldables( idField.getName() );
-    if (id == null || id.length < 1) 
+    if (id == null || id.length < 1)
       throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"Document is missing uniqueKey field " + idField.getName());
-    if( id.length > 1 ) 
+    if( id.length > 1 )
       throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"Document specifies multiple unique ids! " + idField.getName());
-    
+
     return idFieldType.storedToIndexed( id[0] );
   }
 
@@ -154,11 +130,13 @@ public abstract class UpdateHandler implements SolrInfoMBean {
   public abstract int addDoc(AddUpdateCommand cmd) throws IOException;
   public abstract void delete(DeleteUpdateCommand cmd) throws IOException;
   public abstract void deleteByQuery(DeleteUpdateCommand cmd) throws IOException;
+  public abstract int mergeIndexes(MergeIndexesCommand cmd) throws IOException;
   public abstract void commit(CommitUpdateCommand cmd) throws IOException;
+  public abstract void rollback(RollbackUpdateCommand cmd) throws IOException;
   public abstract void close() throws IOException;
 
 
-  class DeleteHitCollector extends HitCollector {
+  static class DeleteHitCollector extends HitCollector {
     public int deleted=0;
     public final SolrIndexSearcher searcher;
 
@@ -183,7 +161,7 @@ public abstract class UpdateHandler implements SolrInfoMBean {
    * NOTE: this function is not thread safe.  However, it is safe to call within the
    * <code>inform( SolrCore core )</code> function for <code>SolrCoreAware</code> classes.
    * Outside <code>inform</code>, this could potentially throw a ConcurrentModificationException
-   * 
+   *
    * @see SolrCoreAware
    */
   public void registerCommitCallback( SolrEventListener listener )
@@ -195,7 +173,7 @@ public abstract class UpdateHandler implements SolrInfoMBean {
    * NOTE: this function is not thread safe.  However, it is safe to call within the
    * <code>inform( SolrCore core )</code> function for <code>SolrCoreAware</code> classes.
    * Outside <code>inform</code>, this could potentially throw a ConcurrentModificationException
-   * 
+   *
    * @see SolrCoreAware
    */
   public void registerOptimizeCallback( SolrEventListener listener )

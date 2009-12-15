@@ -289,7 +289,7 @@ public class MoreLikeThisHandler extends RequestHandlerBase
       BooleanQuery mltQuery = new BooleanQuery();
       mltQuery.add(mltquery, BooleanClause.Occur.MUST);
       mltQuery.add(
-          new TermQuery(new Term(uniqueKeyField.getName(), doc.get(uniqueKeyField.getName()))), 
+          new TermQuery(new Term(uniqueKeyField.getName(), uniqueKeyField.getType().storedToIndexed(doc.getFieldable(uniqueKeyField.getName())))), 
             BooleanClause.Occur.MUST_NOT);
       
       DocListAndSet results = new DocListAndSet();
@@ -358,7 +358,7 @@ public class MoreLikeThisHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-    return "$Revision: 690026 $";
+    return "$Revision: 801768 $";
   }
 
   @Override
@@ -368,12 +368,12 @@ public class MoreLikeThisHandler extends RequestHandlerBase
 
   @Override
   public String getSourceId() {
-    return "$Id: MoreLikeThisHandler.java 690026 2008-08-28 22:20:00Z yonik $";
+    return "$Id: MoreLikeThisHandler.java 801768 2009-08-06 18:47:16Z yonik $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/MoreLikeThisHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/MoreLikeThisHandler.java $";
   }
 
   @Override

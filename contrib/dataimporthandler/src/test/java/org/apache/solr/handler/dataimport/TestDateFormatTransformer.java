@@ -27,7 +27,7 @@ import java.util.*;
  * Test for DateFormatTransformer
  * </p>
  *
- * @version $Id: TestDateFormatTransformer.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TestDateFormatTransformer.java 765499 2009-04-16 08:01:10Z shalin $
  * @since solr 1.3
  */
 public class TestDateFormatTransformer {
@@ -52,7 +52,7 @@ public class TestDateFormatTransformer {
     resolver.addNamespace("e", row);
 
     Context context = AbstractDataImportHandlerTest.getContext(null, resolver,
-            null, 0, fields, null);
+            null, Context.FULL_DUMP, fields, null);
     new DateFormatTransformer().transformRow(row, context);
     Assert.assertEquals(now, row.get("dateAdded"));
   }
@@ -81,7 +81,7 @@ public class TestDateFormatTransformer {
     resolver.addNamespace("e", row);
 
     Context context = AbstractDataImportHandlerTest.getContext(null, resolver,
-            null, 0, fields, null);
+            null, Context.FULL_DUMP, fields, null);
     new DateFormatTransformer().transformRow(row, context);
     List output = new ArrayList();
     output.add(now1);

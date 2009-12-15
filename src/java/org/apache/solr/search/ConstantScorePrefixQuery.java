@@ -25,7 +25,7 @@ import org.apache.lucene.search.ConstantScoreQuery;
 import java.io.IOException;
 
 /**
- * @version $Id: ConstantScorePrefixQuery.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: ConstantScorePrefixQuery.java 741262 2009-02-05 19:41:55Z shalin $
  */
 public class ConstantScorePrefixQuery extends Query {
   private final Term prefix;
@@ -49,7 +49,7 @@ public class ConstantScorePrefixQuery extends Query {
   /** Prints a user-readable version of this query. */
   public String toString(String field)
   {
-    StringBuffer buffer = new StringBuffer();
+    StringBuilder buffer = new StringBuilder();
     if (!prefix.field().equals(field)) {
       buffer.append(prefix.field());
       buffer.append(":");

@@ -19,7 +19,8 @@ package org.apache.solr.handler.dataimport;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -42,37 +43,20 @@ import java.util.logging.Logger;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: TemplateTransformer.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TemplateTransformer.java 747664 2009-02-25 05:27:31Z shalin $
  * @since solr 1.3
  */
 public class TemplateTransformer extends Transformer {
 
-  private static final Logger LOG = Logger.getLogger(TemplateTransformer.class
-          .getName());
+  private static final Logger LOG = LoggerFactory.getLogger(TemplateTransformer.class);
 
   @SuppressWarnings("unchecked")
   public Object transformRow(Map<String, Object> row, Context context) {
 
-    String entityName = context.getEntityAttribute(DataImporter.NAME);
-
     VariableResolverImpl resolver = (VariableResolverImpl) context
             .getVariableResolver();
-    Map<String, Object> resolverMap = (Map<String, Object>) resolver
-            .resolve(entityName);
-
-    // Clone resolver map because the resolver map contains common fields or any
-    // others
-    // that the entity processor chooses to keep.
-    Map<String, Object> resolverMapCopy = new HashMap<String, Object>();
-    if (resolverMap != null) {
-      for (Map.Entry<String, Object> entry : resolverMap.entrySet())
-        resolverMapCopy.put(entry.getKey(), entry.getValue());
-    }
     // Add current row to the copy of resolver map
-    for (Map.Entry<String, Object> entry : row.entrySet())
-      resolverMapCopy.put(entry.getKey(), entry.getValue());
-    // Add this copy to the namespace of the current entity in the resolver
-    resolver.addNamespace(entityName, resolverMapCopy);
+//    for (Map.Entry<String, Object> entry : row.entrySet())
 
     for (Map<String, String> map : context.getAllEntityFields()) {
       String expr = map.get(TEMPLATE);
@@ -86,7 +70,7 @@ public class TemplateTransformer extends Transformer {
       List<String> variables = TemplateString.getVariables(expr);
       for (String v : variables) {
         if (resolver.resolve(v) == null) {
-          LOG.warning("Unable to resolve variable: " + v
+          LOG.warn("Unable to resolve variable: " + v
                   + " while parsing expression: " + expr);
           resolvable = false;
         }
@@ -98,8 +82,6 @@ public class TemplateTransformer extends Transformer {
       row.put(column, resolver.replaceTokens(expr));
     }
 
-    // Restore the original resolver map
-    resolver.addNamespace(entityName, resolverMap);
 
     return row;
   }

@@ -29,8 +29,11 @@ import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.common.util.ContentStreamBase;
+import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.CoreDescriptor;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.request.QueryResponseWriter;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
@@ -38,13 +41,13 @@ import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.schema.IndexSchema;
 
 /**
- * DirectSolrConnection provides an interface to solr that is similar to 
+ * DirectSolrConnection provides an interface to Solr that is similar to
  * the the HTTP interface, but does not require an HTTP connection.
  * 
  * This class is designed to be as simple as possible and allow for more flexibility
- * in how you interface to solr.
+ * in how you interface to Solr.
  * 
- * @version $Id: DirectSolrConnection.java 682005 2008-08-02 16:19:15Z ryan $
+ * @version $Id: DirectSolrConnection.java 705486 2008-10-17 06:07:02Z ehatcher $
  * @since solr 1.2
  */
 public class DirectSolrConnection 
@@ -101,16 +104,19 @@ public class DirectSolrConnection
       }
     }
     
-    // Initialize SolrConfig
-    SolrConfig config = null;
+    if( instanceDir == null ) {
+      instanceDir = SolrResourceLoader.locateInstanceDir();
+    }
+    
+    // Initialize 
     try {
-      config = new SolrConfig(instanceDir, SolrConfig.DEFAULT_CONF_FILE, null);
-      instanceDir = config.getResourceLoader().getInstanceDir();
-
-      // If the Data directory is specified, initialize SolrCore directly
-      IndexSchema schema = new IndexSchema(config, instanceDir+"/conf/schema.xml", null);
-      core = new SolrCore( null, dataDir, config, schema, null );
-      parser = new SolrRequestParsers( config );
+      CoreContainer cores = new CoreContainer(new SolrResourceLoader(instanceDir));
+      SolrConfig solrConfig = new SolrConfig(instanceDir, SolrConfig.DEFAULT_CONF_FILE, null);
+      CoreDescriptor dcore = new CoreDescriptor(cores, "", solrConfig.getResourceLoader().getInstanceDir());
+      IndexSchema indexSchema = new IndexSchema(solrConfig, instanceDir+"/conf/schema.xml", null);
+      core = new SolrCore( null, dataDir, solrConfig, indexSchema, dcore);
+      cores.register("", core, false);
+      parser = new SolrRequestParsers( solrConfig );
     } 
     catch (Exception ee) {
       throw new RuntimeException(ee);

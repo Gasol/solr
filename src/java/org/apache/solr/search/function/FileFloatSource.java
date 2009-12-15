@@ -20,10 +20,12 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.TermDocs;
 import org.apache.lucene.index.TermEnum;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.util.StringHelper;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.search.QParser;
+import org.apache.solr.search.SolrIndexReader;
 import org.apache.solr.util.VersionedFile;
 
 import java.io.*;
@@ -31,7 +33,7 @@ import java.util.*;
 
 /**
  * Obtains float field values from an external file.
- * @version $Id: FileFloatSource.java 613059 2008-01-18 05:30:21Z ryan $
+ * @version $Id: FileFloatSource.java 816202 2009-09-17 14:08:13Z yonik $
  */
 
 public class FileFloatSource extends ValueSource {
@@ -52,27 +54,38 @@ public class FileFloatSource extends ValueSource {
     return "float(" + field + ')';
   }
 
-  public DocValues getValues(IndexReader reader) throws IOException {
+  public DocValues getValues(Map context, IndexReader reader) throws IOException {
+    int offset = 0;
+    if (reader instanceof SolrIndexReader) {
+      SolrIndexReader r = (SolrIndexReader)reader;
+      while (r.getParent() != null) {
+        offset += r.getBase();
+        r = r.getParent();
+      }
+      reader = r;
+    }
+    final int off = offset;
+
     final float[] arr = getCachedFloats(reader);
     return new DocValues() {
       public float floatVal(int doc) {
-        return arr[doc];
+        return arr[doc + off];
       }
 
       public int intVal(int doc) {
-        return (int)arr[doc];
+        return (int)arr[doc + off];
       }
 
       public long longVal(int doc) {
-        return (long)arr[doc];
+        return (long)arr[doc + off];
       }
 
       public double doubleVal(int doc) {
-        return (double)arr[doc];
+        return (double)arr[doc + off];
       }
 
       public String strVal(int doc) {
-        return Float.toString(arr[doc]);
+        return Float.toString(arr[doc + off]);
       }
 
       public String toString(int doc) {
@@ -188,13 +201,13 @@ public class FileFloatSource extends ValueSource {
       is = VersionedFile.getLatestFile(ffs.dataDir, fname);
     } catch (IOException e) {
       // log, use defaults
-      SolrCore.log.severe("Error opening external value source file: " +e);
+      SolrCore.log.error("Error opening external value source file: " +e);
       return vals;
     }
 
     BufferedReader r = new BufferedReader(new InputStreamReader(is));
 
-    String idName = ffs.keyField.getName().intern();
+    String idName = StringHelper.intern(ffs.keyField.getName());
     FieldType idType = ffs.keyField.getType();
     boolean sorted=true;   // assume sorted until we discover it's not
 
@@ -251,7 +264,7 @@ public class FileFloatSource extends ValueSource {
           fval=Float.parseFloat(val);
         } catch (Exception e) {
           if (++otherErrors<=10) {
-            SolrCore.log.severe( "Error loading external value source + fileName + " + e
+            SolrCore.log.error( "Error loading external value source + fileName + " + e
               + (otherErrors<10 ? "" : "\tSkipping future errors for this file.")                    
             );
           }
@@ -325,7 +338,7 @@ public class FileFloatSource extends ValueSource {
       }
     } catch (IOException e) {
       // log, use defaults
-      SolrCore.log.severe("Error loading external value source: " +e);
+      SolrCore.log.error("Error loading external value source: " +e);
     } finally {
       // swallow exceptions on close so we don't override any
       // exceptions that happened in the loop

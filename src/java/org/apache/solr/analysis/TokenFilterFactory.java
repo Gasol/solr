@@ -44,13 +44,13 @@ import java.util.Map;
  * A single instance of any registered TokenFilterFactory is created
  * via the default constructor and is reused for each FieldType.
  * </p>
- * @version $Id: TokenFilterFactory.java 597847 2007-11-24 13:51:46Z ryan $
+ * @version $Id: TokenFilterFactory.java 711737 2008-11-05 23:06:08Z ehatcher $
  */
 
 public interface TokenFilterFactory {
   /** <code>init</code> will be called just once, immediately after creation.
    * <p>The args are user-level initialization parameters that
-   * may be specified when declaring a the factory in the
+   * may be specified when declaring the factory in the
    * schema.xml
    */
   public void init(Map<String,String> args);
