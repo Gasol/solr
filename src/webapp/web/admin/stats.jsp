@@ -40,7 +40,6 @@ for (SolrInfoMBean.Category cat : SolrInfoMBean.Category.values()) {
     <<%= cat.toString() %>>
 <%
  Map<String,SolrInfoMBean> reg = core.getInfoRegistry();
- synchronized(reg) {
   for (Map.Entry<String,SolrInfoMBean> entry : reg.entrySet()) {
     String key = entry.getKey();
     SolrInfoMBean m = entry.getValue();
@@ -71,7 +70,7 @@ for (SolrInfoMBean.Category cat : SolrInfoMBean.Category.values()) {
 <%
       for (int i = 0; i < nl.size() ; i++) {
 %>
-        <stat name="<%= nl.getName(i) %>" >
+        <stat name="<%XML.escapeCharData(nl.getName(i), out);  %>" >
           <%= nl.getVal(i).toString() %>
         </stat>
 <%
@@ -84,7 +83,6 @@ for (SolrInfoMBean.Category cat : SolrInfoMBean.Category.values()) {
 %>
 <%
   }
- }
 %>
     </<%= cat.toString() %>>
 <%

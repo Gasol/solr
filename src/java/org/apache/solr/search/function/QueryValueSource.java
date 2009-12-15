@@ -18,13 +18,11 @@
 package org.apache.solr.search.function;
 
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Weight;
-import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.*;
 import org.apache.solr.common.SolrException;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * <code>QueryValueSource</code> returns the relevance score of the query
@@ -45,8 +43,9 @@ public class QueryValueSource extends ValueSource {
     return "query(" + q + ",def=" + defVal + ")";
   }
 
-  public DocValues getValues(IndexReader reader) throws IOException {
-    return new QueryDocValues(reader, q, defVal);
+  @Override
+  public DocValues getValues(Map context, IndexReader reader) throws IOException {
+    return new QueryDocValues(reader, q, defVal, context==null ? null : (Weight)context.get(this));
   }
 
   public int hashCode() {
@@ -56,7 +55,13 @@ public class QueryValueSource extends ValueSource {
   public boolean equals(Object o) {
     if (QueryValueSource.class != o.getClass()) return false;
     QueryValueSource other = (QueryValueSource)o;
-    return  this.q.equals(other.q);
+    return this.q.equals(other.q) && this.defVal==other.defVal;
+  }
+
+  @Override
+  public void createWeight(Map context, Searcher searcher) throws IOException {
+    Weight w = q.weight(searcher);
+    context.put(this, w);
   }
 }
 
@@ -64,7 +69,6 @@ public class QueryValueSource extends ValueSource {
 class QueryDocValues extends DocValues {
   final Query q;
   final IndexReader reader;
-  final IndexSearcher searcher;
   final Weight weight;
   final float defVal;
 
@@ -75,42 +79,30 @@ class QueryDocValues extends DocValues {
   // to trigger a scorer reset on first access.
   int lastDocRequested=Integer.MAX_VALUE;
 
-  public QueryDocValues(IndexReader reader, Query q, float defVal) throws IOException {
+  public QueryDocValues(IndexReader reader, Query q, float defVal, Weight w) throws IOException {
     this.reader = reader;
     this.q = q;
     this.defVal = defVal;
-    searcher = new IndexSearcher(reader);
-    weight = q.weight(searcher);
+    weight = w!=null ? w : q.weight(new IndexSearcher(reader));
   }
 
   public float floatVal(int doc) {
     try {
       if (doc < lastDocRequested) {
         // out-of-order access.... reset scorer.
-        scorer = weight.scorer(reader);
-        boolean more = scorer.next();
-        if (more) {
-          scorerDoc = scorer.doc();
-        } else {
-          // pretend we skipped to the end
-          scorerDoc = Integer.MAX_VALUE;
-        }
+        scorer = weight.scorer(reader, true, false);
+        if (scorer==null) return defVal;
+        scorerDoc = -1;
       }
       lastDocRequested = doc;
 
       if (scorerDoc < doc) {
-        boolean more = scorer.skipTo(doc);
-        if (more) {
-          scorerDoc = scorer.doc();
-        } else {
-          // pretend we skipped to the end
-          scorerDoc = Integer.MAX_VALUE;
-        }
+        scorerDoc = scorer.advance(doc);
       }
 
       if (scorerDoc > doc) {
         // query doesn't match this document... either because we hit the
-        // end (Integer.MAX_VALUE), or because the next doc is after this doc.
+        // end, or because the next doc is after this doc.
         return defVal;
       }
 
@@ -119,8 +111,8 @@ class QueryDocValues extends DocValues {
     } catch (IOException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "caught exception in QueryDocVals("+q+") doc="+doc, e);
     }
-  }
-  
+  }  
+
   public int intVal(int doc) {
     return (int)floatVal(doc);
   }

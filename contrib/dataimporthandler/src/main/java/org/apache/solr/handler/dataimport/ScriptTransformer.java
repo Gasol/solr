@@ -34,7 +34,7 @@ import java.util.Map;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: ScriptTransformer.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: ScriptTransformer.java 752586 2009-03-11 19:17:50Z shalin $
  * @since solr 1.3
  */
 public class ScriptTransformer extends Transformer {
@@ -71,10 +71,8 @@ public class ScriptTransformer extends Transformer {
 
   private void initEngine(Context context) {
     try {
-      String scriptText = (String) context.getVariableResolver().resolve(
-              DataConfig.IMPORTER_NS + "." + DataConfig.SCRIPT);
-      String scriptLang = (String) context.getVariableResolver().resolve(
-              DataConfig.IMPORTER_NS + "." + DataConfig.SCRIPT_LANG);
+      String scriptText = context.getScript();
+      String scriptLang = context.getScriptLanguage();
       Object scriptEngineMgr = Class
               .forName("javax.script.ScriptEngineManager").newInstance();
       // create a Script engine

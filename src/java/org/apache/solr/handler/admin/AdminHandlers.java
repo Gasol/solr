@@ -120,7 +120,7 @@ public class AdminHandlers implements SolrCoreAware, SolrRequestHandler
   }
 
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/admin/AdminHandlers.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/admin/AdminHandlers.java $";
   }
 
   public Category getCategory() {

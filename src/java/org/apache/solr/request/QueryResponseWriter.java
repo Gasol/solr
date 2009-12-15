@@ -27,9 +27,9 @@ import org.apache.solr.util.plugin.NamedListInitializedPlugin;
  * Implementations of <code>QueryResponseWriter</code> are used to format responses to query requests.
  *
  * Different <code>QueryResponseWriter</code>s are registered with the <code>SolrCore</code>.
- * One way to register a QueryResponseWriter with the core is thorugh the <code>solrconfig.xml</code> file.
+ * One way to register a QueryResponseWriter with the core is through the <code>solrconfig.xml</code> file.
  * <p>
- * Example <code>solrconfig.xml</code> entry to register a <code>QueryResponseWRiter</code> implementation to
+ * Example <code>solrconfig.xml</code> entry to register a <code>QueryResponseWriter</code> implementation to
  * handle all queries with a writer type of "simple":
  * <p>
  * <code>
@@ -39,7 +39,7 @@ import org.apache.solr.util.plugin.NamedListInitializedPlugin;
  * A single instance of any registered QueryResponseWriter is created
  * via the default constructor and is reused for all relevant queries.
  *
- * @version $Id: QueryResponseWriter.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: QueryResponseWriter.java 741723 2009-02-06 21:05:20Z otis $
  */
 public interface QueryResponseWriter extends NamedListInitializedPlugin {
   public static String CONTENT_TYPE_XML_UTF8="text/xml; charset=UTF-8";

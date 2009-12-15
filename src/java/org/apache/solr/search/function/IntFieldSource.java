@@ -22,12 +22,13 @@ import org.apache.solr.search.function.DocValues;
 import org.apache.lucene.search.FieldCache;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * Obtains int field values from the {@link org.apache.lucene.search.FieldCache}
  * using <code>getInts()</code>
  * and makes those values available as other numeric types, casting as needed. *
- * @version $Id: IntFieldSource.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: IntFieldSource.java 816202 2009-09-17 14:08:13Z yonik $
  */
 
 public class IntFieldSource extends FieldCacheSource {
@@ -46,7 +47,8 @@ public class IntFieldSource extends FieldCacheSource {
     return "int(" + field + ')';
   }
 
-  public DocValues getValues(IndexReader reader) throws IOException {
+
+  public DocValues getValues(Map context, IndexReader reader) throws IOException {
     final int[] arr = (parser==null) ?
             cache.getInts(reader, field) :
             cache.getInts(reader, field, parser);
@@ -75,6 +77,39 @@ public class IntFieldSource extends FieldCacheSource {
         return description() + '=' + intVal(doc);
       }
 
+      @Override
+      public ValueSourceScorer getRangeScorer(IndexReader reader, String lowerVal, String upperVal, boolean includeLower, boolean includeUpper) {
+        int lower,upper;
+
+        // instead of using separate comparison functions, adjust the endpoints.
+
+        if (lowerVal==null) {
+          lower = Integer.MIN_VALUE;
+        } else {
+          lower = Integer.parseInt(lowerVal);
+          if (!includeLower && lower < Integer.MAX_VALUE) lower++;
+        }
+
+         if (upperVal==null) {
+          upper = Integer.MAX_VALUE;
+        } else {
+          upper = Integer.parseInt(upperVal);
+          if (!includeUpper && upper > Integer.MIN_VALUE) upper--;
+        }
+
+        final int ll = lower;
+        final int uu = upper;
+
+        return new ValueSourceScorer(reader, this) {
+          @Override
+          public boolean matchesValue(int doc) {
+            int val = arr[doc];
+            // only check for deleted if it's the default value
+            // if (val==0 && reader.isDeleted(doc)) return false;
+            return val >= ll && val <= uu;
+          }
+        };
+      }
     };
   }
 

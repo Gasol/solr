@@ -56,7 +56,7 @@ public class SolrRequestParserTest extends AbstractSolrTestCase {
     String body2 = "qwertasdfgzxcvb";
     String body3 = "1234567890";
     
-    SolrCore core = SolrCore.getSolrCore();
+    SolrCore core = h.getCore();
     
     Map<String,String[]> args = new HashMap<String, String[]>();
     args.put( CommonParams.STREAM_BODY, new String[] {body1} );
@@ -99,7 +99,7 @@ public class SolrRequestParserTest extends AbstractSolrTestCase {
   public void testStreamURL() throws Exception
   {
     boolean ok = false;
-    String url = "http://svn.apache.org/repos/asf/lucene/solr/trunk/";
+    String url = "http://www.apache.org/dist/lucene/solr/";
     String txt = null;
     try {
       txt = IOUtils.toString( new URL(url).openStream() );
@@ -110,7 +110,7 @@ public class SolrRequestParserTest extends AbstractSolrTestCase {
       return;
     }
 
-    SolrCore core = SolrCore.getSolrCore();
+    SolrCore core = h.getCore();
     
     Map<String,String[]> args = new HashMap<String, String[]>();
     args.put( CommonParams.STREAM_URL, new String[] {url} );

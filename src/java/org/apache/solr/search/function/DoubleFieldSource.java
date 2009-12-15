@@ -18,9 +18,10 @@
 package org.apache.solr.search.function;
 
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.search.ExtendedFieldCache;
+import org.apache.lucene.search.FieldCache;
 
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * Obtains float field values from the {@link org.apache.lucene.search.FieldCache}
@@ -31,13 +32,13 @@ import java.io.IOException;
  */
 
 public class DoubleFieldSource extends FieldCacheSource {
-  protected ExtendedFieldCache.DoubleParser parser;
+  protected FieldCache.DoubleParser parser;
 
   public DoubleFieldSource(String field) {
     this(field, null);
   }
 
-  public DoubleFieldSource(String field, ExtendedFieldCache.DoubleParser parser) {
+  public DoubleFieldSource(String field, FieldCache.DoubleParser parser) {
     super(field);
     this.parser = parser;
   }
@@ -46,10 +47,10 @@ public class DoubleFieldSource extends FieldCacheSource {
     return "double(" + field + ')';
   }
 
-  public DocValues getValues(IndexReader reader) throws IOException {
+  public DocValues getValues(Map context, IndexReader reader) throws IOException {
     final double[] arr = (parser == null) ?
-            ((ExtendedFieldCache) cache).getDoubles(reader, field) :
-            ((ExtendedFieldCache) cache).getDoubles(reader, field, parser);
+            ((FieldCache) cache).getDoubles(reader, field) :
+            ((FieldCache) cache).getDoubles(reader, field, parser);
     return new DocValues() {
       public float floatVal(int doc) {
         return (float) arr[doc];
@@ -72,9 +73,70 @@ public class DoubleFieldSource extends FieldCacheSource {
       }
 
       public String toString(int doc) {
-        return description() + '=' + floatVal(doc);
+        return description() + '=' + doubleVal(doc);
       }
-    };
+
+      @Override
+      public ValueSourceScorer getRangeScorer(IndexReader reader, String lowerVal, String upperVal, boolean includeLower, boolean includeUpper) {
+        double lower,upper;
+
+        if (lowerVal==null) {
+          lower = Double.NEGATIVE_INFINITY;
+        } else {
+          lower = Double.parseDouble(lowerVal);
+        }
+
+         if (upperVal==null) {
+          upper = Double.POSITIVE_INFINITY;
+        } else {
+          upper = Double.parseDouble(upperVal);
+        }
+
+        final double l = lower;
+        final double u = upper;
+
+
+        if (includeLower && includeUpper) {
+          return new ValueSourceScorer(reader, this) {
+            @Override
+            public boolean matchesValue(int doc) {
+              double docVal = doubleVal(doc);
+              return docVal >= l && docVal <= u;
+            }
+          };
+        }
+        else if (includeLower && !includeUpper) {
+          return new ValueSourceScorer(reader, this) {
+            @Override
+            public boolean matchesValue(int doc) {
+              double docVal = doubleVal(doc);
+              return docVal >= l && docVal < u;
+            }
+          };
+        }
+        else if (!includeLower && includeUpper) {
+          return new ValueSourceScorer(reader, this) {
+            @Override
+            public boolean matchesValue(int doc) {
+              double docVal = doubleVal(doc);
+              return docVal > l && docVal <= u;
+            }
+          };
+        }
+        else {
+          return new ValueSourceScorer(reader, this) {
+            @Override
+            public boolean matchesValue(int doc) {
+              double docVal = doubleVal(doc);
+              return docVal > l && docVal < u;
+            }
+          };
+        }
+      }
+
+
+      };
+
   }
 
   public boolean equals(Object o) {
@@ -86,11 +148,9 @@ public class DoubleFieldSource extends FieldCacheSource {
   }
 
   public int hashCode() {
-    int h = parser == null ? Float.class.hashCode() : parser.getClass().hashCode();
+    int h = parser == null ? Double.class.hashCode() : parser.getClass().hashCode();
     h += super.hashCode();
     return h;
   }
-
-  ;
 
 }

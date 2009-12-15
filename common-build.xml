@@ -38,6 +38,11 @@
     <format property="dateversion" pattern="yyyy.MM.dd.HH.mm.ss" />
   </tstamp>
 
+  <!-- default arguments to pass to jvm executing tests -->
+  <property name="args" value="" />
+
+  <!-- Example directory -->
+  <property name="example" value="${common.dir}/example" />
   <!-- 
     we attempt to exec svnversion to get details build information
     for jar manifests.  this property can be set at runtime to an
@@ -57,9 +62,8 @@
        By default, this should be set to "X.Y.N-dev" where X.Y.N is
        "1 greater" then the last version released (on this branch).
     -->
-  <property name="version" value="1.3.0" />
-  <!-- The version number to assign to the Maven artifacts.  Usually something like 1.3-SNAPSHOT -->
-  <property name="maven_version" value="1.3.0"/>  
+  <property name="version" value="1.4.1-dev" />
+  
   <!-- Solr Specification Version -->
   <!--
        This will be used in the Manifest file, and therefore must
@@ -68,8 +72,7 @@
        By default, this should be set to "X.Y.M.${dateversion}"
        where X.Y.M is the last version released (on this branch).
     -->
-  <property name="specversion" value="1.3.0" />
-
+  <property name="specversion" value="1.4.0.${dateversion}" />
 
   
     <!-- Type of checksum to compute for distribution files -->
@@ -89,7 +92,7 @@
   <property name="javadoc.link.junit"
             value="http://junit.sourceforge.net/javadoc/"/>
   <property name="javadoc.link.lucene"
-            value="http://lucene.apache.org/java/docs/api/"/>
+            value="http://lucene.apache.org/java/2_9_0/api/all/"/>
   <property name="javadoc.packages" value="org.apache.solr.*"/>
   <property name="build.docs" value="${dest}/docs"/>
   <property name="build.javadoc" value="${common.dir}/${build.docs}/api"/>
@@ -99,14 +102,21 @@
   <property name="junit.includes" value="**/Test*.java,**/*Test.java"/>
   <property name="junit.output.dir" location="${common.dir}/${dest}/test-results"/>
   <property name="junit.reports" location="${common.dir}/${dest}/test-results/reports"/>
+  <property name="junit.formatter" value="plain"/>
 
   <!-- Maven properties -->
   <property name="maven.build.dir" value="${basedir}/build/maven"/>
   <property name="maven.dist.dir" value="${basedir}/dist/maven"/>
 
-  <!-- The version suffix of the Lucene artifacts checked into "lib" -->
-  <property name="lucene_version" value="2.4-dev"/>
+  <property name="maven.dist.prefix" value="${maven.dist.dir}/org/apache/solr"/>
 
+  <!-- 
+       The version suffix of the Lucene artifacts checked into "lib" 
+       IF YOU CHANGE THIS, SANITY CHECK "javadoc.link.lucene"
+  -->
+  <property name="lucene_version" value="2.9.1"/>
+  <!-- The version number to assign to the Maven artifacts. -->
+  <property name="maven_version" value="1.4.1-SNAPSHOT"/>
 
   <!-- By default, "deploy" to a temporary directory (as well as installing
        into your local repository).  If you wish to deploy to a remote
@@ -247,6 +257,7 @@
    </sequential>
   </macrodef>
 
+  <!-- NOTE, the pom.xml MUST be a relative path.  An absolute path may break the build on windows -->
   <macrodef name="m2-deploy" description="Builds a Maven artifact">
         <element name="artifact-attachments" optional="yes"/>
     <attribute name="pom.xml" default="${pom.xml}"/>
@@ -269,6 +280,64 @@
     </sequential>
   </macrodef>
 
+  <macrodef name="sign-artifact" description="Signs the artifact">
+    <attribute name="input.file"/>
+    <attribute name="output.file" default="@{input.file}.asc"/>
+    <!--<attribute name="password.file" default="${user.home}/.pwd.txt"/>-->
+    <sequential>
+      <echo >Signing @{input.file} Sig File: @{output.file}</echo><!--Pass: @{password.file}-->
+
+      <exec executable="gpg" > <!--input="@{password.file}"-->
+        <arg value="--armor"/>
+        <arg value="--output"/>
+        <arg value="@{output.file}"/>
+        <arg value="--detach-sig"/>
+        <arg value="@{input.file}"/>
+      </exec>
+    </sequential>
+  </macrodef>
+
+  <!--
+   We need to sign:
+   The POM
+   The library jar
+   The sources jar
+   the javadoc jar
+   -->
+  <macrodef name="sign-maven-artifacts" description="Signs maven artifacts">
+    <attribute name="artifact.id"/>
+    <attribute name="prefix.dir" default="${maven.dist.prefix}"/>
+    <attribute name="maven.version" default="${maven_version}"/>
+    <sequential>
+      <sign-artifact input.file="@{prefix.dir}/@{artifact.id}/@{maven.version}/@{artifact.id}-@{maven.version}.jar"/>
+      <sign-artifact input.file="@{prefix.dir}/@{artifact.id}/@{maven.version}/@{artifact.id}-@{maven.version}-javadoc.jar"/>
+      <sign-artifact input.file="@{prefix.dir}/@{artifact.id}/@{maven.version}/@{artifact.id}-@{maven.version}-sources.jar"/>
+    </sequential>
+  </macrodef>
+
+  <macrodef name="sign-maven-dependency-artifacts" description="Signs maven artifacts">
+    <attribute name="artifact.id"/>
+    <attribute name="prefix.dir" default="${maven.dist.prefix}"/>
+    <attribute name="maven.version" default="${maven_version}"/>
+    <sequential>
+      <sign-artifact input.file="@{prefix.dir}/@{artifact.id}/@{maven.version}/@{artifact.id}-@{maven.version}.jar"/>
+    </sequential>
+  </macrodef>
+
+  <!-- setup proxy for download tasks -->
+  <condition property="proxy.specified">
+    <or>
+      <isset property="proxy.host"/>
+      <isset property="proxy.port"/>
+      <isset property="proxy.user"/>
+    </or>
+  </condition>
+
+  <target name="proxy.setup" if="proxy.specified">
+    <setproxy proxyhost="${proxy.host}" proxyport="${proxy.port}" proxyuser="${proxy.user}" proxypassword="${proxy.password}"/>
+  </target>
+
+
   <target name="clean-contrib"
 	          description="Cleans all contrib modules and their tests">
 	<contrib-crawl target="clean"/>
@@ -285,6 +354,10 @@
 
   <target name="dist-contrib" description="Make the contribs ready for distribution">
   	<contrib-crawl target="dist" failonerror="true" />
+  </target>
+
+  <target name="example-contrib" description="Tell the contrib to add their stuff to examples">
+  	<contrib-crawl target="example" failonerror="true" />
   </target>
 
   <!-- Creates a Manifest file for Jars and WARs -->

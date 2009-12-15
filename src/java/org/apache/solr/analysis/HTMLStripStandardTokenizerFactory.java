@@ -18,15 +18,24 @@
 package org.apache.solr.analysis;
 
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.standard.StandardTokenizer;
 
 import java.io.Reader;
+import java.io.IOException;
 
 /**
- * @version $Id: HTMLStripStandardTokenizerFactory.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: HTMLStripStandardTokenizerFactory.java 807338 2009-08-24 18:58:22Z ryan $
+ * @deprecated Use {@link HTMLStripCharFilterFactory} and {@link StandardTokenizerFactory}
  */
+@Deprecated
 public class HTMLStripStandardTokenizerFactory extends BaseTokenizerFactory {
-  public TokenStream create(Reader input) {
-    return new StandardTokenizer(new HTMLStripReader(input));
+  public Tokenizer create(Reader input) {
+    return new StandardTokenizer(new HTMLStripReader(input)) {
+      @Override
+      public void reset(Reader reader) throws IOException {
+        super.reset(new HTMLStripReader(reader));
+      }
+    };
   }
 }

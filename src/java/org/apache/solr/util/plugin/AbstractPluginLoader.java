@@ -19,7 +19,8 @@ package org.apache.solr.util.plugin;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.solr.common.ResourceLoader;
 import org.apache.solr.common.SolrException;
@@ -32,12 +33,12 @@ import org.w3c.dom.NodeList;
 /**
  * An abstract super class that manages standard solr-style plugin configuration.
  * 
- * @version $Id: AbstractPluginLoader.java 597847 2007-11-24 13:51:46Z ryan $
+ * @version $Id: AbstractPluginLoader.java 712014 2008-11-06 23:41:39Z yonik $
  * @since solr 1.3
  */
 public abstract class AbstractPluginLoader<T>
 {
-  public static Logger log = Logger.getLogger(AbstractPluginLoader.class.getName());
+  public static Logger log = LoggerFactory.getLogger(AbstractPluginLoader.class);
   
   private final String type;
   private final boolean preRegister;
@@ -180,6 +181,62 @@ public abstract class AbstractPluginLoader<T>
       }
     }
     return defaultPlugin;
+  }
+  
+  /**
+   * Given a NodeList from XML in the form:
+   * 
+   * <plugin name="name1" class="solr.ClassName" > ... </plugin>
+   * 
+   * This will initialize and register a single plugin. A class will be
+   * generated for the plugin and registered to the given name.
+   * 
+   * If 'preRegister' is true, the plugin will be registered *before* it is
+   * initialized This may be useful for implementations that need to inspect
+   * other registered plugins at startup.
+   * 
+   * The created class for the plugin will be returned from this function.
+   * 
+   */
+  public T loadSingle(ResourceLoader loader, Node node) {
+    List<PluginInitInfo> info = new ArrayList<PluginInitInfo>();
+    T plugin = null;
+
+    try {
+      String name = DOMUtil.getAttr(node, "name", requireName ? type : null);
+      String className = DOMUtil.getAttr(node, "class", type);
+      plugin = create(loader, name, className, node);
+      log.info("created " + name + ": " + plugin.getClass().getName());
+
+      // Either initialize now or wait till everything has been registered
+      if (preRegister) {
+        info.add(new PluginInitInfo(plugin, node));
+      } else {
+        init(plugin, node);
+      }
+
+      T old = register(name, plugin);
+      if (old != null && !(name == null && !requireName)) {
+        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
+            "Multiple " + type + " registered to the same name: " + name
+                + " ignoring: " + old);
+      }
+
+    } catch (Exception e) {
+      SolrConfig.severeErrors.add(e);
+      SolrException.logOnce(log, null, e);
+    }
+
+    // If everything needs to be registered *first*, this will initialize later
+    for (PluginInitInfo pinfo : info) {
+      try {
+        init(pinfo.plugin, pinfo.node);
+      } catch (Exception ex) {
+        SolrConfig.severeErrors.add(ex);
+        SolrException.logOnce(log, null, ex);
+      }
+    }
+    return plugin;
   }
   
 

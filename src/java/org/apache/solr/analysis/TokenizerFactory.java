@@ -45,7 +45,7 @@ import org.apache.lucene.analysis.*;
  * A single instance of any registered TokenizerFactory is created
  * via the default constructor and is reused for each FieldType.
  * </p>
- * @version $Id: TokenizerFactory.java 597847 2007-11-24 13:51:46Z ryan $
+ * @version $Id: TokenizerFactory.java 807338 2009-08-24 18:58:22Z ryan $
  */
 public interface TokenizerFactory {
   /** <code>init</code> will be called just once, immediately after creation.
@@ -65,6 +65,6 @@ public interface TokenizerFactory {
   public Map<String,String> getArgs();
   
   /** Creates a TokenStream of the specified input */
-  public TokenStream create(Reader input);
+  public Tokenizer create(Reader input);
 }
 

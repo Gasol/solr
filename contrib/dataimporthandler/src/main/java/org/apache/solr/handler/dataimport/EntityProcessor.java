@@ -36,7 +36,7 @@ import java.util.Map;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: EntityProcessor.java 684025 2008-08-08 17:50:11Z shalin $
+ * @version $Id: EntityProcessor.java 824359 2009-10-12 14:31:54Z ehatcher $
  * @since solr 1.3
  */
 public abstract class EntityProcessor {
@@ -56,7 +56,7 @@ public abstract class EntityProcessor {
    * would fetch as many rows as needed and gives one 'row' at a time. Only this
    * method is used during a full import
    *
-   * @return A 'row' . The 'key' for the map is the column name and the 'value'
+   * @return A 'row'.  The 'key' for the map is the column name and the 'value'
    *         is the value of that column. If there are no more rows to be
    *         returned, return 'null'
    */
@@ -73,7 +73,7 @@ public abstract class EntityProcessor {
   /**
    * This is used during delta-import. It gives the primary keys of the rows
    * that are deleted from this entity. If this entity is the root entity, solr
-   * document is deleted. If this is a sub-entity, the solr document is
+   * document is deleted. If this is a sub-entity, the Solr document is
    * considered as 'changed' and will be recreated
    *
    * @return the pk vs value of all changed rows
@@ -90,7 +90,28 @@ public abstract class EntityProcessor {
   public abstract Map<String, Object> nextModifiedParentRowKey();
 
   /**
-   * Invoked when the Entity processor is detroyed. towards the end of injestion. Called only once
+   * Invoked for each parent-row after the last row for this entity is processed. If this is the root-most
+   * entity, it will be called only once in the import, at the very end.
+   * 
    */
   public abstract void destroy();
+
+  /**
+   * Invoked after the transformers are invoked. EntityProcessors can add, remove or modify values
+   * added by Transformers in this method.
+   *
+   * @param r The transformed row
+   * @since solr 1.4
+   */
+  public void postTransform(Map<String, Object> r) {
+  }
+
+  /**
+   * Invoked when the Entity processor is destroyed towards the end of import.
+   *
+   * @since solr 1.4
+   */
+  public void close() {
+    //no-op
+  }
 }

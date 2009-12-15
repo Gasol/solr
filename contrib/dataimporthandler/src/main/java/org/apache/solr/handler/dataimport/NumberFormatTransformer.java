@@ -42,7 +42,7 @@ import java.util.regex.Pattern;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: NumberFormatTransformer.java 693621 2008-09-09 21:20:40Z gsingers $
+ * @version $Id: NumberFormatTransformer.java 741435 2009-02-06 06:51:50Z shalin $
  * @since solr 1.3
  */
 public class NumberFormatTransformer extends Transformer {
@@ -51,13 +51,14 @@ public class NumberFormatTransformer extends Transformer {
 
   @SuppressWarnings("unchecked")
   public Object transformRow(Map<String, Object> row, Context context) {
+    VariableResolver resolver = context.getVariableResolver();
     for (Map<String, String> fld : context.getAllEntityFields()) {
-      String style = fld.get(FORMAT_STYLE);
+      String style = resolver.replaceTokens(fld.get(FORMAT_STYLE));
       if (style != null) {
         String column = fld.get(DataImporter.COLUMN);
         String srcCol = fld.get(RegexTransformer.SRC_COL_NAME);
         Locale locale = null;
-        String localeStr = fld.get(LOCALE);
+        String localeStr = resolver.replaceTokens(fld.get(LOCALE));
         if (srcCol == null)
           srcCol = column;
         if (localeStr != null) {

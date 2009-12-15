@@ -30,7 +30,7 @@ import java.util.List;
  * Test for DataConfig
  * </p>
  *
- * @version $Id: TestDataConfig.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TestDataConfig.java 730055 2008-12-30 06:42:48Z shalin $
  * @since solr 1.3
  */
 public class TestDataConfig extends AbstractDataImportHandlerTest {
@@ -75,8 +75,7 @@ public class TestDataConfig extends AbstractDataImportHandlerTest {
 
     DataConfig dc = new DataConfig();
     dc.readFromXml(doc.getDocumentElement());
-    Assert.assertEquals("atrimlisting",
-            dc.documents.get(0).entities.get(0).name);
+    Assert.assertEquals("atrimlisting", dc.document.entities.get(0).name);
   }
 
   private static final String xml = "<dataConfig>\n"

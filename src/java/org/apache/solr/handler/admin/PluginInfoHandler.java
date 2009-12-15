@@ -37,7 +37,7 @@ import org.apache.solr.request.SolrQueryResponse;
  * that it works nicely with an XSLT transformation.  Until we have a nice
  * XSLT front end for /admin, the format is still open to change.
  * 
- * @version $Id: PluginInfoHandler.java 690026 2008-08-28 22:20:00Z yonik $
+ * @version $Id: PluginInfoHandler.java 790580 2009-07-02 13:20:22Z markrmiller $
  * @since solr 1.2
  */
 public class PluginInfoHandler extends RequestHandlerBase
@@ -49,6 +49,7 @@ public class PluginInfoHandler extends RequestHandlerBase
     
     boolean stats = params.getBool( "stats", false );
     rsp.add( "plugins", getSolrInfoBeans( req.getCore(), stats ) );
+    rsp.setHttpCaching(false);
   }
   
   private static SimpleOrderedMap<Object> getSolrInfoBeans( SolrCore core, boolean stats )
@@ -59,36 +60,34 @@ public class PluginInfoHandler extends RequestHandlerBase
       SimpleOrderedMap<Object> category = new SimpleOrderedMap<Object>();
       list.add( cat.name(), category );
       Map<String, SolrInfoMBean> reg = core.getInfoRegistry();
-      synchronized(reg) {
-        for (Map.Entry<String,SolrInfoMBean> entry : reg.entrySet()) {
-          SolrInfoMBean m = entry.getValue();
-          if (m.getCategory() != cat) continue;
-      
-          String na = "Not Declared";
-          SimpleOrderedMap<Object> info = new SimpleOrderedMap<Object>();
-          category.add( entry.getKey(), info );
-          
-          info.add( "name",        (m.getName()       !=null ? m.getName()        : na) );
-          info.add( "version",     (m.getVersion()    !=null ? m.getVersion()     : na) );
-          info.add( "description", (m.getDescription()!=null ? m.getDescription() : na) );
-          
-          info.add( "sourceId",    (m.getSourceId()   !=null ? m.getSourceId()    : na) );
-          info.add( "source",      (m.getSource()     !=null ? m.getSource()      : na) );
-        
-          URL[] urls = m.getDocs();
-          if ((urls != null) && (urls.length > 0)) {
-            ArrayList<String> docs = new ArrayList<String>(urls.length);
-            for( URL u : urls ) {
-              docs.add( u.toExternalForm() );
-            }
-            info.add( "docs", docs );
+      for (Map.Entry<String,SolrInfoMBean> entry : reg.entrySet()) {
+        SolrInfoMBean m = entry.getValue();
+        if (m.getCategory() != cat) continue;
+
+        String na = "Not Declared";
+        SimpleOrderedMap<Object> info = new SimpleOrderedMap<Object>();
+        category.add( entry.getKey(), info );
+
+        info.add( "name",        (m.getName()       !=null ? m.getName()        : na) );
+        info.add( "version",     (m.getVersion()    !=null ? m.getVersion()     : na) );
+        info.add( "description", (m.getDescription()!=null ? m.getDescription() : na) );
+
+        info.add( "sourceId",    (m.getSourceId()   !=null ? m.getSourceId()    : na) );
+        info.add( "source",      (m.getSource()     !=null ? m.getSource()      : na) );
+
+        URL[] urls = m.getDocs();
+        if ((urls != null) && (urls.length > 0)) {
+          ArrayList<String> docs = new ArrayList<String>(urls.length);
+          for( URL u : urls ) {
+            docs.add( u.toExternalForm() );
           }
-        
-          if( stats ) {
-            info.add( "stats", m.getStatistics() );
-          }
+          info.add( "docs", docs );
         }
-      }  
+
+        if( stats ) {
+          info.add( "stats", m.getStatistics() );
+        }
+      }
     }
     return list;
   }
@@ -103,16 +102,16 @@ public class PluginInfoHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-      return "$Revision: 690026 $";
+      return "$Revision: 790580 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: PluginInfoHandler.java 690026 2008-08-28 22:20:00Z yonik $";
+    return "$Id: PluginInfoHandler.java 790580 2009-07-02 13:20:22Z markrmiller $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/admin/PluginInfoHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/admin/PluginInfoHandler.java $";
   }
 }

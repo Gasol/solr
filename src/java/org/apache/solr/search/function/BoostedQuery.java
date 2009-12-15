@@ -20,9 +20,11 @@ package org.apache.solr.search.function;
 import org.apache.lucene.search.*;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.util.ToStringUtils;
+import org.apache.solr.search.SolrIndexReader;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.Map;
 
 /**
  * Query that is boosted by a ValueSource
@@ -51,17 +53,20 @@ public class BoostedQuery extends Query {
     q.extractTerms(terms);
   }
 
-  protected Weight createWeight(Searcher searcher) throws IOException {
+  public Weight createWeight(Searcher searcher) throws IOException {
     return new BoostedQuery.BoostedWeight(searcher);
   }
 
-  private class BoostedWeight implements Weight {
+  private class BoostedWeight extends Weight {
     Searcher searcher;
     Weight qWeight;
+    Map context;
 
     public BoostedWeight(Searcher searcher) throws IOException {
       this.searcher = searcher;
       this.qWeight = q.weight(searcher);
+      this.context = boostVal.newContext();
+      boostVal.createWeight(context,searcher);
     }
 
     public Query getQuery() {
@@ -72,24 +77,48 @@ public class BoostedQuery extends Query {
       return getBoost();
     }
 
+    @Override
     public float sumOfSquaredWeights() throws IOException {
       float sum = qWeight.sumOfSquaredWeights();
       sum *= getBoost() * getBoost();
       return sum ;
     }
 
+    @Override
     public void normalize(float norm) {
       norm *= getBoost();
       qWeight.normalize(norm);
     }
 
-    public Scorer scorer(IndexReader reader) throws IOException {
-      Scorer subQueryScorer = qWeight.scorer(reader);
-      return new BoostedQuery.CustomScorer(getSimilarity(searcher), reader, this, subQueryScorer, boostVal);
+    @Override
+    public Scorer scorer(IndexReader reader, boolean scoreDocsInOrder, boolean topScorer) throws IOException {
+      Scorer subQueryScorer = qWeight.scorer(reader, true, false);
+      if(subQueryScorer == null) {
+        return null;
+      }
+      return new BoostedQuery.CustomScorer(getSimilarity(searcher), searcher, reader, this, subQueryScorer, boostVal);
     }
 
+    @Override
     public Explanation explain(IndexReader reader, int doc) throws IOException {
-      return scorer(reader).explain(doc);
+      SolrIndexReader topReader = (SolrIndexReader)reader;
+      SolrIndexReader[] subReaders = topReader.getLeafReaders();
+      int[] offsets = topReader.getLeafOffsets();
+      int readerPos = SolrIndexReader.readerIndex(doc, offsets);
+      int readerBase = offsets[readerPos];
+
+      Explanation subQueryExpl = qWeight.explain(reader,doc);
+      if (!subQueryExpl.isMatch()) {
+        return subQueryExpl;
+      }
+
+      DocValues vals = boostVal.getValues(context, subReaders[readerPos]);
+      float sc = subQueryExpl.getValue() * vals.floatVal(doc-readerBase);
+      Explanation res = new ComplexExplanation(
+        true, sc, BoostedQuery.this.toString() + ", product of:");
+      res.addDetail(subQueryExpl);
+      res.addDetail(vals.explain(doc-readerBase));
+      return res;
     }
   }
 
@@ -100,31 +129,42 @@ public class BoostedQuery extends Query {
     private final Scorer scorer;
     private final DocValues vals;
     private final IndexReader reader;
+    private final Searcher searcher;
 
-    private CustomScorer(Similarity similarity, IndexReader reader, BoostedQuery.BoostedWeight w,
+    private CustomScorer(Similarity similarity, Searcher searcher, IndexReader reader, BoostedQuery.BoostedWeight w,
         Scorer scorer, ValueSource vs) throws IOException {
       super(similarity);
       this.weight = w;
       this.qWeight = w.getValue();
       this.scorer = scorer;
       this.reader = reader;
-      this.vals = vs.getValues(reader);
+      this.searcher = searcher; // for explain
+      this.vals = vs.getValues(weight.context, reader);
     }
 
-    public boolean next() throws IOException {
-      return scorer.next();
+    @Override
+    public int docID() {
+      return scorer.docID();
     }
 
-    public int doc() {
-      return scorer.doc();
+    @Override
+    public int advance(int target) throws IOException {
+      return scorer.advance(target);
     }
 
+    @Override
+    public int nextDoc() throws IOException {
+      return scorer.nextDoc();
+    }
+
+    @Override   
     public float score() throws IOException {
-      return qWeight * scorer.score() * vals.floatVal(scorer.doc());
-    }
+      float score = qWeight * scorer.score() * vals.floatVal(scorer.docID());
 
-    public boolean skipTo(int target) throws IOException {
-      return scorer.skipTo(target);
+      // Current Lucene priority queues can't handle NaN and -Infinity, so
+      // map to -Float.MAX_VALUE. This conditional handles both -infinity
+      // and NaN since comparisons with NaN are always false.
+      return score>Float.NEGATIVE_INFINITY ? score : -Float.MAX_VALUE;
     }
 
     public Explanation explain(int doc) throws IOException {

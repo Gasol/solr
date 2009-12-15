@@ -18,16 +18,19 @@
 package org.apache.solr.core;
 
 import java.util.Properties;
+import java.io.File;
 
 /**
  * A Solr core descriptor
- * 
+ *
  * @since solr 1.3
  */
-public class CoreDescriptor implements Cloneable {
+public class CoreDescriptor {
   protected String name;
   protected String instanceDir;
+  protected String dataDir;
   protected String configName;
+  protected String propertiesName;
   protected String schemaName;
   private final CoreContainer coreContainer;
   private Properties coreProperties;
@@ -41,7 +44,7 @@ public class CoreDescriptor implements Cloneable {
     if (instanceDir == null) {
       throw new NullPointerException("Missing required \'instanceDir\'");
     }
-    if (!instanceDir.endsWith("/")) instanceDir = instanceDir + "/";
+    instanceDir = SolrResourceLoader.normalizeDir(instanceDir);
     this.instanceDir = instanceDir;
     this.configName = getDefaultConfigName();
     this.schemaName = getDefaultSchemaName();
@@ -52,6 +55,7 @@ public class CoreDescriptor implements Cloneable {
     this.configName = descr.configName;
     this.schemaName = descr.schemaName;
     this.name = descr.name;
+    this.dataDir = descr.dataDir;
     coreContainer = descr.coreContainer;
   }
 
@@ -59,38 +63,66 @@ public class CoreDescriptor implements Cloneable {
     Properties implicitProperties = new Properties(coreContainer.getContainerProperties());
     implicitProperties.setProperty("solr.core.name", name);
     implicitProperties.setProperty("solr.core.instanceDir", instanceDir);
+    implicitProperties.setProperty("solr.core.dataDir", getDataDir());
     implicitProperties.setProperty("solr.core.configName", configName);
     implicitProperties.setProperty("solr.core.schemaName", schemaName);
     return implicitProperties;
   }
-  
+
   /**@return the default config name. */
   public String getDefaultConfigName() {
     return "solrconfig.xml";
   }
-  
+
   /**@return the default schema name. */
   public String getDefaultSchemaName() {
     return "schema.xml";
   }
-  
+
   /**@return the default data directory. */
   public String getDefaultDataDir() {
-    return this.instanceDir + "data/";
+    return "data" + File.separator;
   }
- 
+
+  public String getPropertiesName() {
+    return propertiesName;
+  }
+
+  public void setPropertiesName(String propertiesName) {
+    this.propertiesName = propertiesName;
+  }
+
+  public String getDataDir() {
+    String dataDir = this.dataDir;
+    if (dataDir == null) dataDir = getDefaultDataDir();
+    if (new File(dataDir).isAbsolute()) {
+      return dataDir;
+    } else {
+      if (new File(instanceDir).isAbsolute()) {
+        return SolrResourceLoader.normalizeDir(SolrResourceLoader.normalizeDir(instanceDir) + dataDir);
+      } else  {
+        return SolrResourceLoader.normalizeDir(coreContainer.getSolrHome() +
+                SolrResourceLoader.normalizeDir(instanceDir) + dataDir);
+      }
+    }
+  }
+
+  public void setDataDir(String s) {
+    dataDir = s;
+  }
+
   /**@return the core instance directory. */
   public String getInstanceDir() {
     return instanceDir;
   }
-  
+
   /**Sets the core configuration resource name. */
   public void setConfigName(String name) {
     if (name == null || name.length() == 0)
       throw new IllegalArgumentException("name can not be null or empty");
     this.configName = name;
   }
-  
+
   /**@return the core configuration resource name. */
   public String getConfigName() {
     return this.configName;
@@ -102,7 +134,7 @@ public class CoreDescriptor implements Cloneable {
       throw new IllegalArgumentException("name can not be null or empty");
     this.schemaName = name;
   }
-  
+
   /**@return the core schema resource name. */
   public String getSchemaName() {
     return this.schemaName;
@@ -129,11 +161,12 @@ public class CoreDescriptor implements Cloneable {
    * 
    * @param coreProperties
    */
-  void setCoreProperties(Properties coreProperties) {
+  public void setCoreProperties(Properties coreProperties) {
     if (this.coreProperties == null) {
       Properties p = initImplicitProperties();
       this.coreProperties = new Properties(p);
-      this.coreProperties.putAll(coreProperties);
+      if(coreProperties != null)
+        this.coreProperties.putAll(coreProperties);
     }
   }
 }
