@@ -1,0 +1,1 @@
+debian/contrib-dataimporthandler-use-debian-libs,debian/disable-tests-that-break-on-buildd,debian/fix-compile-error-with-ambiguous-assert,debian/fix-failed-test-with-new-jetty,debian/fix-lucene-lock-directory,debian/fix-syntax-error-in-shell-script,debian/use-debian-java-libraries,fixes/fix-failed-SolrInfoMBeanTest,fixes/remove-dependency-on-javanet-staxutils-SOLR-851

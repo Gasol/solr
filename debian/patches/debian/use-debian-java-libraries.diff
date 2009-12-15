@@ -1,15 +1,20 @@
-#! /bin/sh /usr/share/dpatch/dpatch-run
-## 05_use-debian-java-libraries.dpatch by Jan-Pascal van Best <janpascal@vanbest.org>
-##
-## All lines beginning with `## DP:' are a description of the patch.
-## DP: Link to libraries under /usr/share/java instead of those 
-## DP: included with upstream tarball. Do not include the libraries
-## DP: into the war file.
+From: Jan-Pascal van Best <janpascal@vanbest.org>
+Subject: [PATCH] debian/use-debian-java-libraries
 
-@DPATCH@
-diff -urNad solr~/build.xml solr/build.xml
---- solr~/build.xml	2008-09-12 17:01:54.000000000 +0200
-+++ solr/build.xml	2009-07-01 15:26:50.000000000 +0200
+Link to libraries under /usr/share/java instead of those
+included with upstream tarball. Do not include the libraries
+into the war file.
+
+Signed-off-by: Thomas Koch <thomas.koch@ymc.ch>
+
+---
+ build.xml |   40 ++++++++++++++++++++++++++++------------
+ 1 files changed, 28 insertions(+), 12 deletions(-)
+
+diff --git a/build.xml b/build.xml
+index 77dc9e3..03280eb 100644
+--- a/build.xml
++++ b/build.xml
 @@ -22,7 +22,7 @@
    <import file="common-build.xml"/>
    
@@ -92,3 +97,5 @@ diff -urNad solr~/build.xml solr/build.xml
          <include name="wstx-*.jar" />
        </fileset>
        <fileset dir="${solrj-dir}/lib">
+-- 
+tg: (a1b411f..) debian/use-debian-java-libraries (depends on: upstream)

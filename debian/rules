@@ -2,7 +2,6 @@
 # -*- makefile -*-
 #
 include /usr/share/cdbs/1/rules/debhelper.mk
-include /usr/share/cdbs/1/rules/dpatch.mk
 include /usr/share/cdbs/1/class/ant.mk
 
 # Uncomment this to turn on verbose mode.
@@ -32,10 +31,6 @@ DEB_JARS = ant-junit junit4
 DEB_INSTALL_CHANGELOGS_solr-common := CHANGES.txt
 
 DEB_COMPRESS_EXCLUDE = .xsl .js .xslt
-
-cleanbuilddir:: build.xml
-build.xml:
-	debian/rules restore-from-source
 
 clean::
 	rm -f debian/solr-keyring.gpg
@@ -78,22 +73,6 @@ install/solr-tomcat::
 install/solr-jetty::
 	# Configure Jetty
 	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
-
-remove-source:
-	rm -f build.xml common-build.xml
-	rm -f *.txt
-	rm -f *stamp
-	rm -rf debian/patched
-	rm -rf build dist docs example lib src contrib client
-	rm -rf apache-solr*
-
-restore-from-source: remove-source ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
-	tar xzf ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz --strip 1
-
-get-orig-source: ../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz
-
-../solr_$(DEB_UPSTREAM_VERSION).orig.tar.gz:
-	debian/orig-tar.sh --upstream-version $(UPSTREAM_VERSION) 
 
 check:
 	lintian -i $(CHANGESFILE)
