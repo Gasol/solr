@@ -83,6 +83,8 @@ public class AutoCommitTest extends AbstractSolrTestCase {
 
   /* This test is causing too many failures on one of the build slaves.
      Temporarily disabled. -Mike Klaas */
+/* Commented out for Debian builds. Apparently some of the buildd's try to
+ * perform this test anyway (and break)
   public void XXXtestMaxDocs() throws Exception {
 
     CommitListener trigger = new CommitListener();
@@ -128,7 +130,7 @@ public class AutoCommitTest extends AbstractSolrTestCase {
     assertEquals( 1, tracker.getCommitCount());
     
   }
-
+*/
   public void testMaxTime() throws Exception {
     CommitListener trigger = new CommitListener();
     SolrCore core = h.getCore();

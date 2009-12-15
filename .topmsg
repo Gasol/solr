@@ -1,0 +1,8 @@
+From: Jan-Pascal van Best <janpascal@vanbest.org>
+Subject: [PATCH] debian/disable-tests-that-break-on-buildd
+
+Disable tests that need network access, because they fail for (some of)
+the autobuilders
+
+
+Signed-off-by: Thomas Koch <thomas.koch@ymc.ch>
