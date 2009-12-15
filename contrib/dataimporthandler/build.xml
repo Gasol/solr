@@ -36,16 +36,24 @@
   <path id="common.classpath">
   	<pathelement location="${solr-path}/build/solr" />
   	<pathelement location="${solr-path}/build/solrj" />
-  	<fileset dir="${solr-path}/lib" includes="*.jar"/>
+    <fileset dir="/usr/share/java">
+      <include name="commons-io.jar" />
+      <include name="lucene-core.jar" />
+      <include name="slf4j-api.jar" />
+      <include name="xml-apis.jar" />
+      <include name="xml-apis-ext.jar" />
+    </fileset>
   </path>
 
   <path id="extras.classpath">
   	<pathelement location="${solr-path}/build/solr" />
   	<pathelement location="${solr-path}/build/solrj" />
   	<pathelement location="target/classes" />
-  	<fileset dir="${solr-path}/lib" includes="*.jar"/>
-  	<fileset dir="lib/" includes="*.jar"/>
   	<fileset dir="${tikalibs-path}" includes="*.jar"/>
+    <fileset dir="/usr/share/java">
+      <include name="slf4j-api.jar" />
+      <include name="glassfish-mail.jar" />
+    </fileset>
   </path>
 	
   <path id="test.classpath">
@@ -101,11 +109,11 @@
     </solr-javac>
   </target>
 	
-  <target name="build" depends="compile,compileExtras">
+  <target name="build" depends="compile">
     <solr-jar destfile="target/${fullnamever}.jar" basedir="target/classes"
               manifest="${common.dir}/${dest}/META-INF/MANIFEST.MF" />
-    <solr-jar destfile="target/apache-${ant.project.name}-extras-${version}.jar" basedir="target/extras/classes"
-              manifest="${common.dir}/${dest}/META-INF/MANIFEST.MF" />
+    <!--solr-jar destfile="target/apache-${ant.project.name}-extras-${version}.jar" basedir="target/extras/classes"
+              manifest="${common.dir}/${dest}/META-INF/MANIFEST.MF" /-->
   </target>
 	
   <target name="compileTests" depends="compile">
@@ -177,7 +185,7 @@
   	<mkdir dir="../../build/web/WEB-INF/lib"/>
   	<copy file="target/${fullnamever}.jar" todir="${solr-path}/build/web/WEB-INF/lib"></copy>
   	<copy file="target/${fullnamever}.jar" todir="${solr-path}/dist"></copy>
-  	<copy file="target/apache-${ant.project.name}-extras-${version}.jar" todir="${solr-path}/dist"></copy>
+  	<!--copy file="target/apache-${ant.project.name}-extras-${version}.jar" todir="${solr-path}/dist"></copy-->
   </target>
 	
   <target name="javadoc">
