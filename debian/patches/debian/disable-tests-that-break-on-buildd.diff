@@ -33,7 +33,7 @@ index d0344d8..f508002 100644
 +*/
  }
 diff --git a/src/test/org/apache/solr/servlet/SolrRequestParserTest.java b/src/test/org/apache/solr/servlet/SolrRequestParserTest.java
-index 593b855..defb116 100644
+index ad9bc47..e4d20fe 100644
 --- a/src/test/org/apache/solr/servlet/SolrRequestParserTest.java
 +++ b/src/test/org/apache/solr/servlet/SolrRequestParserTest.java
 @@ -95,7 +95,7 @@ public class SolrRequestParserTest extends AbstractSolrTestCase {
@@ -55,10 +55,10 @@ index 593b855..defb116 100644
    {
      String[][] teststr = new String[][] {
 diff --git a/src/test/org/apache/solr/update/AutoCommitTest.java b/src/test/org/apache/solr/update/AutoCommitTest.java
-index ce3979d..bca1e5a 100644
+index dedcedd..438c1a6 100644
 --- a/src/test/org/apache/solr/update/AutoCommitTest.java
 +++ b/src/test/org/apache/solr/update/AutoCommitTest.java
-@@ -83,6 +83,8 @@ public class AutoCommitTest extends AbstractSolrTestCase {
+@@ -98,6 +98,8 @@ public class AutoCommitTest extends AbstractSolrTestCase {
  
    /* This test is causing too many failures on one of the build slaves.
       Temporarily disabled. -Mike Klaas */
@@ -66,15 +66,15 @@ index ce3979d..bca1e5a 100644
 + * perform this test anyway (and break)
    public void XXXtestMaxDocs() throws Exception {
  
-     CommitListener trigger = new CommitListener();
-@@ -128,7 +130,7 @@ public class AutoCommitTest extends AbstractSolrTestCase {
+     SolrCore core = h.getCore();
+@@ -144,7 +146,7 @@ public class AutoCommitTest extends AbstractSolrTestCase {
      assertEquals( 1, tracker.getCommitCount());
      
    }
 -
 +*/
    public void testMaxTime() throws Exception {
-     CommitListener trigger = new CommitListener();
      SolrCore core = h.getCore();
+     CommitListener trigger = new CommitListener(core);    
 -- 
-tg: (a1b411f..) debian/disable-tests-that-break-on-buildd (depends on: upstream)
+tg: (0ec0e86..) debian/disable-tests-that-break-on-buildd (depends on: upstream)

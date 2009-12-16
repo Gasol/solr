@@ -55,7 +55,7 @@ public class ContentStreamTest extends TestCase
     assertTrue( IOUtils.contentEquals( new FileReader(      file ), stream.getReader() ) );
   }
   
-
+/* Disabled for Debian build because this test needs network access
   public void testURLStream() throws IOException 
   {
     String content = null;
@@ -87,4 +87,5 @@ public class ContentStreamTest extends TestCase
     stream = new ContentStreamBase.URLStream( url );
     assertTrue( IOUtils.contentEquals( new StringReader( content ), stream.getReader() ) );
   }
+*/
 }

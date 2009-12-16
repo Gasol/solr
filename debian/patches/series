@@ -1,9 +1,2 @@
-debian/contrib-dataimporthandler-use-debian-libs.diff -p1
-debian/disable-tests-that-break-on-buildd.diff -p1
-debian/fix-compile-error-with-ambiguous-assert.diff -p1
-debian/fix-failed-test-with-new-jetty.diff -p1
-debian/fix-lucene-lock-directory.diff -p1
-debian/fix-syntax-error-in-shell-script.diff -p1
 debian/use-debian-java-libraries.diff -p1
-fixes/fix-failed-SolrInfoMBeanTest.diff -p1
-fixes/remove-dependency-on-javanet-staxutils-SOLR-851.diff -p1
+debian/disable-tests-that-break-on-buildd.diff -p1
