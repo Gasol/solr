@@ -49,7 +49,7 @@
   	<pathelement location="${solr-path}/build/solr" />
   	<pathelement location="${solr-path}/build/solrj" />
   	<pathelement location="target/classes" />
-  	<fileset dir="${tikalibs-path}" includes="*.jar"/>
+  	<!--fileset dir="${tikalibs-path}" includes="*.jar"/-->
     <fileset dir="/usr/share/java">
       <include name="slf4j-api.jar" />
       <include name="glassfish-mail.jar" />

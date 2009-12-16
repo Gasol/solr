@@ -1,0 +1,2 @@
+debian/use-debian-java-libraries.diff -p1
+debian/disable-tests-that-break-on-buildd.diff -p1

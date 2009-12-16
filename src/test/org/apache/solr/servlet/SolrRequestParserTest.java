@@ -95,7 +95,7 @@ public class SolrRequestParserTest extends AbstractSolrTestCase {
     }
   }
   
-
+/* Disabled for Debian builds because this test needs network access
   public void testStreamURL() throws Exception
   {
     boolean ok = false;
@@ -121,7 +121,7 @@ public class SolrRequestParserTest extends AbstractSolrTestCase {
     assertEquals( 1, streams.size() );
     assertEquals( txt, IOUtils.toString( streams.get(0).getStream() ) );
   }
-  
+*/ 
   public void testUrlParamParsing()
   {
     String[][] teststr = new String[][] {
