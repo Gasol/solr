@@ -8,5 +8,47 @@ TODO.Debian for solr
   example). 
 - Maybe: move the API docs to a separate package (it's 8.7 MB, and not generally
   useful to people just interested in running Solr, only to those extending it).
+- Build javadocs
 - Maybe: make seperate solrj client library package
 - Do a license check also of things that 'licensecheck -r' does not catch
+- Check that solr-tomcat, solr-jetty configfiles are installed 0644. Why do they need to?
+- Check what to do about the file KEYS.txt that was formerly copied to /usr/share/doc...
+- Decide, where dist/apache-solr-dataimporthandler-1.4.0.jar should go:
+  - /usr/share/solr/WEB-INF/lib/
+  - /usr/share/java
+  Or should maybe all jars go to /usr/share/java and be symlinked?
+
+Tests
+-----
+
+Some Tests fail:
+
+Jetty/Solr unresponsive:
+org.apache.solr.TestDistributedSearch
+org.apache.solr.TestSolrCoreProperties
+org.apache.solr.client.solrj.TestBatchUpdate
+org.apache.solr.client.solrj.TestLBHttpSolrServer
+org.apache.solr.client.solrj.embedded.JettyWebappTest
+org.apache.solr.client.solrj.embedded.LargeVolumeBinaryJettyTest
+org.apache.solr.client.solrj.embedded.LargeVolumeJettyTest
+org.apache.solr.client.solrj.embedded.MultiCoreExampleJettyTest
+org.apache.solr.client.solrj.embedded.SolrExampleJettyTest
+org.apache.solr.client.solrj.embedded.SolrExampleStreamingTest
+org.apache.solr.client.solrj.response.TestSpellCheckResponse
+org.apache.solr.handler.TestReplicationHandler
+org.apache.solr.schema.TestBinaryField
+org.apache.solr.servlet.CacheHeaderTest
+org.apache.solr.servlet.NoCacheHeaderTest
+
+don't know why:
+org.apache.solr.core.TestJmxMonitoredMap
+
+disabled by patch debian/disable-tests-that-break-on-buildd because internet access:
+org.apache.solr.common.util.ContentStreamTest
+org.apache.solr.servlet.SolrRequestParserTest
+
+missed lucene-memory.jar (should be fixed now):
+org.apache.solr.highlight.HighlighterTest
+
+missing class: org.apache.solr.handler.extraction.ExtractingRequestHandler
+org.apache.solr.client.solrj.embedded.SolrExampleEmbeddedTest

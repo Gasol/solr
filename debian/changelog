@@ -1,3 +1,12 @@
+solr (1.4.0+ds1-1) unstable; urgency=low
+
+  * New upstream release (1.4.0). Closes: #559143.
+  * Switched packaging to GIT. Closes: #540756.
+  * Build with newest lucene version. Closes: #540756.
+  * New version obsoletes Dependency bug. Closes: #521009.
+
+ -- Thomas Koch <thomas.koch@ymc.ch>  Wed, 16 Dec 2009 13:38:44 +0100
+
 solr (1.3.0+ds1-2) unstable; urgency=low
 
   * Moved Debian packaging source repository to git.

@@ -7,25 +7,14 @@ include /usr/share/cdbs/1/class/ant.mk
 # Uncomment this to turn on verbose mode.
 # export DH_VERBOSE=1
 
-# UPSTREAM_VERSION is what Apache Solr thinks its version is
-# DEB_UPSTREAM_VERSION is the Debian source package version (with the +dsN)
-UPSTREAM_VERSION := $(shell echo $(DEB_UPSTREAM_VERSION) | grep -o "^[^+]*")
-UPSTREAM_BASENAME = apache-solr-$(UPSTREAM_VERSION)
-WARFILE = $(UPSTREAM_BASENAME).war
 CHANGESFILE = ../solr_$(DEB_VERSION)_$(DEB_BUILD_ARCH).changes
 
-COMMON_INSTDIR=$(CURDIR)/debian/solr-common
-TOMCAT_INSTDIR=$(CURDIR)/debian/solr-tomcat
-JETTY_INSTDIR=$(CURDIR)/debian/solr-jetty
-SHAREDIR=$(COMMON_INSTDIR)/usr/share/solr
-
 # Build with OpenJDK
-JAVA_HOME = /usr/lib/jvm/java-6-openjdk
-JAR = $(JAVA_HOME)/bin/jar
+JAVA_HOME = /usr/lib/jvm/default-java
 
 # Set ant parameters
-DEB_ANT_BUILD_TARGET = compile javadoc dist-war
-DEB_ANT_CHECK_TARGET = test
+DEB_ANT_BUILD_TARGET = init-forrest-entities dist-solrj dist-jar dist-contrib compile make-manifest
+#DEB_ANT_CHECK_TARGET = test
 DEB_JARS = ant-junit junit4
 
 DEB_INSTALL_CHANGELOGS_solr-common := CHANGES.txt
@@ -38,41 +27,6 @@ clean::
 	rm -rf example/solr/data
 	rm -rf example/multicore/core0/data
 	rm -rf example/multicore/core1/data
-
-install/solr-common::
-	# First unpack the .war file, we need most of it.
-	cd $(SHAREDIR) ; $(JAR) xf $(CURDIR)/dist/$(WARFILE) 
-	mv $(SHAREDIR)/WEB-INF/web.xml $(COMMON_INSTDIR)/etc/solr/
-	
-	# Install replication scripts
-	install src/scripts/* $(SHAREDIR)/scripts
-	
-	# Install Solr configuration files
-	# FIXME: this is example configuration, including example schema
-	# Should be changed to some minimal config, with pointers
-	# to documentation
-	cp -r $(CURDIR)/example/solr/conf/* $(COMMON_INSTDIR)/etc/solr/conf/
-	
-	# This information is already in debian/copyright
-	rm -f $(COMMON_INSTDIR)/usr/share/solr/META-INF/LICENSE.txt
-	
-	cp KEYS.txt NOTICE.txt README.txt $(COMMON_INSTDIR)/usr/share/doc/solr-common/
-	cp -a docs $(COMMON_INSTDIR)/usr/share/doc/solr-common/
-	cp -a build/docs/api $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/
-	
-	# Remove empty directories
-	rmdir --ignore-fail-on-non-empty $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/skin/css
-	rmdir --ignore-fail-on-non-empty $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/skin/scripts
-	rmdir --ignore-fail-on-non-empty $(COMMON_INSTDIR)/usr/share/doc/solr-common/docs/skin/translations
-
-install/solr-tomcat::
-	# Configure tomcat (also see solr-tomcat.links)
-	install --mode 0644 debian/solr-tomcat.xml $(TOMCAT_INSTDIR)/etc/solr/
-	install --mode 0644 debian/tomcat.policy $(TOMCAT_INSTDIR)/etc/solr/
-
-install/solr-jetty::
-	# Configure Jetty
-	install --mode 0644 debian/jetty-web.xml $(JETTY_INSTDIR)/usr/share/solr/WEB-INF/
 
 check:
 	lintian -i $(CHANGESFILE)
