@@ -360,6 +360,7 @@ public final class SolrCore implements SolrInfoMBean {
 
   void initIndex() {
     try {
+      System.setProperty( "org.apache.lucene.lockDir", dataDir );
       File dirFile = new File(getNewIndexDir());
       boolean indexExists = dirFile.canRead();
       boolean firstTime;
