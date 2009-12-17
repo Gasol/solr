@@ -22,6 +22,9 @@ import org.apache.lucene.queryParser.ParseException;
 import org.apache.lucene.queryParser.QueryParser;
 import org.apache.lucene.search.*;
 import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.index.LogByteSizeMergePolicy;
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.AppendedSolrParams;
 import org.apache.solr.common.params.DefaultSolrParams;
@@ -36,13 +39,16 @@ import org.apache.solr.request.SolrQueryResponse;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.*;
+import org.apache.solr.update.DocumentBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.logging.Level;
 import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-    
+import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
+
 /**
  * <p>Utilities that may be of use to RequestHandlers.</p>
  *
@@ -57,6 +63,7 @@ import java.util.regex.Matcher;
  * default parameter settings.  
  */
 public class SolrPluginUtils {
+  final static Logger log = LoggerFactory.getLogger( SolrPluginUtils.class );
 
   /**
    * Set defaults on a SolrQueryRequest.
@@ -180,7 +187,7 @@ public class SolrPluginUtils {
   public static int setReturnFields(SolrQueryRequest req,
                                     SolrQueryResponse res) {
 
-    return setReturnFields(req.getParam(FL), res);
+    return setReturnFields(req.getParams().get(org.apache.solr.common.params.CommonParams.FL), res);
   }
 
   /**
@@ -382,14 +389,14 @@ public class SolrPluginUtils {
                                           DocList results)
     throws IOException {
 
-    String debug = req.getParam(org.apache.solr.common.params.CommonParams.DEBUG_QUERY);
+    String debug = req.getParams().get(org.apache.solr.common.params.CommonParams.DEBUG_QUERY);
 
     NamedList dbg = null;
     if (debug!=null) {
       dbg = new SimpleOrderedMap();
 
       /* userQuery may have been pre-processes .. expose that */
-      dbg.add("rawquerystring", req.getQueryString());
+      dbg.add("rawquerystring", req.getParams().get(org.apache.solr.common.params.CommonParams.Q));
       dbg.add("querystring", userQuery);
 
       /* QueryParsing.toString isn't perfect, use it to see converted
@@ -401,7 +408,7 @@ public class SolrPluginUtils {
 
       dbg.add("explain", getExplainList
               (query, results, req.getSearcher(), req.getSchema()));
-      String otherQueryS = req.getParam("explainOther");
+      String otherQueryS = req.getParams().get(org.apache.solr.common.params.CommonParams.EXPLAIN_OTHER);
       if (otherQueryS != null && otherQueryS.length() > 0) {
         DocList otherResults = doSimpleQuery
           (otherQueryS,req.getSearcher(), req.getSchema(),0,10);
@@ -492,8 +499,8 @@ public class SolrPluginUtils {
    * Like <code>parseFieldBoosts(String)</code>, but parses all the strings
    * in the provided array (which may be null).
    *
-   * @param fieldLists an array of Strings eg. <code>{"fieldOne^2.3", "fieldTwo"}</code>
-   * @return Map of fieldOne =&gt; 2.3, fieldThree =&gt; -0.4
+   * @param fieldLists an array of Strings eg. <code>{"fieldOne^2.3", "fieldTwo", fieldThree^-0.4}</code>
+   * @return Map of fieldOne =&gt; 2.3, fieldTwo =&gt; null, fieldThree =&gt; -0.4
    */
   public static Map<String,Float> parseFieldBoosts(String[] fieldLists) {
     if (null == fieldLists || 0 == fieldLists.length) {
@@ -519,6 +526,7 @@ public class SolrPluginUtils {
    * NOTE: intra-function whitespace is not allowed.
    * </p>
    * @see #parseFieldBoosts
+   * @deprecated
    */
   public static List<Query> parseFuncs(IndexSchema s, String in)
     throws ParseException {
@@ -727,7 +735,11 @@ public class SolrPluginUtils {
      * DisjunctionMaxQuery and the tiebreaker to use.
      */
     protected Map<String,Alias> aliases = new HashMap<String,Alias>(3);
-        
+    public DisjunctionMaxQueryParser(QParser qp, String defaultField) {
+      super(qp,defaultField);
+      // don't trust that our parent class won't ever change it's default
+      setDefaultOperator(QueryParser.Operator.OR);
+    }
     public DisjunctionMaxQueryParser(IndexSchema s, String defaultField) {
       super(s,defaultField);
       // don't trust that our parent class won't ever change it's default
@@ -773,7 +785,7 @@ public class SolrPluginUtils {
         DisjunctionMaxQuery q = new DisjunctionMaxQuery(a.tie);
 
         /* we might not get any valid queries from delegation,
-         * in which we should return null
+         * in which case we should return null
          */
         boolean ok = false;
                 
@@ -791,7 +803,11 @@ public class SolrPluginUtils {
         return ok ? q : null;
 
       } else {
-        return super.getFieldQuery(field, queryText);
+        try {
+          return super.getFieldQuery(field, queryText);
+        } catch (Exception e) {
+          return null;
+        }
       }
     }
         
@@ -804,7 +820,7 @@ public class SolrPluginUtils {
    */
   public static Sort getSort(SolrQueryRequest req) {
 
-    String sort = req.getParam(org.apache.solr.common.params.CommonParams.SORT);
+    String sort = req.getParams().get(org.apache.solr.common.params.CommonParams.SORT);
     if (null == sort || sort.equals("")) {
       return null;
     }
@@ -821,7 +837,7 @@ public class SolrPluginUtils {
       /* we definitely had some sort of sort string from the user,
        * but no SortSpec came out of it
        */
-      SolrCore.log.log(Level.WARNING,"Invalid sort \""+sort+"\" was specified, ignoring", sortE);
+      SolrCore.log.warn("Invalid sort \""+sort+"\" was specified, ignoring", sortE);
       return null;
     }
         
@@ -844,7 +860,7 @@ public class SolrPluginUtils {
   public static List<Query> parseQueryStrings(SolrQueryRequest req, 
                                               String[] queries) throws ParseException {    
     if (null == queries || 0 == queries.length) return null;
-    List<Query> out = new LinkedList<Query>();
+    List<Query> out = new ArrayList<Query>(queries.length);
     for (String q : queries) {
       if (null != q && 0 != q.trim().length()) {
         out.add(QParser.getParser(q, null, req).getQuery());
@@ -872,9 +888,112 @@ public class SolrPluginUtils {
       newCache.put(oldKey,oldVal);
       return true;
     }
-            
   }
 
+  /**
+   * Convert a DocList to a SolrDocumentList
+   *
+   * The optional param "ids" is populated with the lucene document id
+   * for each SolrDocument.
+   *
+   * @param docs The {@link org.apache.solr.search.DocList} to convert
+   * @param searcher The {@link org.apache.solr.search.SolrIndexSearcher} to use to load the docs from the Lucene index
+   * @param fields The names of the Fields to load
+   * @param ids A map to store the ids of the docs
+   * @return The new {@link org.apache.solr.common.SolrDocumentList} containing all the loaded docs
+   * @throws java.io.IOException if there was a problem loading the docs
+   * @since solr 1.4
+   */
+  public static SolrDocumentList docListToSolrDocumentList(
+      DocList docs, 
+      SolrIndexSearcher searcher, 
+      Set<String> fields, 
+      Map<SolrDocument, Integer> ids ) throws IOException
+  {
+    DocumentBuilder db = new DocumentBuilder(searcher.getSchema());
+    SolrDocumentList list = new SolrDocumentList();
+    list.setNumFound(docs.matches());
+    list.setMaxScore(docs.maxScore());
+    list.setStart(docs.offset());
+
+    DocIterator dit = docs.iterator();
+
+    while (dit.hasNext()) {
+      int docid = dit.nextDoc();
+
+      Document luceneDoc = searcher.doc(docid, fields);
+      SolrDocument doc = new SolrDocument();
+      db.loadStoredFields(doc, luceneDoc);
+
+      // this may be removed if XMLWriter gets patched to
+      // include score from doc iterator in solrdoclist
+      if (docs.hasScores()) {
+        doc.addField("score", dit.score());
+      } else {
+        doc.addField("score", 0.0f);
+      }
+
+      list.add( doc );
+
+      if( ids != null ) {
+        ids.put( doc, new Integer(docid) );
+      }
+    }
+    return list;
+  }
+
+
+
+  /**
+   * Given a SolrQueryResponse replace the DocList if it is in the result.  
+   * Otherwise add it to the response
+   * 
+   * @since solr 1.4
+   */
+  public static void addOrReplaceResults(SolrQueryResponse rsp, SolrDocumentList docs) 
+  {
+    NamedList vals = rsp.getValues();
+    int idx = vals.indexOf( "response", 0 );
+    if( idx >= 0 ) {
+      log.debug("Replacing DocList with SolrDocumentList " + docs.size());
+      vals.setVal( idx, docs );
+    }
+    else {
+      log.debug("Adding SolrDocumentList response" + docs.size());
+      vals.add( "response", docs );
+    }
+  }
+  
+  public static void invokeSetters(Object bean, NamedList initArgs) {
+    if (initArgs == null) return;
+    Class clazz = bean.getClass();
+    Method[] methods = clazz.getMethods();
+    Iterator<Map.Entry<String, Object>> iterator = initArgs.iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<String, Object> entry = iterator.next();
+      String key = entry.getKey();
+      String setterName = "set" + String.valueOf(Character.toUpperCase(key.charAt(0))) + key.substring(1);
+      Method method = null;
+      try {
+        for (Method m : methods) {
+          if (m.getName().equals(setterName) && m.getParameterTypes().length == 1) { 
+            method = m;
+            break;
+          }
+        }
+        if (method == null) {
+          throw new RuntimeException("no setter corrresponding to '" + key + "' in " + clazz.getName());
+        }
+        Class pClazz = method.getParameterTypes()[0];
+        Object val = entry.getValue();
+        method.invoke(bean, val);
+      } catch (InvocationTargetException e1) {
+        throw new RuntimeException("Error invoking setter " + setterName + "on class : " + clazz.getName(), e1);
+      } catch (IllegalAccessException e1) {
+        throw new RuntimeException("Error invoking setter " + setterName + "on class : " + clazz.getName(), e1);
+      }
+    }
+  }
 }
 
 

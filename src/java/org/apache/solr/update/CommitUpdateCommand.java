@@ -17,12 +17,13 @@
 
 package org.apache.solr.update;
 /**
- * @version $Id: CommitUpdateCommand.java 677767 2008-07-17 22:44:30Z hossman $
+ * @version $Id: CommitUpdateCommand.java 805774 2009-08-19 12:21:22Z noble $
  */
 public class CommitUpdateCommand extends UpdateCommand {
   public boolean optimize;
   public boolean waitFlush;
   public boolean waitSearcher=true;
+  public boolean expungeDeletes = false;
 
   /**
    * During optimize, optimize down to <= this many segments.  Must be >= 1
@@ -39,6 +40,7 @@ public class CommitUpdateCommand extends UpdateCommand {
     return "commit(optimize="+optimize
             +",waitFlush="+waitFlush
             +",waitSearcher="+waitSearcher
+            +",expungeDeletes="+expungeDeletes
             +')';
   }
 }

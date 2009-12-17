@@ -30,13 +30,14 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.namespace.QName;
 import java.io.*;
 import java.util.List;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * @version $Id: Config.java 688359 2008-08-23 16:25:19Z shalin $
+ * @version $Id: Config.java 820652 2009-10-01 13:32:22Z gsingers $
  */
 public class Config {
-  public static final Logger log = Logger.getLogger(Config.class.getName());
+  public static final Logger log = LoggerFactory.getLogger(Config.class);
 
   static final XPathFactory xpathFactory = XPathFactory.newInstance();
 
@@ -99,10 +100,22 @@ public class Config {
       if (lis == null) {
         lis = loader.openConfig(name);
       }
-      javax.xml.parsers.DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-      doc = builder.parse(lis);
+      javax.xml.parsers.DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      try {
+        dbf.setXIncludeAware(true);
+        dbf.setNamespaceAware(true);
+      } catch(UnsupportedOperationException e) {
+        log.warn(name + " XML parser doesn't support XInclude option");
+      }
+      doc = dbf.newDocumentBuilder().parse(lis);
 
         DOMUtil.substituteProperties(doc, loader.getCoreProperties());
+    } catch (ParserConfigurationException e)  {
+      SolrException.log(log, "Exception during parsing file: " + name, e);
+      throw e;
+    } catch (SAXException e)  {
+      SolrException.log(log, "Exception during parsing file: " + name, e);
+      throw e;
     } catch( SolrException e ){
     	SolrException.log(log,"Error in "+name,e);
     	throw e;
@@ -170,12 +183,12 @@ public class Config {
         if (errIfMissing) {
           throw new RuntimeException(name + " missing "+path);
         } else {
-          log.fine(name + " missing optional " + path);
+          log.debug(name + " missing optional " + path);
           return null;
         }
       }
 
-      log.finest(name + ":" + path + "=" + nd);
+      log.trace(name + ":" + path + "=" + nd);
       return nd;
 
     } catch (XPathExpressionException e) {
@@ -195,7 +208,7 @@ public class Config {
 
     String txt = DOMUtil.getText(nd);
 
-    log.fine(name + ' '+path+'='+txt);
+    log.debug(name + ' '+path+'='+txt);
     return txt;
 
     /******

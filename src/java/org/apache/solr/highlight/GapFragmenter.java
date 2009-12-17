@@ -17,6 +17,10 @@
 package org.apache.solr.highlight;
 
 import org.apache.lucene.analysis.Token;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
+import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
+import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 import org.apache.lucene.search.highlight.Fragmenter;
 import org.apache.lucene.search.highlight.NullFragmenter;
 import org.apache.lucene.search.highlight.SimpleFragmenter;
@@ -49,17 +53,17 @@ public class GapFragmenter extends HighlightingPluginBase implements SolrFragmen
 
   @Override
   public String getVersion() {
-      return "$Revision: 552682 $";
+      return "$Revision: 801872 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: GapFragmenter.java 552682 2007-07-03 06:14:07Z ryan $";
+    return "$Id: GapFragmenter.java 801872 2009-08-07 03:21:06Z markrmiller $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/highlight/GapFragmenter.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/highlight/GapFragmenter.java $";
   }
 }
 
@@ -75,7 +79,10 @@ class LuceneGapFragmenter extends SimpleFragmenter {
    * the gap as a fragment delimiter.
    */
   public static final int INCREMENT_THRESHOLD = 50;
-  protected int fragOffsetAccum = 0;
+  protected int fragOffset = 0;
+  
+  private OffsetAttribute offsetAtt;
+  private PositionIncrementAttribute posIncAtt;
   
   public LuceneGapFragmenter() {
   }
@@ -87,19 +94,22 @@ class LuceneGapFragmenter extends SimpleFragmenter {
   /* (non-Javadoc)
    * @see org.apache.lucene.search.highlight.TextFragmenter#start(java.lang.String)
    */
-  public void start(String originalText) {
-    fragOffsetAccum = 0;
+  public void start(String originalText, TokenStream tokenStream) {
+    offsetAtt = (OffsetAttribute) tokenStream.getAttribute(OffsetAttribute.class);
+    posIncAtt = (PositionIncrementAttribute) tokenStream.getAttribute(PositionIncrementAttribute.class);
+    fragOffset = 0;
   }
 
   /* (non-Javadoc)
    * @see org.apache.lucene.search.highlight.TextFragmenter#isNewFragment(org.apache.lucene.analysis.Token)
    */
-  public boolean isNewFragment(Token token) {
+  public boolean isNewFragment() {
+    int endOffset = offsetAtt.endOffset();
     boolean isNewFrag = 
-      token.endOffset() >= fragOffsetAccum + getFragmentSize() ||
-      token.getPositionIncrement() > INCREMENT_THRESHOLD;
+      endOffset >= fragOffset + getFragmentSize() ||
+      posIncAtt.getPositionIncrement() > INCREMENT_THRESHOLD;
     if(isNewFrag) {
-        fragOffsetAccum += token.endOffset() - fragOffsetAccum;
+        fragOffset = endOffset;
     }
     return isNewFrag;
   }

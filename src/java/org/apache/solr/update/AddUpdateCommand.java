@@ -19,13 +19,14 @@ package org.apache.solr.update;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.index.Term;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
 
 /**
- * @version $Id: AddUpdateCommand.java 556064 2007-07-13 16:48:00Z ryan $
+ * @version $Id: AddUpdateCommand.java 743163 2009-02-10 23:21:57Z yonik $
  */
 public class AddUpdateCommand extends UpdateCommand {
    // optional id in "internal" indexed form... if it is needed and not supplied,
@@ -42,6 +43,10 @@ public class AddUpdateCommand extends UpdateCommand {
    public boolean allowDups;
    public boolean overwritePending;
    public boolean overwriteCommitted;
+   
+   public Term updateTerm;
+   public int commitWithin = -1;
+   
 
    /** Reset state to reuse this object with a different document in the same request */
    public void clear() {

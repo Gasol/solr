@@ -86,6 +86,44 @@ public class FunctionQParser extends QParser {
     consumeArgumentDelimiter();
     return value;
   }
+
+  public String parseArg() throws ParseException {
+    sp.eatws();
+    char ch = sp.peek();
+    String val = null;
+    switch (ch) {
+      case ')': return null;
+      case '$':
+        sp.pos++;
+        String param = sp.getId();
+        val = getParam(param);
+        break;
+      case '\'':
+      case '"':
+        val = sp.getQuotedString();
+        break;
+      default:
+        // read unquoted literal ended by whitespace ',' or ')'
+        // there is no escaping.
+        int valStart = sp.pos;
+        for (;;) {
+          if (sp.pos >= sp.end) {
+            throw new ParseException("Missing end to unquoted value starting at " + valStart + " str='" + sp.val +"'");
+          }
+          char c = sp.val.charAt(sp.pos);
+          if (c==')' || c==',' || Character.isWhitespace(c)) {
+            val = sp.val.substring(valStart, sp.pos);
+            break;
+          }
+          sp.pos++;
+        }
+    }
+
+    sp.eatws();
+    consumeArgumentDelimiter();
+    return val;
+  }
+
   
   /**
    * Parse a list of ValueSource.  Must be the final set of arguments
@@ -123,19 +161,17 @@ public class FunctionQParser extends QParser {
     
     if (sp.opt("$")) {
       String param = sp.getId();
-      sp.pos += param.length();
       String qstr = getParam(param);
       qstr = qstr==null ? "" : qstr;
-      nestedQuery = subQuery(qstr, null).parse();
+      nestedQuery = subQuery(qstr, null).getQuery();
     }
     else {
       int start = sp.pos;
-      int end = sp.pos;
-      String v = sp.val; 
+      String v = sp.val;
   
-      String qs = v.substring(start);
+      String qs = v;
       HashMap nestedLocalParams = new HashMap<String,String>();
-      end = QueryParsing.parseLocalParams(qs, start, nestedLocalParams, getParams());
+      int end = QueryParsing.parseLocalParams(qs, start, nestedLocalParams, getParams());
   
       QParser sub;
   
@@ -143,7 +179,7 @@ public class FunctionQParser extends QParser {
         if (nestedLocalParams.get(QueryParsing.V) != null) {
           // value specified directly in local params... so the end of the
           // query should be the end of the local params.
-          sub = subQuery(qs.substring(0, end), null);
+          sub = subQuery(qs.substring(start, end), null);
         } else {
           // value here is *after* the local params... ask the parser.
           sub = subQuery(qs, null);

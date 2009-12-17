@@ -18,10 +18,10 @@
 package org.apache.solr.schema;
 
 import org.apache.lucene.search.SortField;
-import org.apache.lucene.search.FieldCache;
 import org.apache.solr.search.function.ValueSource;
 import org.apache.solr.search.function.FieldCacheSource;
 import org.apache.solr.search.function.DocValues;
+import org.apache.solr.search.function.StringIndexDocValues;
 import org.apache.lucene.document.Fieldable;
 import org.apache.lucene.index.IndexReader;
 import org.apache.solr.util.NumberUtils;
@@ -31,7 +31,7 @@ import org.apache.solr.request.TextResponseWriter;
 import java.util.Map;
 import java.io.IOException;
 /**
- * @version $Id: SortableIntField.java 648384 2008-04-15 19:22:38Z yonik $
+ * @version $Id: SortableIntField.java 816202 2009-09-17 14:08:13Z yonik $
  */
 public class SortableIntField extends FieldType {
   protected void init(IndexSchema schema, Map<String,String> args) {
@@ -96,13 +96,14 @@ class SortableIntFieldSource extends FieldCacheSource {
     return "sint(" + field + ')';
   }
 
-  public DocValues getValues(IndexReader reader) throws IOException {
-    final FieldCache.StringIndex index = cache.getStringIndex(reader, field);
-    final int[] order = index.order;
-    final String[] lookup = index.lookup;
+  public DocValues getValues(Map context, IndexReader reader) throws IOException {
     final int def = defVal;
 
-    return new DocValues() {
+    return new StringIndexDocValues(this, reader, field) {
+      protected String toTerm(String readableValue) {
+        return NumberUtils.int2sortableStr(readableValue);
+      }
+
       public float floatVal(int doc) {
         return (float)intVal(doc);
       }

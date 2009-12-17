@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.HashMap;
 
 /**
- * @version $Id: FieldProperties.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: FieldProperties.java 777496 2009-05-22 12:29:02Z markrmiller $
  */
 abstract class FieldProperties {
 
@@ -35,19 +35,21 @@ abstract class FieldProperties {
   final static int BINARY              = 0x00000008;
   final static int COMPRESSED          = 0x00000010;
   final static int OMIT_NORMS          = 0x00000020;
-  final static int STORE_TERMVECTORS   = 0x00000040;
-  final static int STORE_TERMPOSITIONS = 0x00000080;
-  final static int STORE_TERMOFFSETS   = 0x00000100;
+  final static int OMIT_TF_POSITIONS   = 0x00000040;
+  final static int STORE_TERMVECTORS   = 0x00000080;
+  final static int STORE_TERMPOSITIONS = 0x00000100;
+  final static int STORE_TERMOFFSETS   = 0x00000200;
 
-  final static int MULTIVALUED         = 0x00000200;
-  final static int SORT_MISSING_FIRST  = 0x00000400;
-  final static int SORT_MISSING_LAST   = 0x00000800;
+
+  final static int MULTIVALUED         = 0x00000400;
+  final static int SORT_MISSING_FIRST  = 0x00000800;
+  final static int SORT_MISSING_LAST   = 0x00001000;
   
-  final static int REQUIRED            = 0x00001000;
+  final static int REQUIRED            = 0x00002000;
   
   static final String[] propertyNames = {
           "indexed", "tokenized", "stored",
-          "binary", "compressed", "omitNorms",
+          "binary", "compressed", "omitNorms", "omitTermFreqAndPositions",
           "termVectors", "termPositions", "termOffsets",
           "multiValued",
           "sortMissingFirst","sortMissingLast","required"
@@ -133,11 +135,11 @@ abstract class FieldProperties {
 
   static int parseProperties(Map<String,String> properties, boolean which) {
     int props = 0;
-    for (String prop : properties.keySet()) {
-      if (propertyMap.get(prop)==null) continue;
-      String val = properties.get(prop);
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String val = entry.getValue();
+      if(val == null) continue;
       if (Boolean.parseBoolean(val) == which) {
-        props |= propertyNameToInt(prop);
+        props |= propertyNameToInt(entry.getKey());
       }
     }
     return props;

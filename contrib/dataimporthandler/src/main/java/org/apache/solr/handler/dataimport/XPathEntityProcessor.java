@@ -16,6 +16,11 @@
  */
 package org.apache.solr.handler.dataimport;
 
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.xml.transform.Source;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
@@ -29,30 +34,22 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * <p>
- * An implementation of EntityProcessor which uses a streaming xpath parser to
- * extract values out of XML documents. It is typically used in conjunction with
- * HttpDataSource or FileDataSource.
- * </p>
- * <p/>
- * <p>
- * Refer to <a
- * href="http://wiki.apache.org/solr/DataImportHandler">http://wiki.apache.org/solr/DataImportHandler</a>
- * for more details.
- * </p>
+ * <p> An implementation of EntityProcessor which uses a streaming xpath parser to extract values out of XML documents.
+ * It is typically used in conjunction with HttpDataSource or FileDataSource. </p> <p/> <p> Refer to <a
+ * href="http://wiki.apache.org/solr/DataImportHandler">http://wiki.apache.org/solr/DataImportHandler</a> for more
+ * details. </p>
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: XPathEntityProcessor.java 682383 2008-08-04 13:36:55Z shalin $
+ * @version $Id: XPathEntityProcessor.java 808759 2009-08-28 05:22:08Z noble $
  * @see XPathRecordReader
  * @since solr 1.3
  */
 public class XPathEntityProcessor extends EntityProcessorBase {
-  private static final Logger LOG = Logger.getLogger(XPathEntityProcessor.class
-          .getName());
+  private static final Logger LOG = LoggerFactory.getLogger(XPathEntityProcessor.class);
 
   protected List<String> placeHolderVariables;
 
@@ -68,8 +65,8 @@ public class XPathEntityProcessor extends EntityProcessorBase {
 
   protected boolean useSolrAddXml = false;
 
-  protected boolean streamRows   =  false;
-  
+  protected boolean streamRows = false;
+
   private int batchSz = 1000;
 
   @SuppressWarnings("unchecked")
@@ -79,6 +76,7 @@ public class XPathEntityProcessor extends EntityProcessorBase {
       initXpathReader();
     pk = context.getEntityAttribute("pk");
     dataSource = context.getDataSource();
+    rowIterator = null;
 
   }
 
@@ -86,8 +84,8 @@ public class XPathEntityProcessor extends EntityProcessorBase {
     useSolrAddXml = Boolean.parseBoolean(context
             .getEntityAttribute(USE_SOLR_ADD_SCHEMA));
     streamRows = Boolean.parseBoolean(context
-        .getEntityAttribute(STREAM));
-    if(context.getEntityAttribute("batchSize") != null){
+            .getEntityAttribute(STREAM));
+    if (context.getEntityAttribute("batchSize") != null) {
       batchSz = Integer.parseInt(context.getEntityAttribute("batchSize"));
     }
     String xslt = context.getEntityAttribute(XSL);
@@ -102,7 +100,7 @@ public class XPathEntityProcessor extends EntityProcessorBase {
                 .info("Using xslTransformer: "
                         + xslTransformer.getClass().getName());
       } catch (Exception e) {
-        throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
+        throw new DataImportHandlerException(SEVERE,
                 "Error initializing XSL ", e);
       }
     }
@@ -115,7 +113,7 @@ public class XPathEntityProcessor extends EntityProcessorBase {
     } else {
       String forEachXpath = context.getEntityAttribute(FOR_EACH);
       if (forEachXpath == null)
-        throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
+        throw new DataImportHandlerException(SEVERE,
                 "Entity : " + context.getEntityAttribute("name")
                         + " must have a 'forEach' attribute");
 
@@ -124,18 +122,24 @@ public class XPathEntityProcessor extends EntityProcessorBase {
         for (Map<String, String> field : context.getAllEntityFields()) {
           if (field.get(XPATH) == null)
             continue;
+          int flags = 0;
+          if ("true".equals(field.get("flatten"))) {
+            flags = XPathRecordReader.FLATTEN;
+          }
+          String xpath = field.get(XPATH);
+          xpath = resolver.replaceTokens(xpath);
           xpathReader.addField(field.get(DataImporter.COLUMN),
-                  field.get(XPATH), Boolean.parseBoolean(field
-                  .get(DataImporter.MULTI_VALUED)));
+                  xpath,
+                  Boolean.parseBoolean(field.get(DataImporter.MULTI_VALUED)),
+                  flags);
         }
       } catch (RuntimeException e) {
-        throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
+        throw new DataImportHandlerException(SEVERE,
                 "Exception while reading xpaths for fields", e);
       }
     }
-
-    List<String> l = TemplateString.getVariables(context
-            .getEntityAttribute(URL));
+    String url = context.getEntityAttribute(URL);
+    List<String> l = url == null ? Collections.EMPTY_LIST : TemplateString.getVariables(url);
     for (String s : l) {
       if (s.startsWith(entityName + ".")) {
         if (placeHolderVariables == null)
@@ -170,108 +174,175 @@ public class XPathEntityProcessor extends EntityProcessorBase {
     }
   }
 
+  @Override
+  public void postTransform(Map<String, Object> r) {
+    readUsefulVars(r);
+  }
+
   @SuppressWarnings("unchecked")
   private Map<String, Object> fetchNextRow() {
     Map<String, Object> r = null;
     while (true) {
-      if (rowcache != null)
-        return getFromRowCache();
       if (rowIterator == null)
         initQuery(resolver.replaceTokens(context.getEntityAttribute(URL)));
       r = getNext();
       if (r == null) {
-        Object hasMore = getSessionAttribute(HAS_MORE);
-        if ("true".equals(hasMore) || Boolean.TRUE.equals(hasMore)) {
-          String url = (String) getSessionAttribute(NEXT_URL);
-          if (url == null)
-            url = context.getEntityAttribute(URL);
-          Map namespace = (Map) getSessionAttribute(entityName);
-          if (namespace != null)
-            resolver.addNamespace(entityName, namespace);
-          clearSession();
-          initQuery(resolver.replaceTokens(url));
-          r = getNext();
-          if (r == null)
+        Object hasMore = context.getSessionAttribute(HAS_MORE, Context.SCOPE_ENTITY);
+        try {
+          if ("true".equals(hasMore) || Boolean.TRUE.equals(hasMore)) {
+            String url = (String) context.getSessionAttribute(NEXT_URL, Context.SCOPE_ENTITY);
+            if (url == null)
+              url = context.getEntityAttribute(URL);
+            addNamespace();
+            initQuery(resolver.replaceTokens(url));
+            r = getNext();
+            if (r == null)
+              return null;
+          } else {
             return null;
-        } else {
-          return null;
+          }
+        } finally {
+          context.setSessionAttribute(HAS_MORE,null,Context.SCOPE_ENTITY);
+          context.setSessionAttribute(NEXT_URL,null,Context.SCOPE_ENTITY);
         }
       }
-      r = applyTransformer(r);
-      if (r != null)
-        return readUsefulVars(r);
+      addCommonFields(r);
+      return r;
     }
   }
 
+  private void addNamespace() {
+    Map<String, Object> namespace = new HashMap<String, Object>();
+    Set<String> allNames = new HashSet<String>();
+    if (commonFields != null) allNames.addAll(commonFields);
+    if (placeHolderVariables != null) allNames.addAll(placeHolderVariables);
+    if(allNames.isEmpty()) return;
+
+    for (String name : allNames) {
+      Object val = context.getSessionAttribute(name, Context.SCOPE_ENTITY);
+      if (val != null) namespace.put(name, val);
+    }
+    resolver.addNamespace(entityName, namespace);
+
+  }
+
+  private void addCommonFields(Map<String, Object> r) {
+    if(commonFields != null){
+      for (String commonField : commonFields) {
+        if(r.get(commonField) == null) {
+          Object val = context.getSessionAttribute(commonField, Context.SCOPE_ENTITY);
+          if(val != null) r.put(commonField, val);
+        }
+
+      }
+    }
+
+  }
+
   private void initQuery(String s) {
-      Reader data = null;
+    Reader data = null;
+    try {
+      final List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
       try {
-        final List<Map<String, Object>> rows = new ArrayList<Map<String, Object>>();
         data = dataSource.getData(s);
-        if (xslTransformer != null) {
-          try {
-            SimpleCharArrayReader caw = new SimpleCharArrayReader();
-            xslTransformer.transform(new StreamSource(data),
-                new StreamResult(caw));
-            data = caw.getReader();
-          } catch (TransformerException e) {
-            throw new DataImportHandlerException(
-                DataImportHandlerException.SEVERE,
-                "Exception in applying XSL Transformeation", e);
+      } catch (Exception e) {
+        if (ABORT.equals(onError)) {
+          wrapAndThrow(SEVERE, e);
+        } else if (SKIP.equals(onError)) {
+          if (LOG.isDebugEnabled()) LOG.debug("Skipping url : " + s, e);
+          wrapAndThrow(DataImportHandlerException.SKIP, e);
+        } else {
+          LOG.warn("Failed for url : " + s, e);
+          rowIterator = Collections.EMPTY_LIST.iterator();
+          return;
+        }
+      }
+      if (xslTransformer != null) {
+        try {
+          SimpleCharArrayReader caw = new SimpleCharArrayReader();
+          xslTransformer.transform(new StreamSource(data),
+                  new StreamResult(caw));
+          data = caw.getReader();
+        } catch (TransformerException e) {
+          if (ABORT.equals(onError)) {
+            wrapAndThrow(SEVERE, e, "Exception in applying XSL Transformeation");
+          } else if (SKIP.equals(onError)) {
+            wrapAndThrow(DataImportHandlerException.SKIP, e);
+          } else {
+            LOG.warn("Failed for url : " + s, e);
+            rowIterator = Collections.EMPTY_LIST.iterator();
+            return;
           }
         }
-        if(streamRows ){
-          rowIterator = getRowIterator(data);
-        } else {
+      }
+      if (streamRows) {
+        rowIterator = getRowIterator(data, s);
+      } else {
+        try {
           xpathReader.streamRecords(data, new XPathRecordReader.Handler() {
             @SuppressWarnings("unchecked")
             public void handle(Map<String, Object> record, String xpath) {
               rows.add(readRow(record, xpath));
             }
           });
-          rowIterator = rows.iterator();
+        } catch (Exception e) {
+          String msg = "Parsing failed for xml, url:" + s + " rows processed:" + rows.size();
+          if (rows.size() > 0) msg += " last row: " + rows.get(rows.size() - 1);
+          if (ABORT.equals(onError)) {
+            wrapAndThrow(SEVERE, e, msg);
+          } else if (SKIP.equals(onError)) {
+            LOG.warn(msg, e);
+            Map<String, Object> map = new HashMap<String, Object>();
+            map.put(SKIP_DOC, Boolean.TRUE);
+            rows.add(map);
+          } else if (CONTINUE.equals(onError)) {
+            LOG.warn(msg, e);
+          }
         }
-      } finally {
-        if (!streamRows) {
-          closeIt(data);
-        }
-
+        rowIterator = rows.iterator();
       }
-    }
-
-    private void closeIt(Reader data) {
-      try {
-        data.close();
-      } catch (Exception e) { /* Ignore */
+    } finally {
+      if (!streamRows) {
+        closeIt(data);
       }
+
     }
+  }
+
+  private void closeIt(Reader data) {
+    try {
+      data.close();
+    } catch (Exception e) { /* Ignore */
+    }
+  }
+
   private Map<String, Object> readRow(Map<String, Object> record, String xpath) {
-     if (useSolrAddXml) {
-       List<String> names = (List<String>) record.get("name");
-       List<String> values = (List<String>) record.get("value");
-       Map<String, Object> row = new HashMap<String, Object>();
-       for (int i = 0; i < names.size(); i++) {
-         if (row.containsKey(names.get(i))) {
-           Object existing = row.get(names.get(i));
-           if (existing instanceof List) {
-             List list = (List) existing;
-             list.add(values.get(i));
-           } else {
-             List list = new ArrayList();
-             list.add(existing);
-             list.add(values.get(i));
-             row.put(names.get(i), list);
-           }
-         } else {
-           row.put(names.get(i), values.get(i));
-         }
-       }
-       return row;
-     } else {
-       record.put(XPATH_FIELD_NAME, xpath);
-       return  record;
-     }
-   }
+    if (useSolrAddXml) {
+      List<String> names = (List<String>) record.get("name");
+      List<String> values = (List<String>) record.get("value");
+      Map<String, Object> row = new HashMap<String, Object>();
+      for (int i = 0; i < names.size() && i < values.size(); i++) {
+        if (row.containsKey(names.get(i))) {
+          Object existing = row.get(names.get(i));
+          if (existing instanceof List) {
+            List list = (List) existing;
+            list.add(values.get(i));
+          } else {
+            List list = new ArrayList();
+            list.add(existing);
+            list.add(values.get(i));
+            row.put(names.get(i), list);
+          }
+        } else {
+          row.put(names.get(i), values.get(i));
+        }
+      }
+      return row;
+    } else {
+      record.put(XPATH_FIELD_NAME, xpath);
+      return record;
+    }
+  }
 
 
   private static class SimpleCharArrayReader extends CharArrayWriter {
@@ -285,35 +356,31 @@ public class XPathEntityProcessor extends EntityProcessorBase {
   private Map<String, Object> readUsefulVars(Map<String, Object> r) {
     Object val = r.get(HAS_MORE);
     if (val != null)
-      setSessionAttribute(HAS_MORE, val);
+      context.setSessionAttribute(HAS_MORE, val,Context.SCOPE_ENTITY);
     val = r.get(NEXT_URL);
     if (val != null)
-      setSessionAttribute(NEXT_URL, val);
+      context.setSessionAttribute(NEXT_URL, val,Context.SCOPE_ENTITY);
     if (placeHolderVariables != null) {
-      Map namespace = getNameSpace();
       for (String s : placeHolderVariables) {
         val = r.get(s);
-        if (val != null)
-          namespace.put(s, val);
+        context.setSessionAttribute(s, val,Context.SCOPE_ENTITY);
       }
     }
     if (commonFields != null) {
       for (String s : commonFields) {
         Object commonVal = r.get(s);
         if (commonVal != null) {
-          setSessionAttribute(s, commonVal);
-          getNameSpace().put(s, commonVal);
-        } else {
-          commonVal = getSessionAttribute(s);
-          if (commonVal != null)
-            r.put(s, commonVal);
+          context.setSessionAttribute(s, commonVal,Context.SCOPE_ENTITY);
         }
       }
     }
     return r;
 
   }
-  private Iterator<Map<String ,Object>> getRowIterator(final Reader data){
+
+  private Iterator<Map<String, Object>> getRowIterator(final Reader data, final String s) {
+    //nothing atomic about it. I just needed a StongReference
+    final AtomicReference<Exception> exp = new AtomicReference<Exception>();
     final BlockingQueue<Map<String, Object>> blockingQueue = new ArrayBlockingQueue<Map<String, Object>>(batchSz);
     final AtomicBoolean isEnd = new AtomicBoolean(false);
     new Thread() {
@@ -322,7 +389,7 @@ public class XPathEntityProcessor extends EntityProcessorBase {
           xpathReader.streamRecords(data, new XPathRecordReader.Handler() {
             @SuppressWarnings("unchecked")
             public void handle(Map<String, Object> record, String xpath) {
-              if(isEnd.get()) return ;
+              if (isEnd.get()) return;
               try {
                 blockingQueue.offer(readRow(record, xpath), 10, TimeUnit.SECONDS);
               } catch (Exception e) {
@@ -330,32 +397,52 @@ public class XPathEntityProcessor extends EntityProcessorBase {
               }
             }
           });
+        } catch (Exception e) {
+          exp.set(e);
         } finally {
           closeIt(data);
           try {
             blockingQueue.offer(Collections.EMPTY_MAP, 10, TimeUnit.SECONDS);
-          } catch (Exception e) { }
+          } catch (Exception e) {
+          }
         }
       }
     }.start();
 
     return new Iterator<Map<String, Object>>() {
+      private Map<String, Object> lastRow;
+      int count = 0;
+
       public boolean hasNext() {
         return !isEnd.get();
       }
+
       public Map<String, Object> next() {
         try {
           Map<String, Object> row = blockingQueue.poll(10, TimeUnit.SECONDS);
           if (row == null || row == Collections.EMPTY_MAP) {
             isEnd.set(true);
+            if (exp.get() != null) {
+              String msg = "Parsing failed for xml, url:" + s + " rows processed in this xml:" + count;
+              if (lastRow != null) msg += " last row in this xml:" + lastRow;
+              if (ABORT.equals(onError)) {
+                wrapAndThrow(SEVERE, exp.get(), msg);
+              } else if (SKIP.equals(onError)) {
+                wrapAndThrow(DataImportHandlerException.SKIP, exp.get());
+              } else {
+                LOG.warn(msg, exp.get());
+              }
+            }
             return null;
           }
-          return row;
+          count++;
+          return lastRow = row;
         } catch (InterruptedException e) {
           isEnd.set(true);
           return null;
         }
       }
+
       public void remove() {
         /*no op*/
       }
@@ -363,15 +450,6 @@ public class XPathEntityProcessor extends EntityProcessorBase {
 
   }
 
-  @SuppressWarnings("unchecked")
-  private Map getNameSpace() {
-    Map namespace = (Map) getSessionAttribute(entityName);
-    if (namespace == null) {
-      namespace = new HashMap();
-      setSessionAttribute(entityName, namespace);
-    }
-    return namespace;
-  }
 
   public static final String URL = "url";
 

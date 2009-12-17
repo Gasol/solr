@@ -16,6 +16,7 @@
  */
 package org.apache.solr.handler.dataimport;
 
+import static org.apache.solr.handler.dataimport.DataImporter.IMPORT_CMD;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.params.CommonParams;
@@ -24,6 +25,7 @@ import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.params.UpdateParams;
 import org.apache.solr.common.util.ContentStreamBase;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.common.util.ContentStream;
 import org.apache.solr.core.SolrConfig;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.core.SolrResourceLoader;
@@ -32,14 +34,14 @@ import org.apache.solr.handler.RequestHandlerUtils;
 import org.apache.solr.request.RawResponseWriter;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
-import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.request.SolrRequestHandler;
 import org.apache.solr.update.processor.UpdateRequestProcessor;
 import org.apache.solr.update.processor.UpdateRequestProcessorChain;
 import org.apache.solr.util.plugin.SolrCoreAware;
 
 import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <p>
@@ -57,43 +59,48 @@ import java.util.logging.Logger;
  * <p/>
  * <b>This API is experimental and subject to change</b>
  *
- * @version $Id: DataImportHandler.java 690134 2008-08-29 07:18:52Z shalin $
+ * @version $Id: DataImportHandler.java 788580 2009-06-26 05:20:23Z noble $
  * @since solr 1.3
  */
 public class DataImportHandler extends RequestHandlerBase implements
         SolrCoreAware {
 
-  private static final Logger LOG = Logger.getLogger(DataImportHandler.class
-          .getName());
+  private static final Logger LOG = LoggerFactory.getLogger(DataImportHandler.class);
 
   private DataImporter importer;
 
-  private Map<String, String> variables = new HashMap<String, String>();
-
-  @SuppressWarnings("unchecked")
-  private NamedList initArgs;
-
   private Map<String, Properties> dataSources = new HashMap<String, Properties>();
-
-  private DataImporter.RequestParams requestParams;
 
   private List<SolrInputDocument> debugDocuments;
 
-  private DebugLogger debugLogger;
-
   private boolean debugEnabled = true;
+
+  private String myName = "dataimport";
+
+  private Map<String , Object> coreScopeSession = new HashMap<String, Object>();
 
   @Override
   @SuppressWarnings("unchecked")
   public void init(NamedList args) {
     super.init(args);
-
-    initArgs = args;
   }
 
   @SuppressWarnings("unchecked")
   public void inform(SolrCore core) {
     try {
+      //hack to get the name of this handler
+      for (Map.Entry<String, SolrRequestHandler> e : core.getRequestHandlers().entrySet()) {
+        SolrRequestHandler handler = e.getValue();
+        //this will not work if startup=lazy is set
+        if( this == handler) {
+          String name= e.getKey();
+          if(name.startsWith("/")){
+            myName = name.substring(1);
+          }
+          // some users may have '/' in the handler name. replace with '_'
+          myName = myName.replaceAll("/","_") ;
+        }
+      }
       String debug = (String) initArgs.get(ENABLE_DEBUG);
       if (debug != null && "no".equals(debug))
         debugEnabled = false;
@@ -105,12 +112,12 @@ public class DataImportHandler extends RequestHandlerBase implements
 
           importer = new DataImporter(SolrWriter.getResourceAsString(core
                   .getResourceLoader().openResource(configLoc)), core,
-                  dataSources);
+                  dataSources, coreScopeSession);
         }
       }
     } catch (Throwable e) {
       SolrConfig.severeErrors.add(e);
-      LOG.log(Level.SEVERE, DataImporter.MSG.LOAD_EXP, e);
+      LOG.error( DataImporter.MSG.LOAD_EXP, e);
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
               DataImporter.MSG.INVALID_CONFIG, e);
     }
@@ -122,9 +129,15 @@ public class DataImportHandler extends RequestHandlerBase implements
           throws Exception {
     rsp.setHttpCaching(false);
     SolrParams params = req.getParams();
-    requestParams = new DataImporter.RequestParams(getParamsMap(params));
+    DataImporter.RequestParams requestParams = new DataImporter.RequestParams(getParamsMap(params));
     String command = requestParams.command;
-
+    Iterable<ContentStream> streams = req.getContentStreams();
+    if(streams != null){
+      for (ContentStream stream : streams) {
+          requestParams.contentStream = stream;
+          break;
+      }
+    }
     if (DataImporter.SHOW_CONF_CMD.equals(command)) {
       // Modify incoming request params to add wt=raw
       ModifiableSolrParams rawParams = new ModifiableSolrParams(req.getParams());
@@ -144,14 +157,14 @@ public class DataImportHandler extends RequestHandlerBase implements
     if (command != null)
       rsp.add("command", command);
 
-    if (requestParams.debug) {
+    if (requestParams.debug && (importer == null || !importer.isBusy())) {
       // Reload the data-config.xml
       importer = null;
       if (requestParams.dataConfig != null) {
         try {
           processConfiguration((NamedList) initArgs.get("defaults"));
           importer = new DataImporter(requestParams.dataConfig, req.getCore()
-                  , dataSources);
+                  , dataSources, coreScopeSession);
         } catch (RuntimeException e) {
           rsp.add("exception", DebugLogger.getStacktraceString(e));
           importer = null;
@@ -170,36 +183,39 @@ public class DataImportHandler extends RequestHandlerBase implements
     }
 
     if (command != null && DataImporter.ABORT_CMD.equals(command)) {
-      importer.runCmd(requestParams, null, null);
-    } else if (importer.getStatus() != DataImporter.Status.IDLE) {
+      importer.runCmd(requestParams, null);
+    } else if (importer.isBusy()) {
       message = DataImporter.MSG.CMD_RUNNING;
     } else if (command != null) {
       if (DataImporter.FULL_IMPORT_CMD.equals(command)
-              || DataImporter.DELTA_IMPORT_CMD.equals(command)) {
+              || DataImporter.DELTA_IMPORT_CMD.equals(command) ||
+              IMPORT_CMD.equals(command)) {
 
         UpdateRequestProcessorChain processorChain =
                 req.getCore().getUpdateProcessingChain(params.get(UpdateParams.UPDATE_PROCESSOR));
         UpdateRequestProcessor processor = processorChain.createProcessor(req, rsp);
         SolrResourceLoader loader = req.getCore().getResourceLoader();
-        SolrWriter sw = getSolrWriter(processor, loader, req
-                .getSchema());
+        SolrWriter sw = getSolrWriter(processor, loader, requestParams);
 
         if (requestParams.debug) {
           if (debugEnabled) {
             // Synchronous request for the debug mode
-            importer.runCmd(requestParams, sw, variables);
+            importer.runCmd(requestParams, sw);
             rsp.add("mode", "debug");
             rsp.add("documents", debugDocuments);
-            if (debugLogger != null)
-              rsp.add("verbose-output", debugLogger.output);
-            debugLogger = null;
+            if (sw.debugLogger != null)
+              rsp.add("verbose-output", sw.debugLogger.output);
             debugDocuments = null;
           } else {
             message = DataImporter.MSG.DEBUG_NOT_ENABLED;
           }
         } else {
           // Asynchronous request for normal mode
-          importer.runAsync(requestParams, sw, variables);
+          if(requestParams.contentStream == null){
+            importer.runAsync(requestParams, sw);
+          } else {
+              importer.runCmd(requestParams, sw);
+          }
         }
       } else if (DataImporter.RELOAD_CONF_CMD.equals(command)) {
         importer = null;
@@ -207,8 +223,7 @@ public class DataImportHandler extends RequestHandlerBase implements
         message = DataImporter.MSG.CONFIG_RELOADED;
       }
     }
-    rsp.add("status", importer.getStatus() == DataImporter.Status.IDLE ? "idle"
-            : "busy");
+    rsp.add("status", importer.isBusy() ? "busy" : "idle");
     rsp.add("importResponse", message);
     rsp.add("statusMessages", importer.getStatusMessages());
 
@@ -234,15 +249,13 @@ public class DataImportHandler extends RequestHandlerBase implements
   @SuppressWarnings("unchecked")
   private void processConfiguration(NamedList defaults) {
     if (defaults == null) {
-      LOG
-              .info("No configuration specified in solrconfig.xml for DataImportHandler");
+      LOG.info("No configuration specified in solrconfig.xml for DataImportHandler");
       return;
     }
 
     LOG.info("Processing configuration from solrconfig.xml: " + defaults);
 
     dataSources = new HashMap<String, Properties>();
-    variables = new HashMap<String, String>();
 
     int position = 0;
 
@@ -258,77 +271,31 @@ public class DataImportHandler extends RequestHandlerBase implements
           props.put(dsConfig.getName(i), dsConfig.getVal(i));
         LOG.info("Adding properties to datasource: " + props);
         dataSources.put((String) dsConfig.get("name"), props);
-      } else if (!name.equals("config")) {
-        String value = (String) defaults.getVal(position);
-        variables.put(name, value);
       }
       position++;
     }
   }
 
   private SolrWriter getSolrWriter(final UpdateRequestProcessor processor,
-                                   final SolrResourceLoader loader, final IndexSchema schema) {
+                                   final SolrResourceLoader loader, final DataImporter.RequestParams requestParams) {
 
-    return new SolrWriter(processor, loader.getConfigDir()) {
+    return new SolrWriter(processor, loader.getConfigDir(), myName) {
 
       @Override
-      public boolean upload(SolrDoc d) {
+      public boolean upload(SolrInputDocument document) {
         try {
-          SolrInputDocument document = ((SolrDocumentWrapper) d).doc;
           if (requestParams.debug) {
             if (debugDocuments == null)
               debugDocuments = new ArrayList<SolrInputDocument>();
             debugDocuments.add(document);
-            if (debugDocuments.size() >= requestParams.rows) {
-              // Abort this operation now
-              importer.getDocBuilder().abort();
-            }
           }
-
           return super.upload(document);
         } catch (RuntimeException e) {
-          LOG.log(Level.SEVERE, "Exception while adding: " + d, e);
+          LOG.error( "Exception while adding: " + document, e);
           return false;
         }
       }
-
-      public void log(int event, String name, Object row) {
-        if (debugLogger == null) {
-          debugLogger = new DebugLogger();
-        }
-        debugLogger.log(event, name, row);
-      }
-
-
-
-      public SolrDoc getSolrDocInstance() {
-        return new SolrDocumentWrapper();
-      }
     };
-  }
-
-  static class SolrDocumentWrapper implements SolrWriter.SolrDoc {
-    SolrInputDocument doc;
-
-    public SolrDocumentWrapper() {
-      doc = new SolrInputDocument();
-    }
-
-    public void setDocumentBoost(float boost) {
-      doc.setDocumentBoost(boost);
-    }
-
-    public Object getField(String field) {
-      return doc.getField(field);
-    }
-
-    public void addField(String name, Object value, float boost) {
-      doc.addField(name, value, boost);
-    }
-
-    public String toString() {
-      return doc.toString();
-    }
   }
 
   @Override
@@ -376,7 +343,7 @@ public class DataImportHandler extends RequestHandlerBase implements
 
   @Override
   public String getSourceId() {
-    return "$Id: DataImportHandler.java 690134 2008-08-29 07:18:52Z shalin $";
+    return "$Id: DataImportHandler.java 788580 2009-06-26 05:20:23Z noble $";
   }
 
   @Override
@@ -386,7 +353,7 @@ public class DataImportHandler extends RequestHandlerBase implements
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/contrib/dataimporthandler/src/main/java/org/apache/solr/handler/dataimport/DataImportHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/contrib/dataimporthandler/src/main/java/org/apache/solr/handler/dataimport/DataImportHandler.java $";
   }
 
   public static final String ENABLE_DEBUG = "enableDebug";

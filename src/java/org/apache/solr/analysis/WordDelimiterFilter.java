@@ -20,6 +20,7 @@ package org.apache.solr.analysis;
 import org.apache.lucene.analysis.TokenFilter;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Token;
+import org.apache.lucene.analysis.CharArraySet;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -58,7 +59,7 @@ import java.util.List;
  *  this filter be used after a tokenizer that does not do this
  *  (such as WhitespaceTokenizer).
  *
- *  @version $Id: WordDelimiterFilter.java 684908 2008-08-11 20:37:36Z gsingers $
+ *  @version $Id: WordDelimiterFilter.java 808005 2009-08-26 13:32:46Z yonik $
  */
 
 final class WordDelimiterFilter extends TokenFilter {
@@ -141,6 +142,25 @@ final class WordDelimiterFilter extends TokenFilter {
   final int preserveOriginal;
 
   /**
+   * If 0, causes numeric changes to be ignored (subwords will only be generated
+   * given SUBWORD_DELIM tokens). (Defaults to 1)
+   */
+  final int splitOnNumerics;
+
+  /**
+   * If 1, causes trailing "'s" to be removed for each subword. (Defaults to 1)
+   * <p/>
+   * "O'Neil's" => "O", "Neil"
+   */
+  final int stemEnglishPossessive;
+  
+  /**
+   * If not null is the set of tokens to protect from being delimited
+   *
+   */
+  final CharArraySet protWords;
+
+  /**
    *
    * @param in Token stream to be filtered.
    * @param charTypeTable
@@ -151,8 +171,11 @@ final class WordDelimiterFilter extends TokenFilter {
    * @param catenateAll If 1, causes all subword parts to be catenated: "wi-fi-4000" => "wifi4000"
    * @param splitOnCaseChange 1, causes "PowerShot" to be two tokens; ("Power-Shot" remains two parts regards)
    * @param preserveOriginal If 1, includes original words in subwords: "500-42" => "500" "42" "500-42"
+   * @param splitOnNumerics 1, causes "j2se" to be three tokens; "j" "2" "se"
+   * @param stemEnglishPossessive If 1, causes trailing "'s" to be removed for each subword: "O'Neil's" => "O", "Neil"
+   * @param protWords If not null is the set of tokens to protect from being delimited
    */
-  public WordDelimiterFilter(TokenStream in, byte[] charTypeTable, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll, int splitOnCaseChange, int preserveOriginal) {
+  public WordDelimiterFilter(TokenStream in, byte[] charTypeTable, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll, int splitOnCaseChange, int preserveOriginal,int splitOnNumerics, int stemEnglishPossessive, CharArraySet protWords) {
     super(in);
     this.generateWordParts = generateWordParts;
     this.generateNumberParts = generateNumberParts;
@@ -162,7 +185,35 @@ final class WordDelimiterFilter extends TokenFilter {
     this.splitOnCaseChange = splitOnCaseChange;
     this.preserveOriginal = preserveOriginal;
     this.charTypeTable = charTypeTable;
+    this.splitOnNumerics = splitOnNumerics;
+    this.stemEnglishPossessive = stemEnglishPossessive;
+    this.protWords = protWords;
   }
+  
+  /**
+   * Compatibility constructor
+   * 
+   * @deprecated Use
+   *             {@link #WordDelimiterFilter(TokenStream, byte[], int, int, int, int, int, int, int, int, int, CharArraySet)}
+   *             instead.
+   */
+  @Deprecated
+  public WordDelimiterFilter(TokenStream in, byte[] charTypeTable, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll, int splitOnCaseChange, int preserveOriginal,int splitOnNumerics, CharArraySet protWords) {
+    this(in,charTypeTable,generateWordParts,generateNumberParts,catenateWords,catenateNumbers,catenateAll,splitOnCaseChange,preserveOriginal, 1, 1, null);
+  }
+
+  /**
+   * Compatibility constructor
+   * 
+   * @deprecated Use
+   *             {@link #WordDelimiterFilter(TokenStream, byte[], int, int, int, int, int, int, int, int, int, CharArraySet)}
+   *             instead.
+   */
+  @Deprecated
+  public WordDelimiterFilter(TokenStream in, byte[] charTypeTable, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll, int splitOnCaseChange, int preserveOriginal) {
+    this(in,charTypeTable,generateWordParts,generateNumberParts,catenateWords,catenateNumbers,catenateAll,splitOnCaseChange,preserveOriginal, 1, null);
+  }
+
   /**
    * @param in Token stream to be filtered.
    * @param generateWordParts If 1, causes parts of words to be generated: "PowerShot", "Power-Shot" => "Power" "Shot"
@@ -172,7 +223,31 @@ final class WordDelimiterFilter extends TokenFilter {
    * @param catenateAll If 1, causes all subword parts to be catenated: "wi-fi-4000" => "wifi4000"
    * @param splitOnCaseChange 1, causes "PowerShot" to be two tokens; ("Power-Shot" remains two parts regards)
    * @param preserveOriginal If 1, includes original words in subwords: "500-42" => "500" "42" "500-42"
+   * @param splitOnNumerics 1, causes "j2se" to be three tokens; "j" "2" "se"
+   * @param stemEnglishPossessive If 1, causes trailing "'s" to be removed for each subword: "O'Neil's" => "O", "Neil"
+   * @param protWords If not null is the set of tokens to protect from being delimited
    */
+  public WordDelimiterFilter(TokenStream in, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll, int splitOnCaseChange, int preserveOriginal,int splitOnNumerics, int stemEnglishPossessive, CharArraySet protWords) {
+    this(in, defaultWordDelimTable, generateWordParts, generateNumberParts, catenateWords, catenateNumbers, catenateAll, splitOnCaseChange, preserveOriginal, splitOnNumerics, stemEnglishPossessive, protWords);
+  }
+  
+  /**
+   * @deprecated Use
+   *             {@link #WordDelimiterFilter(TokenStream, int, int, int, int, int, int, int, int, int, CharArraySet)}
+   *             instead.
+   */
+  @Deprecated
+  public WordDelimiterFilter(TokenStream in, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll, int splitOnCaseChange, int preserveOriginal,int splitOnNumerics, CharArraySet protWords) {
+    this(in, defaultWordDelimTable, generateWordParts, generateNumberParts, catenateWords, catenateNumbers, catenateAll, splitOnCaseChange, preserveOriginal, splitOnNumerics, 1, protWords);
+  }
+
+  /**   * Compatibility constructor
+   * 
+   * @deprecated Use
+   *             {@link #WordDelimiterFilter(TokenStream, int, int, int, int, int, int, int, int, int, CharArraySet)}
+   *             instead.
+   */
+  @Deprecated
   public WordDelimiterFilter(TokenStream in, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll, int splitOnCaseChange, int preserveOriginal) {
     this(in, defaultWordDelimTable, generateWordParts, generateNumberParts, catenateWords, catenateNumbers, catenateAll, splitOnCaseChange, preserveOriginal);
   }
@@ -180,34 +255,70 @@ final class WordDelimiterFilter extends TokenFilter {
    * Compatibility constructor
    * 
    * @deprecated Use
-   *             {@link #WordDelimiterFilter(TokenStream, int, int, int, int, int, int, int)}
+   *             {@link #WordDelimiterFilter(TokenStream, int, int, int, int, int, int, int, int, int, CharArraySet)}
    *             instead.
    */
   @Deprecated
   public WordDelimiterFilter(TokenStream in, byte[] charTypeTable, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll) {
-    this(in, charTypeTable, generateWordParts, generateNumberParts, catenateWords, catenateNumbers, catenateAll, 1, 0);
+    this(in, charTypeTable, generateWordParts, generateNumberParts, catenateWords, catenateNumbers, catenateAll, 1, 0, 1, null);
   }
   /**
    * Compatibility constructor
    * 
    * @deprecated Use
-   *             {@link #WordDelimiterFilter(TokenStream, int, int, int, int, int, int, int)}
+   *             {@link #WordDelimiterFilter(TokenStream, int, int, int, int, int, int, int, int, int, CharArraySet)}
    *             instead.
    */
   @Deprecated
   public WordDelimiterFilter(TokenStream in, int generateWordParts, int generateNumberParts, int catenateWords, int catenateNumbers, int catenateAll) {
-    this(in, defaultWordDelimTable, generateWordParts, generateNumberParts, catenateWords, catenateNumbers, catenateAll, 1, 0);
+    this(in, defaultWordDelimTable, generateWordParts, generateNumberParts, catenateWords, catenateNumbers, catenateAll, 1, 0, 1, null);
   }
+
 
   int charType(int ch) {
     if (ch<charTypeTable.length) {
       return charTypeTable[ch];
-    } else if (Character.isLowerCase(ch)) {
-      return LOWER;
-    } else if (Character.isLetter(ch)) {
-      return UPPER;
-    } else {
-      return SUBWORD_DELIM;
+    }
+    switch (Character.getType(ch)) {
+      case Character.UPPERCASE_LETTER: return UPPER;
+      case Character.LOWERCASE_LETTER: return LOWER;
+
+      case Character.TITLECASE_LETTER:
+      case Character.MODIFIER_LETTER:
+      case Character.OTHER_LETTER:
+      case Character.NON_SPACING_MARK:
+      case Character.ENCLOSING_MARK:  // depends what it encloses?
+      case Character.COMBINING_SPACING_MARK:
+        return ALPHA; 
+
+      case Character.DECIMAL_DIGIT_NUMBER:
+      case Character.LETTER_NUMBER:
+      case Character.OTHER_NUMBER:
+        return DIGIT;
+
+      // case Character.SPACE_SEPARATOR:
+      // case Character.LINE_SEPARATOR:
+      // case Character.PARAGRAPH_SEPARATOR:
+      // case Character.CONTROL:
+      // case Character.FORMAT:
+      // case Character.PRIVATE_USE:
+
+      case Character.SURROGATE:  // prevent splitting
+        return ALPHA|DIGIT;  
+
+      // case Character.DASH_PUNCTUATION:
+      // case Character.START_PUNCTUATION:
+      // case Character.END_PUNCTUATION:
+      // case Character.CONNECTOR_PUNCTUATION:
+      // case Character.OTHER_PUNCTUATION:
+      // case Character.MATH_SYMBOL:
+      // case Character.CURRENCY_SYMBOL:
+      // case Character.MODIFIER_SYMBOL:
+      // case Character.OTHER_SYMBOL:
+      // case Character.INITIAL_QUOTE_PUNCTUATION:
+      // case Character.FINAL_QUOTE_PUNCTUATION:
+
+      default: return SUBWORD_DELIM;
     }
   }
 
@@ -236,11 +347,7 @@ final class WordDelimiterFilter extends TokenFilter {
       startOff += start;     
     }
 
-    Token newTok = new Token(startOff,
-            endOff,
-            orig.type());
-    newTok.setTermBuffer(orig.termBuffer(), start, (end - start));
-    return newTok;
+    return (Token)orig.clone(orig.termBuffer(), start, (end - start), startOff, endOff);
   }
 
 
@@ -277,7 +384,14 @@ final class WordDelimiterFilter extends TokenFilter {
       int start=0;
       if (len ==0) continue;
 
-      origPosIncrement += t.getPositionIncrement();
+      int posInc = t.getPositionIncrement();
+      origPosIncrement += posInc;
+
+      //skip protected tokens
+      if (protWords != null && protWords.contains(termBuffer, 0, len)) {
+        t.setPositionIncrement(origPosIncrement);
+        return t;
+      }
 
       // Avoid calling charType more than once for each char (basically
       // avoid any backtracking).
@@ -304,11 +418,11 @@ final class WordDelimiterFilter extends TokenFilter {
 
         while (pos< len) {
 
-          if (type!=lastType) {
+          if ((type & lastType)==0) {  // no overlap in character type
             // check and remove "'s" from the end of a token.
             // the pattern to check for is
             //   ALPHA "'" ("s"|"S") (SUBWORD_DELIM | END)
-            if ((lastType & ALPHA)!=0) {
+            if (stemEnglishPossessive != 0 && ((lastType & ALPHA)!=0)) {
               if (ch=='\'' && pos+1< len
                       && (termBuffer[pos+1]=='s' || termBuffer[pos+1]=='S'))
               {
@@ -345,9 +459,11 @@ final class WordDelimiterFilter extends TokenFilter {
             if (splitOnCaseChange == 0 && 
                 (lastType & ALPHA) != 0 && (type & ALPHA) != 0) {
               // ALPHA->ALPHA: always ignore if case isn't considered.
-
-            } else if ((lastType & UPPER)!=0 && (type & LOWER)!=0) {
-              // UPPER->LOWER: Don't split
+            } else if ((lastType & UPPER)!=0 && (type & ALPHA)!=0) {
+              // UPPER->letter: Don't split
+            } else if(splitOnNumerics == 0 &&
+                ( ((lastType &  ALPHA) != 0 && (type & DIGIT) != 0) || ((lastType &  DIGIT) != 0 && (type & ALPHA) != 0) ) ) {
+              // ALPHA->NUMERIC, NUMERIC->ALPHA :Don't split
             } else {
               // NOTE: this code currently assumes that only one flag
               // is set for each character now, so we don't have
@@ -368,6 +484,7 @@ final class WordDelimiterFilter extends TokenFilter {
             if (start==0) {
               // the subword is the whole original token, so
               // return it unchanged.
+              t.setPositionIncrement(origPosIncrement);
               return t;
             }
 
@@ -377,6 +494,8 @@ final class WordDelimiterFilter extends TokenFilter {
               // just adjust the text w/o changing the rest
               // of the original token
               t.setTermBuffer(termBuffer, start, len-start);
+              t.setStartOffset(t.startOffset() + start);
+              t.setPositionIncrement(origPosIncrement);              
               return t;
             }
 
@@ -409,6 +528,9 @@ final class WordDelimiterFilter extends TokenFilter {
         if (preserveOriginal != 0) {
           return t;
         }
+
+        // if this token had a "normal" gap of 1, remove it.
+        if (posInc==1) origPosIncrement-=1;
         continue;
       }
 
@@ -542,6 +664,12 @@ final class WordDelimiterFilter extends TokenFilter {
     }
   }
 
+  @Override
+  public void reset() throws IOException {
+    input.reset();
+    queuePos=0;
+    queue.clear();    
+  }
 
   // questions:
   // negative numbers?  -42 indexed as just 42?

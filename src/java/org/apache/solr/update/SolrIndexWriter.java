@@ -17,40 +17,50 @@
 
 package org.apache.solr.update;
 
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.MergePolicy;
-import org.apache.lucene.index.MergeScheduler;
-import org.apache.lucene.index.LogMergePolicy;
+import org.apache.lucene.index.*;
 import org.apache.lucene.store.*;
 import org.apache.solr.common.SolrException;
+import org.apache.solr.common.util.NamedList;
+import org.apache.solr.core.DirectoryFactory;
+import org.apache.solr.core.StandardDirectoryFactory;
 import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.util.SolrPluginUtils;
 
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.text.DateFormat;
+import java.util.Date;
 
 /**
  * An IndexWriter that is configured via Solr config mechanisms.
  *
-* @version $Id: SolrIndexWriter.java 684339 2008-08-09 20:34:35Z yonik $
+* @version $Id: SolrIndexWriter.java 823281 2009-10-08 19:05:06Z yonik $
 * @since solr 0.9
 */
 
 
 public class SolrIndexWriter extends IndexWriter {
-  private static Logger log = Logger.getLogger(SolrIndexWriter.class.getName());
+  private static Logger log = LoggerFactory.getLogger(SolrIndexWriter.class);
 
   String name;
   IndexSchema schema;
 
+  private PrintStream infoStream;
+
   private void init(String name, IndexSchema schema, SolrIndexConfig config) throws IOException {
-    log.fine("Opened Writer " + name);
+    log.debug("Opened Writer " + name);
     this.name = name;
     this.schema = schema;
     setSimilarity(schema.getSimilarity());
     // setUseCompoundFile(false);
 
     if (config != null) {
-      setUseCompoundFile(config.useCompoundFile);
       //only set maxBufferedDocs
       if (config.maxBufferedDocs != -1) {
         setMaxBufferedDocs(config.maxBufferedDocs);
@@ -58,32 +68,56 @@ public class SolrIndexWriter extends IndexWriter {
       if (config.ramBufferSizeMB != -1) {
         setRAMBufferSizeMB(config.ramBufferSizeMB);
       }
+      if (config.termIndexInterval != -1) {
+        setTermIndexInterval(config.termIndexInterval);
+        
+      }
       if (config.maxMergeDocs != -1) setMaxMergeDocs(config.maxMergeDocs);
       if (config.maxFieldLength != -1) setMaxFieldLength(config.maxFieldLength);
-      if (config.mergePolicyClassName != null && SolrIndexConfig.DEFAULT_MERGE_POLICY_CLASSNAME.equals(config.mergePolicyClassName) == false) {
-        MergePolicy policy = (MergePolicy) schema.getSolrConfig().getResourceLoader().newInstance(config.mergePolicyClassName);
-        setMergePolicy(policy);///hmm, is this really the best way to get a newInstance?
+      String className = config.mergePolicyInfo == null ? SolrIndexConfig.DEFAULT_MERGE_POLICY_CLASSNAME: config.mergePolicyInfo.className;
+      MergePolicy  policy = null;
+      try {
+        policy = (MergePolicy) schema.getResourceLoader().newInstance(className, null, new Class[]{IndexWriter.class}, new Object[] { this });
+      } catch (Exception e) {
+        policy = (MergePolicy) schema.getResourceLoader().newInstance(className);
       }
-      if (config.mergeFactor != -1 && getMergePolicy() instanceof LogMergePolicy) {
-        setMergeFactor(config.mergeFactor);
-      }
-      if (config.mergeSchedulerClassname != null && SolrIndexConfig.DEFAULT_MERGE_SCHEDULER_CLASSNAME.equals(config.mergeSchedulerClassname) == false) {
-        MergeScheduler scheduler = (MergeScheduler) schema.getSolrConfig().getResourceLoader().newInstance(config.mergeSchedulerClassname);
-        setMergeScheduler(scheduler);
+      if(config.mergePolicyInfo != null) SolrPluginUtils.invokeSetters(policy,config.mergePolicyInfo.initArgs);
+      setMergePolicy(policy);
+
+      if (getMergePolicy() instanceof LogMergePolicy) {
+        setUseCompoundFile(config.useCompoundFile);
+      } else  {
+        log.warn("Use of compound file format cannot be configured if merge policy is not an instance " +
+                "of LogMergePolicy. The configured policy's defaults will be used.");
       }
 
+      className = config.mergeSchedulerInfo == null ? SolrIndexConfig.DEFAULT_MERGE_SCHEDULER_CLASSNAME: config.mergeSchedulerInfo.className;
+      MergeScheduler scheduler = (MergeScheduler) schema.getResourceLoader().newInstance(className);
+      if(config.mergeSchedulerInfo != null) SolrPluginUtils.invokeSetters(scheduler,config.mergeSchedulerInfo.initArgs);
+      setMergeScheduler(scheduler);
+
+      String infoStreamFile = config.infoStreamFile;
+      if (infoStreamFile != null) {
+        File f = new File(infoStreamFile);
+        File parent = f.getParentFile();
+        if (parent != null) parent.mkdirs();
+        FileOutputStream fos = new FileOutputStream(f, true);
+        infoStream = new TimeLoggingPrintStream(fos, true);
+        setInfoStream(infoStream);
+      }
       //if (config.commitLockTimeout != -1) setWriteLockTimeout(config.commitLockTimeout);
     }
 
   }
 
-  public static Directory getDirectory(String path, SolrIndexConfig config) throws IOException {
-    Directory d = FSDirectory.getDirectory(path);
+  public static Directory getDirectory(String path, DirectoryFactory directoryFactory, SolrIndexConfig config) throws IOException {
+    
+    Directory d = directoryFactory.open(path);
 
     String rawLockType = (null == config) ? null : config.lockType;
     if (null == rawLockType) {
-      // we default to "simple" for backwards compatiblitiy
-      log.warning("No lockType configured for " + path + " assuming 'simple'");
+      // we default to "simple" for backwards compatibility
+      log.warn("No lockType configured for " + path + " assuming 'simple'");
       rawLockType = "simple";
     }
     final String lockType = rawLockType.toLowerCase().trim();
@@ -97,8 +131,8 @@ public class SolrIndexWriter extends IndexWriter {
       if (!(d.getLockFactory() instanceof SingleInstanceLockFactory))
         d.setLockFactory(new SingleInstanceLockFactory());
     } else if ("none".equals(lockType)) {
-      // recipie for disaster
-      log.severe("CONFIGURATION WARNING: locks are disabled on " + path);      
+      // Recipe for disaster
+      log.error("CONFIGURATION WARNING: locks are disabled on " + path);      
       d.setLockFactory(new NoLockFactory());
     } else {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,
@@ -106,16 +140,57 @@ public class SolrIndexWriter extends IndexWriter {
     }
     return d;
   }
+  
+  /** @deprecated remove when getDirectory(String,SolrIndexConfig) is gone */
+  private static DirectoryFactory LEGACY_DIR_FACTORY 
+    = new StandardDirectoryFactory();
+  static {
+    LEGACY_DIR_FACTORY.init(new NamedList());
+  }
 
+  /**
+   * @deprecated use getDirectory(String path, DirectoryFactory directoryFactory, SolrIndexConfig config)
+   */
+  public static Directory getDirectory(String path, SolrIndexConfig config) throws IOException {
+    log.warn("SolrIndexWriter is using LEGACY_DIR_FACTORY which means deprecated code is likely in use and SolrIndexWriter is ignoring any custom DirectoryFactory.");
+    return getDirectory(path, LEGACY_DIR_FACTORY, config);
+  }
+  
+  /**
+   *
+   */
+  public SolrIndexWriter(String name, String path, DirectoryFactory dirFactory, boolean create, IndexSchema schema) throws IOException {
+    super(getDirectory(path, dirFactory, null), false, schema.getAnalyzer(), create);
+    init(name, schema, null);
+  }
+
+  @Deprecated
+  public SolrIndexWriter(String name, String path, DirectoryFactory dirFactory, boolean create, IndexSchema schema, SolrIndexConfig config) throws IOException {
+    super(getDirectory(path, dirFactory, null), config.luceneAutoCommit, schema.getAnalyzer(), create);
+    init(name, schema, config);
+  }
+  
+  /**
+   * @deprecated
+   */
   public SolrIndexWriter(String name, String path, boolean create, IndexSchema schema) throws IOException {
     super(getDirectory(path, null), false, schema.getAnalyzer(), create);
     init(name, schema, null);
   }
 
+  /**
+   * @deprecated
+   */
   public SolrIndexWriter(String name, String path, boolean create, IndexSchema schema, SolrIndexConfig config) throws IOException {
     super(getDirectory(path, config), config.luceneAutoCommit, schema.getAnalyzer(), create);
     init(name, schema, config);
   }
+
+  public SolrIndexWriter(String name, String path, DirectoryFactory dirFactory, boolean create, IndexSchema schema, SolrIndexConfig config, IndexDeletionPolicy delPolicy) throws IOException {
+    super(getDirectory(path, dirFactory, config), schema.getAnalyzer(), create, delPolicy, new MaxFieldLength(IndexWriter.DEFAULT_MAX_FIELD_LENGTH));
+    init(name, schema, config);
+  }
+
 
   /**
    * use DocumentBuilder now...
@@ -147,17 +222,47 @@ public class SolrIndexWriter extends IndexWriter {
    * }
    * ****
    */
-
+  private boolean isClosed = false;
   public void close() throws IOException {
-    log.fine("Closing Writer " + name);
-    super.close();
+    log.debug("Closing Writer " + name);
+    try {
+      super.close();
+      if(infoStream != null) {
+        infoStream.close();
+      }
+    } finally {
+      isClosed = true;
+    }
   }
 
   @Override
-  protected void finalize() {
+  protected void finalize() throws Throwable {
     try {
-      super.close();
-    } catch (IOException e) {
+      if(!isClosed){
+        log.error("SolrIndexWriter was not closed prior to finalize(), indicates a bug -- POSSIBLE RESOURCE LEAK!!!");
+        close();
+      }
+    } finally { 
+      super.finalize();
+    }
+    
+  }
+  
+  // Helper class for adding timestamps to infoStream logging
+  class TimeLoggingPrintStream extends PrintStream {
+    private DateFormat dateFormat;
+    public TimeLoggingPrintStream(OutputStream underlyingOutputStream,
+        boolean autoFlush) {
+      super(underlyingOutputStream, autoFlush);
+      this.dateFormat = DateFormat.getDateTimeInstance();
+    }
+
+    // We might ideally want to override print(String) as well, but
+    // looking through the code that writes to infoStream, it appears
+    // that all the classes except CheckIndex just use println.
+    public void println(String x) {
+      print(dateFormat.format(new Date()) + " ");
+      super.println(x);
     }
   }
 

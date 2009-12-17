@@ -26,7 +26,7 @@ import java.util.*;
  * Test for SqlEntityProcessor
  * </p>
  *
- * @version $Id: TestSqlEntityProcessor.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TestSqlEntityProcessor.java 766608 2009-04-20 07:36:55Z shalin $
  * @since solr 1.3
  */
 public class TestSqlEntityProcessor {
@@ -55,7 +55,7 @@ public class TestSqlEntityProcessor {
 
   @Test
   public void tranformer() {
-    SqlEntityProcessor sep = new SqlEntityProcessor();
+    EntityProcessor sep = new EntityProcessorWrapper( new SqlEntityProcessor(), null);
     List<Map<String, Object>> rows = getRows(2);
     VariableResolverImpl vr = new VariableResolverImpl();
     HashMap<String, String> ea = new HashMap<String, String>();
@@ -79,7 +79,7 @@ public class TestSqlEntityProcessor {
 
   @Test
   public void tranformerWithReflection() {
-    SqlEntityProcessor sep = new SqlEntityProcessor();
+    EntityProcessor sep = new EntityProcessorWrapper(new SqlEntityProcessor(), null);
     List<Map<String, Object>> rows = getRows(2);
     VariableResolverImpl vr = new VariableResolverImpl();
     HashMap<String, String> ea = new HashMap<String, String>();
@@ -103,7 +103,7 @@ public class TestSqlEntityProcessor {
 
   @Test
   public void tranformerList() {
-    SqlEntityProcessor sep = new SqlEntityProcessor();
+    EntityProcessor sep = new EntityProcessorWrapper(new SqlEntityProcessor(),null);
     List<Map<String, Object>> rows = getRows(2);
     VariableResolverImpl vr = new VariableResolverImpl();
 

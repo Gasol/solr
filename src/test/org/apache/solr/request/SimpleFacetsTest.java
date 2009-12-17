@@ -30,12 +30,14 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                  "name", "Zapp Brannigan"));
     assertU(adoc("id", "43" ,
                  "title", "Democratic Order of Planets"));
+    assertU(commit());
     assertU(adoc("id", "44", "trait_s", "Tool",
                  "name", "The Zapper"));
     assertU(adoc("id", "45", "trait_s", "Chauvinist",
                  "title", "25 star General"));
     assertU(adoc("id", "46", "trait_s", "Obnoxious",
                  "subject", "Defeated the pacifists of the Gandhi nebula"));
+    assertU(commit());
     assertU(adoc("id", "47", "trait_s", "Pig",
                  "text", "line up and fly directly at the enemy death cannons, clogging them with wreckage!"));
     assertU(commit());
@@ -86,7 +88,31 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
             ,"//lst[@name='trait_s']/int[@name='Obnoxious'][.='2']"
             ,"//lst[@name='trait_s']/int[@name='Pig'][.='1']"
             );
- 
+
+    assertQ("check multi-select facets with naming",
+            req("q", "id:[42 TO 47]"
+                ,"facet", "true"
+                ,"facet.query", "{!ex=1}trait_s:Obnoxious"
+                ,"facet.query", "{!ex=2 key=foo}id:[42 TO 45]"    // tag=2 same as 1
+                ,"facet.query", "{!ex=3,4 key=bar}id:[43 TO 47]"  // tag=3,4 don't exist
+                ,"facet.field", "{!ex=3,1}trait_s"                // 3,1 same as 1
+                ,"fq", "{!tag=1,2}id:47"                          // tagged as 1 and 2
+                )
+            ,"*[count(//doc)=1]"
+
+            ,"//lst[@name='facet_counts']/lst[@name='facet_queries']"
+            ,"//lst[@name='facet_queries']/int[@name='{!ex=1}trait_s:Obnoxious'][.='2']"
+            ,"//lst[@name='facet_queries']/int[@name='foo'][.='4']"
+            ,"//lst[@name='facet_queries']/int[@name='bar'][.='1']"
+
+            ,"//lst[@name='facet_counts']/lst[@name='facet_fields']"
+            ,"//lst[@name='facet_fields']/lst[@name='trait_s']"
+            ,"*[count(//lst[@name='trait_s']/int)=4]"
+            ,"//lst[@name='trait_s']/int[@name='Tool'][.='2']"
+            ,"//lst[@name='trait_s']/int[@name='Obnoxious'][.='2']"
+            ,"//lst[@name='trait_s']/int[@name='Pig'][.='1']"
+            );
+
     assertQ("check counts for applied facet queries using filtering (fq)",
             req("q", "id:[42 TO 47]"
                 ,"facet", "true"
@@ -192,6 +218,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
     assertU(adoc("id", "1",  f, "1976-07-04T12:08:56.235Z"));
     assertU(adoc("id", "2",  f, "1976-07-05T00:00:00.000Z"));
     assertU(adoc("id", "3",  f, "1976-07-15T00:07:67.890Z"));
+    assertU(commit());
     assertU(adoc("id", "4",  f, "1976-07-21T00:07:67.890Z"));
     assertU(adoc("id", "5",  f, "1976-07-13T12:12:25.255Z"));
     assertU(adoc("id", "6",  f, "1976-07-03T17:01:23.456Z"));
@@ -199,6 +226,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
     assertU(adoc("id", "8",  f, "1976-07-15T15:15:15.155Z"));
     assertU(adoc("id", "9",  f, "1907-07-12T13:13:23.235Z"));
     assertU(adoc("id", "10", f, "1976-07-03T11:02:45.678Z"));
+    assertU(commit());
     assertU(adoc("id", "11", f, "1907-07-12T12:12:25.255Z"));
     assertU(adoc("id", "12", f, "2007-07-30T07:07:07.070Z"));
     assertU(adoc("id", "13", f, "1976-07-30T22:22:22.222Z"));
@@ -303,9 +331,10 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
   }
 
   public void testFacetMultiValued() {
-    doFacets("t_s");
-    doFacets("t_s", "facet.enum.cache.minDf", "2");
-    doFacets("t_s", "facet.enum.cache.minDf", "100");
+    doFacetPrefix("t_s", "facet.method","enum");
+    doFacetPrefix("t_s", "facet.method", "enum", "facet.enum.cache.minDf", "2");
+    doFacetPrefix("t_s", "facet.method", "enum", "facet.enum.cache.minDf", "100");
+    doFacetPrefix("t_s", "facet.method", "fc");
   }
 
   public void testFacetSingleValued() {
@@ -318,6 +347,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
 
     assertU(adoc("id", "1",  f, "A"));
     assertU(adoc("id", "2",  f, "B"));
+    assertU(commit());
     assertU(adoc("id", "3",  f, "C"));
     assertU(adoc("id", "4",  f, "C"));
     assertU(adoc("id", "5",  f, "D"));
@@ -325,6 +355,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
     assertU(adoc("id", "7",  f, "E"));
     assertU(adoc("id", "8",  f, "E"));
     assertU(adoc("id", "9",  f, "F"));
+    assertU(commit());
     assertU(adoc("id", "10", f, "G"));
     assertU(adoc("id", "11", f, "G"));
     assertU(adoc("id", "12", f, "G"));
@@ -417,7 +448,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                 ,"facet.mincount","1"
                 ,"facet.offset","3"
                 ,"facet.limit","2"
-                ,"facet.sort","true"
+                ,"facet.sort","count"
                 )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=2]"
             ,pre+"/int[1][@name='B'][.='1']"
@@ -432,7 +463,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                 ,"facet.mincount","1"
                 ,"facet.offset","0"
                 ,"facet.limit","6"
-                ,"facet.sort","false"
+                ,"facet.sort","index"
                 )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=6]"
             ,pre+"/int[1][@name='A'][.='1']"
@@ -451,7 +482,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                 ,"facet.mincount","1"
                 ,"facet.offset","3"
                 ,"facet.limit","2"
-                ,"facet.sort","false"
+                ,"facet.sort","index"
                 )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=2]"
             ,pre+"/int[1][@name='E'][.='3']"
@@ -466,7 +497,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                 ,"facet.mincount","2"
                 ,"facet.offset","1"
                 ,"facet.limit","2"
-                ,"facet.sort","false"
+                ,"facet.sort","index"
                 )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=1]"
             ,pre+"/int[1][@name='G'][.='5']"
@@ -476,9 +507,10 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
 
 
   public void testFacetPrefixMultiValued() {
-    doFacetPrefix("t_s");   
-    doFacetPrefix("t_s", "facet.enum.cache.minDf", "3");
-    doFacetPrefix("t_s", "facet.enum.cache.minDf", "100");
+    doFacetPrefix("t_s", "facet.method","enum");
+    doFacetPrefix("t_s", "facet.method", "enum", "facet.enum.cache.minDf", "3");
+    doFacetPrefix("t_s", "facet.method", "enum", "facet.enum.cache.minDf", "100");
+    doFacetPrefix("t_s", "facet.method", "fc");
   }
 
   public void testFacetPrefixSingleValued() {
@@ -494,13 +526,17 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
     assertU(adoc("id", "2",  f, "B"));
     assertU(adoc("id", "3",  f, "BB"));
     assertU(adoc("id", "4",  f, "BB"));
+    assertU(commit());
     assertU(adoc("id", "5",  f, "BBB"));
     assertU(adoc("id", "6",  f, "BBB"));
+    assertU(commit());
     assertU(adoc("id", "7",  f, "BBB"));
     assertU(adoc("id", "8",  f, "CC"));
     assertU(adoc("id", "9",  f, "CC"));
+    assertU(commit());
     assertU(adoc("id", "10", f, "CCC"));
     assertU(adoc("id", "11", f, "CCC"));
+    assertU(commit());    
     assertU(adoc("id", "12", f, "CCC"));
     assertU(commit());
 
@@ -512,7 +548,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","B"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=3]"
@@ -529,7 +565,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","false"
+                    ,"facet.sort","index"
                     ,"facet.prefix","B"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=3]"
@@ -547,7 +583,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","false"
+                    ,"facet.sort","index"
                     ,"facet.prefix","B"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=3]"
@@ -565,7 +601,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","1"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","B"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=2]"
@@ -581,7 +617,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","1"
                     ,"facet.limit","1"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","B"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=1]"
@@ -596,7 +632,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","1"
                     ,"facet.limit","1"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","B"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=1]"
@@ -611,7 +647,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","C"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=2]"
@@ -627,7 +663,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","CC"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=2]"
@@ -643,7 +679,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","X"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=0]"
@@ -657,7 +693,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","1"
                     ,"facet.limit","-1"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","X"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=0]"
@@ -671,7 +707,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","AAA"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=1]"
@@ -685,7 +721,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","AA"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=1]"
@@ -699,7 +735,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","AA"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=1]"
@@ -713,7 +749,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","0"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","999"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=0]"
@@ -727,7 +763,7 @@ public class SimpleFacetsTest extends AbstractSolrTestCase {
                     ,"facet.mincount","0"
                     ,"facet.offset","2"
                     ,"facet.limit","100"
-                    ,"facet.sort","true"
+                    ,"facet.sort","count"
                     ,"facet.prefix","999"
             )
             ,"*[count(//lst[@name='facet_fields']/lst/int)=0]"

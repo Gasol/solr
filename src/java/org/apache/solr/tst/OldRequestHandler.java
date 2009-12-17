@@ -21,7 +21,6 @@ import org.apache.lucene.search.*;
 import org.apache.lucene.document.Document;
 
 import java.util.List;
-import java.util.logging.Level;
 import java.io.IOException;
 import java.net.URL;
 
@@ -35,7 +34,7 @@ import org.apache.solr.request.SolrQueryResponse;
 import org.apache.solr.request.SolrQueryRequest;
 
 /**
- * @version $Id: OldRequestHandler.java 684908 2008-08-11 20:37:36Z gsingers $
+ * @version $Id: OldRequestHandler.java 696539 2008-09-18 02:16:26Z ryan $
  * 
  * @deprecated Test against the real request handlers instead.
  */
@@ -45,7 +44,7 @@ public class OldRequestHandler implements SolrRequestHandler {
   long numErrors;
   
   public void init(NamedList args) {
-    SolrCore.log.log(Level.INFO, "Unused request handler arguments:" + args);
+    SolrCore.log.info( "Unused request handler arguments:" + args);
   }
 
 
@@ -118,11 +117,11 @@ public class OldRequestHandler implements SolrRequestHandler {
   }
 
   public String getSourceId() {
-    return "$Id: OldRequestHandler.java 684908 2008-08-11 20:37:36Z gsingers $";
+    return "$Id: OldRequestHandler.java 696539 2008-09-18 02:16:26Z ryan $";
   }
 
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/tst/OldRequestHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/tst/OldRequestHandler.java $";
   }
 
   public URL[] getDocs() {

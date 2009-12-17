@@ -30,7 +30,7 @@ import org.apache.lucene.analysis.Token;
 
 
 /**
- * @version $Id: TestPhoneticFilter.java 643465 2008-04-01 16:10:19Z gsingers $
+ * @version $Id: TestPhoneticFilter.java 804270 2009-08-14 15:52:24Z yonik $
  */
 public class TestPhoneticFilter extends BaseTokenTestCase {
   
@@ -71,18 +71,27 @@ public class TestPhoneticFilter extends BaseTokenTestCase {
     ArrayList<Token> output = new ArrayList<Token>();
     for( String s : input ) {
       stream.add( new Token( s, 0, s.length() ) );
+
+      // phonetic token is added first in the current impl
+      output.add( new Token( enc.encode(s).toString(), 0, s.length() ) );
+
+      // add the original if applicable
       if( inject ) {
         output.add( new Token( s, 0, s.length() ) );
       }
-      output.add( new Token( enc.encode(s).toString(), 0, s.length() ) );
     }
-    
+
+    // System.out.println("###stream="+stream);
+    // System.out.println("###output="+output);
+
     PhoneticFilter filter = new PhoneticFilter( 
         new IterTokenStream(stream.iterator()), enc, "text", inject );
-    
+
+    Token got = new Token();
     for( Token t : output ) {
-      Token got = filter.next(t);
-      assertEquals( new String(t.termBuffer(), 0, t.termLength()), new String(got.termBuffer(), 0, got.termLength()));
+      got = filter.next(got);
+      // System.out.println("##### expect=" + t + " got="+got);
+      assertEquals( t.term(), got.term());
     }
     assertNull( filter.next() );  // no more tokens
   }

@@ -20,6 +20,20 @@
 <!-- $Id: solrconfig.xml 382610 2006-03-03 01:43:03Z yonik $
      $Source$
      $Name$
+
+
+
+     This is a "kitchen sink" config file that tests can use.
+     When writting a new test, feel free to add *new* items (plugins,
+     config options, etc...) as long as they don't break any existing
+     tests.  if you need to test something esoteric please add a new
+     "solrconfig-your-esoteric-purpose.xml" config file.
+
+     Note in particular that this test is used by MinimalSchemaTest so 
+     Anything added to this file needs to work correctly even if there
+     is now uniqueKey or defaultSearch Field.
+
+
   -->
 
 <config>
@@ -70,14 +84,14 @@
 
      Other implementations of MergePolicy must have a no-argument constructor
      -->
-    <mergePolicy>org.apache.lucene.index.LogByteSizeMergePolicy</mergePolicy>
+    <mergePolicy class="org.apache.lucene.index.LogByteSizeMergePolicy"/>
 
     <!--
      Expert:
      The Merge Scheduler in Lucene controls how merges are performed.  The ConcurrentMergeScheduler (Lucene 2.3 default)
       can perform merges in the background using separate threads.  The SerialMergeScheduler (Lucene 2.2 default) does not.
      -->
-    <mergeScheduler>org.apache.lucene.index.ConcurrentMergeScheduler</mergeScheduler>
+    <mergeScheduler class="org.apache.lucene.index.ConcurrentMergeScheduler"/>
     <!-- these are global... can't currently override per index -->
     <writeLockTimeout>1000</writeLockTimeout>
     <commitLockTimeout>10000</commitLockTimeout>
@@ -89,9 +103,13 @@
     <!-- lucene options specific to the main on-disk lucene index -->
     <useCompoundFile>false</useCompoundFile>
     <mergeFactor>10</mergeFactor>
-    <ramBufferSizeMB>32</ramBufferSizeMB>
+    <!-- for better multi-segment testing, we are using slower
+    indexing properties of maxBufferedDocs=10 and LogDocMergePolicy.
+    -->
+    <maxBufferedDocs>10</maxBufferedDocs>
     <maxMergeDocs>2147483647</maxMergeDocs>
     <maxFieldLength>10000</maxFieldLength>
+    <mergePolicy class="org.apache.lucene.index.LogDocMergePolicy"/>
 
     <unlockOnStartup>true</unlockOnStartup>
   </mainIndex>
@@ -143,7 +161,7 @@
          that match a particular query.
       -->
     <filterCache
-      class="solr.search.LRUCache"
+      class="solr.search.FastLRUCache"
       size="512"
       initialSize="512"
       autowarmCount="256"/>
@@ -176,7 +194,9 @@
     -->
 
 
+    <!--
     <useFilterForSortedQuery>true</useFilterForSortedQuery>
+    -->
 
     <queryResultWindowSize>10</queryResultWindowSize>
 
@@ -238,6 +258,7 @@
           it's init params as "defaults" if there is no "defaults" list
           specified
      -->
+     <str name="q.alt">*:*</str>
      <float name="tie">0.01</float>
      <str name="qf">
         text^0.5 features_t^1.0 subject^1.4 title_stemmed^2.0
@@ -283,6 +304,8 @@
     <lst name="lst2"> <str name="op">log</str> <float name="val">10</float> </lst>
   </requestHandler>
 
+  <requestHandler name="/admin/" class="org.apache.solr.handler.admin.AdminHandlers" />
+
   <requestHandler name="test" class="solr.tst.TestRequestHandler" />
 
   <!-- test query parameter defaults -->
@@ -306,21 +329,6 @@
   <requestHandler name="/update"     class="solr.XmlUpdateRequestHandler"          />
   <requestHandler name="/update/csv" class="solr.CSVRequestHandler" startup="lazy">
   	<bool name="httpCaching">false</bool>
-  </requestHandler>
-
-  <!-- test elevation -->
-  <searchComponent name="elevate" class="org.apache.solr.handler.component.QueryElevationComponent" >
-    <str name="queryFieldType">string</str>
-    <str name="config-file">elevate.xml</str>
-  </searchComponent>
-
-  <requestHandler name="/elevate" class="org.apache.solr.handler.component.SearchHandler">
-    <lst name="defaults">
-      <str name="echoParams">explicit</str>
-    </lst>
-    <arr name="last-components">
-      <str>elevate</str>
-    </arr>
   </requestHandler>
 
   <searchComponent name="spellcheck" class="org.apache.solr.handler.component.SpellCheckComponent">
@@ -349,6 +357,14 @@
       <str name="spellcheckIndexDir">spellchecker3</str>
     </lst>
   </searchComponent>
+
+  <searchComponent name="termsComp" class="org.apache.solr.handler.component.TermsComponent"/>
+
+  <requestHandler name="/terms" class="org.apache.solr.handler.component.SearchHandler">
+    <arr name="components">
+      <str>termsComp</str>
+    </arr>
+  </requestHandler>
   <!--
   The SpellingQueryConverter to convert raw (CommonParams.Q) queries into tokens.  Uses a simple regular expression
    to strip off field markup, boosts, ranges, etc. but it is not guaranteed to match an exact parse from the query parser.
@@ -366,6 +382,18 @@
     </lst>
     <arr name="last-components">
       <str>spellcheck</str>
+    </arr>
+  </requestHandler>
+
+  
+  <searchComponent name="tvComponent" class="org.apache.solr.handler.component.TermVectorComponent"/>
+
+  <requestHandler name="tvrh" class="org.apache.solr.handler.component.SearchHandler">
+    <lst name="defaults">
+
+    </lst>
+    <arr name="last-components">
+      <str>tvComponent</str>
     </arr>
   </requestHandler>
 
@@ -412,6 +440,14 @@
 
   <queryParser name="foo" class="FooQParserPlugin"/>
 
-
+  <updateRequestProcessorChain name="dedupe">
+    <processor class="org.apache.solr.update.processor.SignatureUpdateProcessorFactory">
+      <bool name="enabled">false</bool>
+      <bool name="overwriteDupes">true</bool>
+      <str name="fields">v_t,t_field</str>
+      <str name="signatureClass">org.apache.solr.update.processor.TextProfileSignature</str>
+    </processor>
+    <processor class="solr.RunUpdateProcessorFactory" />
+  </updateRequestProcessorChain>
 
 </config>

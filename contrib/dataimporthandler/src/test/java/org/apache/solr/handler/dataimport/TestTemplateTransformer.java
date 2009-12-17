@@ -28,7 +28,7 @@ import java.util.Map;
  * Test for TemplateTransformer
  * </p>
  *
- * @version $Id: TestTemplateTransformer.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TestTemplateTransformer.java 765499 2009-04-16 08:01:10Z shalin $
  * @since solr 1.3
  */
 public class TestTemplateTransformer {
@@ -43,18 +43,25 @@ public class TestTemplateTransformer {
     fields.add(AbstractDataImportHandlerTest.createMap("column", "name",
             TemplateTransformer.TEMPLATE,
             "${e.lastName}, ${e.firstName} ${e.middleName}"));
-
-    Map row = AbstractDataImportHandlerTest.createMap("firstName", "Shalin",
-            "middleName", "Shekhar", "lastName", "Mangar");
+    // test reuse of template output in another template 
+    fields.add(AbstractDataImportHandlerTest.createMap("column", "mrname",
+            TemplateTransformer.TEMPLATE,"Mr ${e.name}"));
+            
+    Map row = AbstractDataImportHandlerTest.createMap(
+            "firstName", "Shalin",
+            "middleName", "Shekhar", 
+            "lastName", "Mangar");
 
     VariableResolverImpl resolver = new VariableResolverImpl();
+    resolver.addNamespace("e", row);
     Map<String, String> entityAttrs = AbstractDataImportHandlerTest.createMap(
             "name", "e");
 
     Context context = AbstractDataImportHandlerTest.getContext(null, resolver,
-            null, 0, fields, entityAttrs);
+            null, Context.FULL_DUMP, fields, entityAttrs);
     new TemplateTransformer().transformRow(row, context);
     Assert.assertEquals("Mangar, Shalin Shekhar", row.get("name"));
+    Assert.assertEquals("Mr Mangar, Shalin Shekhar", row.get("mrname"));
   }
 
 }

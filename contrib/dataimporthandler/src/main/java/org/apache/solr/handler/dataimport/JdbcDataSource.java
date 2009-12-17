@@ -16,36 +16,31 @@
  */
 package org.apache.solr.handler.dataimport;
 
-import org.apache.solr.common.SolrException;
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.naming.InitialContext;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.Callable;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
- * <p>
- * A DataSource implementation which can fetch data using JDBC.
- * </p>
- * <p/>
- * <p>
- * Refer to <a
- * href="http://wiki.apache.org/solr/DataImportHandler">http://wiki.apache.org/solr/DataImportHandler</a>
- * for more details.
- * </p>
+ * <p> A DataSource implementation which can fetch data using JDBC. </p> <p/> <p> Refer to <a
+ * href="http://wiki.apache.org/solr/DataImportHandler">http://wiki.apache.org/solr/DataImportHandler</a> for more
+ * details. </p>
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: JdbcDataSource.java 690134 2008-08-29 07:18:52Z shalin $
+ * @version $Id: JdbcDataSource.java 823398 2009-10-09 04:06:09Z noble $
  * @since solr 1.3
  */
 public class JdbcDataSource extends
         DataSource<Iterator<Map<String, Object>>> {
-  private static final Logger LOG = Logger.getLogger(JdbcDataSource.class
-          .getName());
+  private static final Logger LOG = LoggerFactory.getLogger(JdbcDataSource.class);
 
-  private Callable<Connection> factory;
+  protected Callable<Connection> factory;
 
   private long connLastUsed = 0;
 
@@ -57,21 +52,24 @@ public class JdbcDataSource extends
 
   private int batchSize = FETCH_SIZE;
 
+  private int maxRows = 0;
+
   public void init(Context context, Properties initProps) {
     Object o = initProps.get(CONVERT_TYPE);
     if (o != null)
       convertType = Boolean.parseBoolean(o.toString());
 
-    createConnectionFactory(context, initProps);
+    factory = createConnectionFactory(context, initProps);
 
     String bsz = initProps.getProperty("batchSize");
     if (bsz != null) {
+      bsz = context.getVariableResolver().replaceTokens(bsz);
       try {
         batchSize = Integer.parseInt(bsz);
         if (batchSize == -1)
           batchSize = Integer.MIN_VALUE;
       } catch (NumberFormatException e) {
-        LOG.log(Level.WARNING, "Invalid batch size: " + bsz);
+        LOG.warn("Invalid batch size: " + bsz);
       }
     }
 
@@ -90,40 +88,71 @@ public class JdbcDataSource extends
         fieldNameVsType.put(n, Types.DATE);
       else if ("boolean".equals(t))
         fieldNameVsType.put(n, Types.BOOLEAN);
+      else if ("binary".equals(t))
+        fieldNameVsType.put(n, Types.BLOB);
       else
         fieldNameVsType.put(n, Types.VARCHAR);
     }
   }
 
-  private void createConnectionFactory(final Context context,
+  protected Callable<Connection> createConnectionFactory(final Context context,
                                        final Properties initProps) {
-
+    final VariableResolver resolver = context.getVariableResolver();
+    resolveVariables(resolver, initProps);
+    final String jndiName = initProps.getProperty(JNDI_NAME);
     final String url = initProps.getProperty(URL);
     final String driver = initProps.getProperty(DRIVER);
 
-    if (url == null)
-      throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
-              "JDBC URL cannot be null");
+    if (url == null && jndiName == null)
+      throw new DataImportHandlerException(SEVERE,
+              "JDBC URL or JNDI name has to be specified");
 
     if (driver != null) {
       try {
         DocBuilder.loadClass(driver, context.getSolrCore());
       } catch (ClassNotFoundException e) {
-        throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Could not load driver: " + driver, e);
+        wrapAndThrow(SEVERE, e, "Could not load driver: " + driver);
       }
     } else {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Driver must be specified");
+      if(jndiName == null){
+        throw new DataImportHandlerException(SEVERE, "One of driver or jndiName must be specified in the data source");
+      }
     }
 
-    factory = new Callable<Connection>() {
+    String s = initProps.getProperty("maxRows");
+    if (s != null) {
+      maxRows = Integer.parseInt(s);
+    }
+
+    return factory = new Callable<Connection>() {
       public Connection call() throws Exception {
+        // Resolve variables again because the variables may have changed
+        resolveVariables(resolver, initProps);
         LOG.info("Creating a connection for entity "
                 + context.getEntityAttribute(DataImporter.NAME) + " with URL: "
                 + url);
         long start = System.currentTimeMillis();
         Connection c = null;
         try {
-          c = DriverManager.getConnection(url, initProps);
+          if(url != null){
+            c = DriverManager.getConnection(url, initProps);
+          } else if(jndiName != null){
+            InitialContext ctx =  new InitialContext();
+            Object jndival =  ctx.lookup(jndiName);
+            if (jndival instanceof javax.sql.DataSource) {
+              javax.sql.DataSource dataSource = (javax.sql.DataSource) jndival;
+              String user = (String) initProps.get("user");
+              String pass = (String) initProps.get("password");
+              if(user == null || user.trim().equals("")){
+                c = dataSource.getConnection();
+              } else {
+                c = dataSource.getConnection(user, pass);
+              }
+            } else {
+              throw new DataImportHandlerException(SEVERE,
+                      "the jndi name : '"+jndiName +"' is not a valid javax.sql.DataSource");
+            }
+          }
         } catch (SQLException e) {
           // DriverManager does not allow you to use a driver which is not loaded through
           // the class loader of the class which is trying to make the connection.
@@ -132,11 +161,49 @@ public class JdbcDataSource extends
           Driver d = (Driver) DocBuilder.loadClass(driver, context.getSolrCore()).newInstance();
           c = d.connect(url, initProps);
         }
+        if (c != null) {
+          if (Boolean.parseBoolean(initProps.getProperty("readOnly"))) {
+            c.setReadOnly(true);
+            // Add other sane defaults
+            c.setAutoCommit(true);
+            c.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
+            c.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT);
+          }
+          if (!Boolean.parseBoolean(initProps.getProperty("autoCommit"))) {
+            c.setAutoCommit(false);
+          }
+          String transactionIsolation = initProps.getProperty("transactionIsolation");
+          if ("TRANSACTION_READ_UNCOMMITTED".equals(transactionIsolation)) {
+            c.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
+          } else if ("TRANSACTION_READ_COMMITTED".equals(transactionIsolation)) {
+            c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+          } else if ("TRANSACTION_REPEATABLE_READ".equals(transactionIsolation)) {
+            c.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+          } else if ("TRANSACTION_SERIALIZABLE".equals(transactionIsolation)) {
+            c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+          } else if ("TRANSACTION_NONE".equals(transactionIsolation)) {
+            c.setTransactionIsolation(Connection.TRANSACTION_NONE);
+          }
+          String holdability = initProps.getProperty("holdability");
+          if ("CLOSE_CURSORS_AT_COMMIT".equals(holdability)) {
+            c.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT);
+          } else if ("HOLD_CURSORS_OVER_COMMIT".equals(holdability)) {
+            c.setHoldability(ResultSet.HOLD_CURSORS_OVER_COMMIT);
+          }
+        }
         LOG.info("Time taken for getConnection(): "
                 + (System.currentTimeMillis() - start));
         return c;
       }
     };
+  }
+
+  private void resolveVariables(VariableResolver resolver, Properties initProps) {
+    for (Map.Entry<Object, Object> entry : initProps.entrySet()) {
+      if (entry.getValue() != null) {
+        entry.setValue(resolver.replaceTokens((String) entry.getValue()));
+      }
+    }
   }
 
   public Iterator<Map<String, Object>> getData(String query) {
@@ -145,7 +212,7 @@ public class JdbcDataSource extends
   }
 
   private void logError(String msg, Exception e) {
-    LOG.log(Level.WARNING, msg, e);
+    LOG.warn(msg, e);
   }
 
   private List<String> readFieldNames(ResultSetMetaData metaData)
@@ -171,20 +238,19 @@ public class JdbcDataSource extends
 
       try {
         Connection c = getConnection();
-        stmt = c.createStatement(ResultSet.TYPE_FORWARD_ONLY,
-                ResultSet.CONCUR_READ_ONLY);
+        stmt = c.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         stmt.setFetchSize(batchSize);
-        LOG.finer("Executing SQL: " + query);
+        stmt.setMaxRows(maxRows);
+        LOG.debug("Executing SQL: " + query);
         long start = System.currentTimeMillis();
         if (stmt.execute(query)) {
           resultSet = stmt.getResultSet();
         }
-        LOG.finest("Time taken for sql :"
+        LOG.trace("Time taken for sql :"
                 + (System.currentTimeMillis() - start));
         colNames = readFieldNames(resultSet.getMetaData());
       } catch (Exception e) {
-        throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
-                "Unable to execute query: " + query, e);
+        wrapAndThrow(SEVERE, e, "Unable to execute query: " + query);
       }
       if (resultSet == null) {
         rSetIterator = new ArrayList<Map<String, Object>>().iterator();
@@ -223,7 +289,7 @@ public class JdbcDataSource extends
 
           Integer type = fieldNameVsType.get(colName);
           if (type == null)
-            type = 12;
+            type = Types.VARCHAR;
           switch (type) {
             case Types.INTEGER:
               result.put(colName, resultSet.getInt(colName));
@@ -241,8 +307,10 @@ public class JdbcDataSource extends
               result.put(colName, resultSet.getDate(colName));
               break;
             case Types.BOOLEAN:
-              result
-                      .put(colName, resultSet.getBoolean(colName));
+              result.put(colName, resultSet.getBoolean(colName));
+              break;
+            case Types.BLOB:
+              result.put(colName, resultSet.getBytes(colName));
               break;
             default:
               result.put(colName, resultSet.getString(colName));
@@ -250,9 +318,7 @@ public class JdbcDataSource extends
           }
         } catch (SQLException e) {
           logError("Error reading data ", e);
-          throw new DataImportHandlerException(
-                  DataImportHandlerException.SEVERE,
-                  "Error reading data from database", e);
+          wrapAndThrow(SEVERE, e, "Error reading data from database");
         }
       }
       return result;
@@ -269,8 +335,8 @@ public class JdbcDataSource extends
           return false;
         }
       } catch (SQLException e) {
-        logError("Error reading data ", e);
         close();
+        wrapAndThrow(SEVERE,e);
         return false;
       }
     }
@@ -281,7 +347,6 @@ public class JdbcDataSource extends
           resultSet.close();
         if (stmt != null)
           stmt.close();
-
       } catch (Exception e) {
         logError("Exception while closing result set", e);
       } finally {
@@ -296,7 +361,7 @@ public class JdbcDataSource extends
     if (currTime - connLastUsed > CONN_TIME_OUT) {
       synchronized (this) {
         Connection tmpConn = factory.call();
-        close();
+        closeConnection();
         connLastUsed = System.currentTimeMillis();
         return conn = tmpConn;
       }
@@ -307,19 +372,35 @@ public class JdbcDataSource extends
     }
   }
 
-  protected void finalize() {
+  protected void finalize() throws Throwable {
     try {
-      conn.close();
-    } catch (Exception e) {
+      if(!isClosed){
+        LOG.error("JdbcDataSource was not closed prior to finalize(), indicates a bug -- POSSIBLE RESOURCE LEAK!!!");
+        close();
+      }
+    } finally {
+      super.finalize();
     }
   }
 
+  private boolean isClosed = false;
+
   public void close() {
     try {
-      conn.close();
-    } catch (Exception e) {
+      closeConnection();
+    } finally {
+      isClosed = true;
     }
+  }
 
+  private void closeConnection()  {
+    try {
+      if (conn != null) {
+        conn.close();
+      }
+    } catch (Exception e) {
+      LOG.error("Ignoring Error when closing connection", e);
+    }
   }
 
   private static final long CONN_TIME_OUT = 10 * 1000; // 10 seconds
@@ -327,6 +408,8 @@ public class JdbcDataSource extends
   private static final int FETCH_SIZE = 500;
 
   public static final String URL = "url";
+
+  public static final String JNDI_NAME = "jndiName";
 
   public static final String DRIVER = "driver";
 

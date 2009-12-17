@@ -20,6 +20,10 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.apache.solr.schema.SchemaField;
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -36,69 +40,49 @@ import java.util.*;
  * <p/>
  * <b>This API is experimental and subject to change</b>
  *
- * @version $Id: DataConfig.java 690134 2008-08-29 07:18:52Z shalin $
+ * @version $Id: DataConfig.java 807537 2009-08-25 09:54:26Z noble $
  * @since solr 1.3
  */
 public class DataConfig {
-  public List<Document> documents;
+  static final Logger LOG = LoggerFactory.getLogger(DataConfig.class);
 
-  public List<Props> properties;
+  public Document document;
 
-  private Map<String, Document> documentCache;
-
-  public Map<String, Evaluator> evaluators = new HashMap<String, Evaluator>();
+  public List<Map<String, String >> functions = new ArrayList<Map<String ,String>>();
 
   public Script script;
 
   public Map<String, Properties> dataSources = new HashMap<String, Properties>();
 
-  public Document getDocumentByName(String name) {
-    if (documentCache == null) {
-      documentCache = new HashMap<String, Document>();
-      for (Document document : documents)
-        documentCache.put(document.name, document);
-    }
-
-    return documentCache.get(name);
-  }
+  public Map<String, SchemaField> lowerNameVsSchemaField = new HashMap<String, SchemaField>();
 
   public static class Document {
-    public String name;
-
+    // TODO - remove from here and add it to entity
     public String deleteQuery;
 
     public List<Entity> entities = new ArrayList<Entity>();
 
-    public List<Field> fields;
+    public String onImportStart, onImportEnd;
 
     public Document() {
     }
 
     public Document(Element element) {
-      this.name = getStringAttribute(element, NAME, null);
       this.deleteQuery = getStringAttribute(element, "deleteQuery", null);
+      this.onImportStart = getStringAttribute(element, "onImportStart", null);
+      this.onImportEnd = getStringAttribute(element, "onImportEnd", null);
       List<Element> l = getChildNodes(element, "entity");
       for (Element e : l)
         entities.add(new Entity(e));
-      // entities = new Entity(l.get(0));
-      l = getChildNodes(element, "field");
-      if (!l.isEmpty())
-        fields = new ArrayList<Field>();
-      for (Element e : l)
-        fields.add(new Field(e));
     }
-  }
-
-  public static class Props {
-    public String name;
-
-    public String file;
   }
 
   public static class Entity {
     public String name;
 
     public String pk;
+
+    public String pkMappingFromSchema;
 
     public String dataSource;
 
@@ -110,7 +94,7 @@ public class DataConfig {
 
     public boolean isDocRoot = false;
 
-    public List<Field> fields;
+    public List<Field> fields = new ArrayList<Field>();
 
     public List<Map<String, String>> allFieldsList = new ArrayList<Map<String, String>>();
 
@@ -120,29 +104,52 @@ public class DataConfig {
 
     public Entity parentEntity;
 
-    public EntityProcessor processor;
+    public EntityProcessorWrapper processor;
 
     @SuppressWarnings("unchecked")
     public DataSource dataSrc;
 
     public Script script;
 
-    public List<Field> implicitFields;
+    public Map<String, List<Field>> colNameVsField = new HashMap<String, List<Field>>();
 
     public Entity() {
     }
 
     public Entity(Element element) {
       name = getStringAttribute(element, NAME, null);
+      if(name == null){
+        LOG.warn("Entity does not have a name");
+        name= ""+System.nanoTime();
+      }
+      if(name.indexOf(".") != -1){
+        throw new DataImportHandlerException(SEVERE, "Entity name must not have period (.): '" + name);
+      }      
+      if (RESERVED_WORDS.contains(name)) {
+        throw new DataImportHandlerException(SEVERE, "Entity name : '" + name
+                + "' is a reserved keyword. Reserved words are: " + RESERVED_WORDS);
+      }
       pk = getStringAttribute(element, "pk", null);
       docRoot = getStringAttribute(element, ROOT_ENTITY, null);
       proc = getStringAttribute(element, PROCESSOR, null);
       dataSource = getStringAttribute(element, DataImporter.DATA_SRC, null);
       allAttributes = getAllAttributes(element);
       List<Element> n = getChildNodes(element, "field");
-      fields = new ArrayList<Field>();
-      for (Element elem : n)
-        fields.add(new Field(elem));
+      for (Element elem : n)  {
+        Field field = new Field(elem);
+        fields.add(field);
+        List<Field> l = colNameVsField.get(field.column);
+        if(l == null) l = new ArrayList<Field>();
+        boolean alreadyFound = false;
+        for (Field f : l) {
+          if(f.getName().equals(field.getName())) {
+            alreadyFound = true;
+            break;
+          }
+        }
+        if(!alreadyFound) l.add(field);
+        colNameVsField.put(field.column, l);
+      }
       n = getChildNodes(element, "entity");
       if (!n.isEmpty())
         entities = new ArrayList<Entity>();
@@ -156,33 +163,36 @@ public class DataConfig {
         for (Entity entity : entities)
           entity.clearCache();
       }
-
       try {
-        processor.destroy();
+        processor.close();
       } catch (Exception e) {
         /*no op*/
       }
       processor = null;
       if (dataSrc != null)
         dataSrc.close();
+        dataSrc = null;
+    }
 
+    public String getPk(){
+      return pk == null ? pkMappingFromSchema : pk;
     }
   }
 
   public static class Script {
     public String language;
 
-    public String script;
+    public String text;
 
     public Script() {
     }
 
     public Script(Element e) {
       this.language = getStringAttribute(e, "language", "JavaScript");
-      StringBuffer buffer = new StringBuffer();
+      StringBuilder buffer = new StringBuilder();
       String script = getTxt(e, buffer);
       if (script != null)
-        this.script = script.trim();
+        this.text = script.trim();
     }
   }
 
@@ -198,7 +208,8 @@ public class DataConfig {
 
     public boolean multiValued = false;
 
-    public String nameOrColName;
+    boolean dynamicName;
+
 
     public Map<String, String> allAttributes = new HashMap<String, String>() {
       public String put(String key, String value) {
@@ -214,14 +225,11 @@ public class DataConfig {
     public Field(Element e) {
       this.name = getStringAttribute(e, DataImporter.NAME, null);
       this.column = getStringAttribute(e, DataImporter.COLUMN, null);
+      if (column == null) {
+        throw new DataImportHandlerException(SEVERE, "Field must have a column attribute");
+      }
       this.boost = Float.parseFloat(getStringAttribute(e, "boost", "1.0f"));
       allAttributes.putAll(getAllAttributes(e));
-    }
-
-    public Field(String name, boolean b) {
-      name = nameOrColName = column = name;
-      multiValued = b;
-
     }
 
     public String getName() {
@@ -234,10 +242,11 @@ public class DataConfig {
 
   public void readFromXml(Element e) {
     List<Element> n = getChildNodes(e, "document");
-    if (!n.isEmpty())
-      documents = new ArrayList<Document>();
-    for (Element element : n)
-      documents.add(new Document(element));
+    if (n.isEmpty()) {
+      throw new DataImportHandlerException(SEVERE, "DataImportHandler " +
+              "configuration file must have one <document> node.");
+    }
+    document = new Document(n.get(0));
 
     n = getChildNodes(e, SCRIPT);
     if (!n.isEmpty()) {
@@ -245,29 +254,17 @@ public class DataConfig {
     }
 
     // Add the provided evaluators
-    evaluators.put(EvaluatorBag.DATE_FORMAT_EVALUATOR, EvaluatorBag
-            .getDateFormatEvaluator());
-    evaluators.put(EvaluatorBag.SQL_ESCAPE_EVALUATOR, EvaluatorBag
-            .getSqlEscapingEvaluator());
-    evaluators.put(EvaluatorBag.URL_ENCODE_EVALUATOR, EvaluatorBag
-            .getUrlEvaluator());
-
     n = getChildNodes(e, FUNCTION);
     if (!n.isEmpty()) {
       for (Element element : n) {
         String func = getStringAttribute(element, NAME, null);
         String clz = getStringAttribute(element, CLASS, null);
-        if (func == null || clz == null)
+        if (func == null || clz == null){
           throw new DataImportHandlerException(
-                  DataImportHandlerException.SEVERE,
+                  SEVERE,
                   "<function> must have a 'name' and 'class' attributes");
-        try {
-          evaluators.put(func, (Evaluator) DocBuilder.loadClass(clz, null)
-                  .newInstance());
-        } catch (Exception exp) {
-          throw new DataImportHandlerException(
-                  DataImportHandlerException.SEVERE,
-                  "Unable to instantiate evaluator: " + clz, exp);
+        } else {
+          functions.add(getAllAttributes(element));
         }
       }
     }
@@ -300,8 +297,7 @@ public class DataConfig {
     return m;
   }
 
-  public static String getTxt(Node elem, StringBuffer buffer) {
-
+  public static String getTxt(Node elem, StringBuilder buffer) {
     if (elem.getNodeType() != Node.CDATA_SECTION_NODE) {
       NodeList childs = elem.getChildNodes();
       for (int i = 0; i < childs.getLength(); i++) {
@@ -331,23 +327,23 @@ public class DataConfig {
   }
 
   public void clearCaches() {
-    for (Document document : documents)
-      for (Entity entity : document.entities)
-        entity.clearCache();
-
+    for (Entity entity : document.entities)
+      entity.clearCache();
   }
 
   public static final String SCRIPT = "script";
 
   public static final String NAME = "name";
 
-  public static final String SCRIPT_LANG = "scriptlanguage";
-
-  public static final String SCRIPT_NAME = "scriptname";
-
   public static final String PROCESSOR = "processor";
 
+  /**
+   * @deprecated use IMPORTER_NS_SHORT instead
+   */
+  @Deprecated
   public static final String IMPORTER_NS = "dataimporter";
+
+  public static final String IMPORTER_NS_SHORT = "dih";
 
   public static final String ROOT_ENTITY = "rootEntity";
 
@@ -356,5 +352,16 @@ public class DataConfig {
   public static final String CLASS = "class";
 
   public static final String DATA_SRC = "dataSource";
+
+  private static final Set<String> RESERVED_WORDS = new HashSet<String>();
+  static{
+    RESERVED_WORDS.add(IMPORTER_NS);
+    RESERVED_WORDS.add(IMPORTER_NS_SHORT);
+    RESERVED_WORDS.add("request");
+    RESERVED_WORDS.add("delta");
+    RESERVED_WORDS.add("functions");
+    RESERVED_WORDS.add("session");
+    RESERVED_WORDS.add(SolrWriter.LAST_INDEX_KEY);
+  }
 
 }

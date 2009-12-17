@@ -39,13 +39,14 @@ import java.util.Stack;
  * <p/>
  * <b>This API is experimental and subject to change</b>
  *
- * @version $Id: DebugLogger.java 693621 2008-09-09 21:20:40Z gsingers $
+ * @version $Id: DebugLogger.java 819262 2009-09-27 06:27:28Z shalin $
  * @since solr 1.3
  */
-public class DebugLogger {
+class DebugLogger {
   private Stack<DebugInfo> debugStack;
 
   NamedList output;
+  private final SolrWriter writer;
 
   private static final String LINE = "---------------------------------------------";
 
@@ -54,7 +55,8 @@ public class DebugLogger {
 
   boolean enabled = true;
 
-  public DebugLogger() {
+  public DebugLogger(SolrWriter solrWriter) {
+    writer = solrWriter;
     output = new NamedList();
     debugStack = new Stack<DebugInfo>() {
 
@@ -69,7 +71,7 @@ public class DebugLogger {
     output = debugStack.peek().lst;
   }
 
-  private DebugInfo peekStack() {
+    private DebugInfo peekStack() {
     return debugStack.isEmpty() ? null : debugStack.peek();
   }
 
@@ -165,8 +167,7 @@ public class DebugLogger {
     }
   }
 
-  static DataSource wrapDs(final DataSource ds) {
-    final SolrWriter writer = DocBuilder.INSTANCE.get().writer;
+  DataSource wrapDs(final DataSource ds) {
     return new DataSource() {
       public void init(Context context, Properties initProps) {
         ds.init(context, initProps);
@@ -182,11 +183,11 @@ public class DebugLogger {
         try {
           return ds.getData(query);
         } catch (DataImportHandlerException de) {
-          DocBuilder.INSTANCE.get().writer.log(SolrWriter.ENTITY_EXCEPTION,
+          writer.log(SolrWriter.ENTITY_EXCEPTION,
                   null, de);
           throw de;
         } catch (Exception e) {
-          DocBuilder.INSTANCE.get().writer.log(SolrWriter.ENTITY_EXCEPTION,
+          writer.log(SolrWriter.ENTITY_EXCEPTION,
                   null, e);
           DataImportHandlerException de = new DataImportHandlerException(
                   DataImportHandlerException.SEVERE, "", e);
@@ -200,38 +201,28 @@ public class DebugLogger {
     };
   }
 
-  static Transformer wrapTransformer(final Transformer t) {
-    if (DocBuilder.INSTANCE.get() != null
-            && DocBuilder.INSTANCE.get().verboseDebug) {
-      return new Transformer() {
-        public Object transformRow(Map<String, Object> row, Context context) {
-          DocBuilder.INSTANCE.get().writer.log(SolrWriter.PRE_TRANSFORMER_ROW,
-                  null, row);
-          String tName = getTransformerName(t);
-          Object result = null;
-          try {
-            result = t.transformRow(row, context);
-            DocBuilder.INSTANCE.get().writer.log(SolrWriter.TRANSFORMED_ROW,
-                    tName, result);
-          } catch (DataImportHandlerException de) {
-            DocBuilder.INSTANCE.get().writer.log(
-                    SolrWriter.TRANSFORMER_EXCEPTION, tName, de);
-            de.debugged = true;
-            throw de;
-          } catch (Exception e) {
-            DocBuilder.INSTANCE.get().writer.log(
-                    SolrWriter.TRANSFORMER_EXCEPTION, tName, e);
-            DataImportHandlerException de = new DataImportHandlerException(
-                    DataImportHandlerException.SEVERE, "", e);
-            de.debugged = true;
-            throw de;
-          }
-          return result;
+  Transformer wrapTransformer(final Transformer t) {
+    return new Transformer() {
+      public Object transformRow(Map<String, Object> row, Context context) {
+        writer.log(SolrWriter.PRE_TRANSFORMER_ROW, null, row);
+        String tName = getTransformerName(t);
+        Object result = null;
+        try {
+          result = t.transformRow(row, context);
+          writer.log(SolrWriter.TRANSFORMED_ROW, tName, result);
+        } catch (DataImportHandlerException de) {
+          writer.log(SolrWriter.TRANSFORMER_EXCEPTION, tName, de);
+          de.debugged = true;
+          throw de;
+        } catch (Exception e) {
+          writer.log(SolrWriter.TRANSFORMER_EXCEPTION, tName, e);
+          DataImportHandlerException de = new DataImportHandlerException(DataImportHandlerException.SEVERE, "", e);
+          de.debugged = true;
+          throw de;
         }
-      };
-    } else {
-      return t;
-    }
+        return result;
+      }
+    };
   }
 
   public static String getStacktraceString(Exception e) {
@@ -242,8 +233,8 @@ public class DebugLogger {
 
   static String getTransformerName(Transformer t) {
     Class transClass = t.getClass();
-    if (t instanceof EntityProcessorBase.ReflectionTransformer) {
-      return ((EntityProcessorBase.ReflectionTransformer) t).trans;
+    if (t instanceof EntityProcessorWrapper.ReflectionTransformer) {
+      return ((EntityProcessorWrapper.ReflectionTransformer) t).trans;
     }
     if (t instanceof ScriptTransformer) {
       ScriptTransformer scriptTransformer = (ScriptTransformer) t;
@@ -280,7 +271,7 @@ public class DebugLogger {
                 || type == SolrWriter.TRANSFORMER_EXCEPTION) {
           displayName = "transformer:" + name;
         } else if (type == SolrWriter.START_DOC) {
-          name = displayName = "document#" + SolrWriter.getDocCount();
+          this.name = displayName = "document#" + SolrWriter.getDocCount();
         }
         parent.lst.add(displayName, lst);
       }

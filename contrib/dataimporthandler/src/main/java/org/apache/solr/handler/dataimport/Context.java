@@ -35,14 +35,32 @@ import java.util.Map;
  * <p/>
  * <b>This API is experimental and subject to change</b>
  *
- * @version $Id: Context.java 689947 2008-08-28 19:38:05Z shalin $
+ * @version $Id: Context.java 766608 2009-04-20 07:36:55Z shalin $
  * @since solr 1.3
  */
 public abstract class Context {
-  public static final int FULL_DUMP = 1, DELTA_DUMP = 2, FIND_DELTA = 3;
+  public static final String FULL_DUMP = "FULL_DUMP", DELTA_DUMP = "DELTA_DUMP", FIND_DELTA = "FIND_DELTA";
 
-  public static final String SCOPE_ENTITY = "entity", SCOPE_GLOBAL = "global",
-          SCOPE_DOC = "document";
+  /**
+   * An object stored in entity scope is valid only for the current entity for the current document only.
+   */
+  public static final String SCOPE_ENTITY = "entity";
+
+  /**
+   * An object stored in global scope is available for the current import only but across entities and documents.
+   */
+  public static final String SCOPE_GLOBAL = "global";
+
+  /**
+   * An object stored in document scope is available for the current document only but across entities.
+   */
+  public static final String SCOPE_DOC = "document";
+
+  /**
+   * An object stored in 'solrcore' scope is available across imports, entities and documents throughout the life of
+   * a solr core. A solr core unload or reload will destroy this data.
+   */
+  public static final String SCOPE_SOLR_CORE = "solrcore";
 
   /**
    * Get the value of any attribute put into this entity
@@ -51,6 +69,13 @@ public abstract class Context {
    * @return value of named attribute in entity
    */
   public abstract String getEntityAttribute(String name);
+
+  /**
+   * Get the value of any attribute put into this entity after resolving all variables found in the attribute value
+   * @param name name of the attribute
+   * @return value of the named attribute after resolving all variables
+   */
+  public abstract String getResolvedEntityAttribute(String name);
 
   /**
    * Returns all the fields put into an entity. each item (which is a map ) in
@@ -84,7 +109,7 @@ public abstract class Context {
   /**
    * Gets a new DataSource instance with a name. Ensure that you close() this after use
    * because this is created just for this method call.
-   *  
+   *
    * @param name Name of the dataSource as defined in the dataSource tag
    * @return a new DataSource instance
    * @see org.apache.solr.handler.dataimport.DataSource
@@ -142,11 +167,11 @@ public abstract class Context {
   public abstract boolean isRootEntity();
 
   /**
-   * Returns the current process FULL_DUMP =1, DELTA_DUMP=2, FIND_DELTA=3
+   * Returns the current process FULL_DUMP, DELTA_DUMP, FIND_DELTA
    *
-   * @return the code of the current running process
+   * @return the type of the current running process
    */
-  public abstract int currentProcess();
+  public abstract String currentProcess();
 
   /**
    * Exposing the actual SolrCore to the components
@@ -154,4 +179,34 @@ public abstract class Context {
    * @return the core
    */
   public abstract SolrCore getSolrCore();
+
+  /**
+   * Makes available some basic running statistics such as "docCount",
+   * "deletedDocCount", "rowCount", "queryCount" and "skipDocCount"
+   *
+   * @return a Map containing running statistics of the current import
+   */
+  public abstract Map<String, Object> getStats();
+
+  /**
+   * Returns the text specified in the script tag in the data-config.xml 
+   */
+  public abstract String getScript();
+
+  /**
+   * Returns the language of the script as specified in the script tag in data-config.xml
+   */
+  public abstract String getScriptLanguage();
+
+  /**delete a document by id
+   * @param id
+   */
+  public abstract void deleteDoc(String id);
+
+  /**delete documents by query
+   * @param query
+   */
+  public abstract void deleteDocByQuery(String query);
+
+
 }

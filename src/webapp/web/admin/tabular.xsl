@@ -15,8 +15,8 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 -->
-<!-- $Id: tabular.xsl 673168 2008-07-01 18:41:41Z hossman $ -->
-<!-- $URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/webapp/web/admin/tabular.xsl $ -->
+<!-- $Id: tabular.xsl 728842 2008-12-23 01:45:23Z koji $ -->
+<!-- $URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/webapp/web/admin/tabular.xsl $ -->
 
 
 <xsl:stylesheet
@@ -43,7 +43,7 @@
       </head>
       <body>
         <a href=".">
-           <img border="0" align="right" height="61" width="142" src="solr-head.gif" alt="SOLR">
+           <img border="0" align="right" height="78" width="142" src="solr_small.png" alt="SOLR">
            </img>
         </a>
         <h1>SOLR Search Results</h1>

@@ -20,7 +20,6 @@ package org.apache.solr.core;
 import junit.framework.Assert;
 import junit.framework.TestCase;
 
-import org.apache.lucene.analysis.ngram.NGramTokenFilter;
 import org.apache.solr.analysis.KeywordTokenizerFactory;
 import org.apache.solr.analysis.NGramFilterFactory;
 import org.apache.solr.common.SolrException;
@@ -29,6 +28,8 @@ import org.apache.solr.handler.component.FacetComponent;
 import org.apache.solr.request.JSONResponseWriter;
 import org.apache.solr.util.plugin.ResourceLoaderAware;
 import org.apache.solr.util.plugin.SolrCoreAware;
+
+import java.io.File;
 
 public class ResourceLoaderTest extends TestCase 
 {
@@ -39,7 +40,7 @@ public class ResourceLoaderTest extends TestCase
 
     loader = new SolrResourceLoader("solr");
     instDir = loader.getInstanceDir();
-    assertTrue(instDir + " is not equal to " + "solr/", instDir.equals("solr/") == true);
+    assertTrue(instDir + " is not equal to " + "solr/", instDir.equals("solr" + File.separator) == true);
   }
 
   public void testAwareCompatibility() 
@@ -53,7 +54,7 @@ public class ResourceLoaderTest extends TestCase
     
     // Make sure it throws an error for invalid objects
     Object[] invalid = new Object[] {
-        new NGramTokenFilter( null ),
+        // new NGramTokenFilter( null ),
         "hello",  new Float( 12.3f ),
         new LukeRequestHandler(),
         new JSONResponseWriter()
