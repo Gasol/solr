@@ -1,0 +1,9 @@
+From: Thomas Koch <thomas.koch@ymc.ch>
+Subject: [PATCH] debian/solr-example-solrconfig
+
+Two problems with the configuration from examples/
+
+- Contains <lib> tags that fail
+- The solr index directory is not FHS compliant
+
+Signed-off-by: Thomas Koch <thomas.koch@ymc.ch>
