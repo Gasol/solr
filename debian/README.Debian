@@ -37,3 +37,16 @@ Upstream provides additional functionality in so called contributions.
 We have so far included only the dataimporthandler without
 dataimporthandler-extras. The other contributions have dependencies not
 yet packaged for Debian.
+
+DataImportHandler
+-----------------
+
+If you use the handler with mysql, you need to install libmysql-java and
+add the following to your solrconfig.xml:
+
+  <lib path="/usr/share/java/mysql.jar" />
+
+The handler writes status information to
+/etc/solr/conf/dataimport.properties
+Make sure that the tomcat user can write to this file. Yes this is ugly,
+but nobody has teached the FHS to java developers yet.

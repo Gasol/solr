@@ -3,3 +3,4 @@ src/scripts /usr/share/solr
 example/solr/conf /etc/solr
 dist/*.jar /usr/share/solr/WEB-INF/lib/
 src/webapp/web/* /usr/share/solr/
+build/web/* /usr/share/solr/
