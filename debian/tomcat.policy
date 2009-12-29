@@ -1,6 +1,7 @@
 grant codeBase "file:/usr/share/solr/-" {
   permission java.lang.RuntimePermission "modifyThread";
   permission java.lang.RuntimePermission "accessClassInPackage.org.apache.tomcat.util.http";
+  permission java.util.PropertyPermission "sun.arch.data.model", "read";
   permission java.util.PropertyPermission "java.io.tmpdir", "read";
   permission java.util.PropertyPermission "user.dir", "read";
   permission java.util.PropertyPermission "solr.*", "read";
@@ -18,4 +19,10 @@ grant codeBase "file:/usr/share/solr/-" {
   permission javax.management.MBeanServerPermission "findMBeanServer";
   permission javax.management.MBeanPermission "org.apache.solr.core.*", "*";
   permission javax.management.MBeanTrustPermission "register";
+
+  /* needed by admin/get-properties.jsp 
+  permission java.util.PropertyPermission "*", "read,write"; */
+
+  /* for admin/threaddump.jsp
+  permission java.lang.management.ManagementPermission "monitor"; */
 };

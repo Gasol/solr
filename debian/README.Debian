@@ -18,6 +18,8 @@ Configuration
 The solr-common package comes with an example configuration that is not
 at all suitable for production use! Please learn about solr and write
 your own configuration in /etc/solr.
+Certain features of the admin interface are disabled by tomcat policies.
+Have a look at /etc/solr/tomcat.policy if you want to enable them.
 
 Replication
 -----------
