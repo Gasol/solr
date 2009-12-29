@@ -52,6 +52,10 @@ Description: enterprise search server based on Lucene - common files
  .
  This package provides the common files for Solr. Install
  solr-tomcat or solr-jetty to use Solr under Tomcat or Jetty.
+ .
+ This package also contains the dataimporthandler contrib while omiting
+ dataimporthandler-extras, clustering, extraction and velocity due to missing
+ dependencies.
 
 Package: solr-tomcat
 Architecture: all

@@ -1,6 +1,6 @@
 Format-Specification: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?op=file&rev=REVISION
 Name: solr
-Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
+Maintainer: solr-dev@lucene.apache.org
 Source: http://lucene.apache.org/solr/
 
 Files: *
@@ -9,6 +9,7 @@ License: Apache-2
 
 Files: debian/*
 Copyright: 2007,2008,2009 Jan-Pascal van Best <janpascal@vanbest.org> 
+           2009 Thomas Koch <thomas@koch.ro>
 License: Apache-2
 
 License: Apache-2
