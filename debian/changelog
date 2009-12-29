@@ -4,6 +4,7 @@ solr (1.4.0+ds1-1) unstable; urgency=low
   * Switched packaging to GIT. Closes: #540756.
   * Build with newest lucene version. Closes: #540756.
   * New version obsoletes Dependency bug. Closes: #521009.
+  * Added japanese translation. Thanks to Hideki Yamane. Closes: #554110.
 
  -- Thomas Koch <thomas.koch@ymc.ch>  Wed, 16 Dec 2009 13:38:44 +0100
 
