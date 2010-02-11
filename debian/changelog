@@ -5,8 +5,10 @@ solr (1.4.0+ds1-1) unstable; urgency=low
   * Build with newest lucene version. Closes: #540756.
   * New version obsoletes Dependency bug. Closes: #521009.
   * Added japanese translation. Thanks to Hideki Yamane. Closes: #554110.
+  * New Solr version builds with Lucene 2.9. Closes: #560611.
+  * solr-jetty works now. Did it ever work?
 
- -- Thomas Koch <thomas.koch@ymc.ch>  Wed, 16 Dec 2009 13:38:44 +0100
+ -- Thomas Koch <thomas.koch@ymc.ch>  Thu, 11 Feb 2010 15:05:54 +0100
 
 solr (1.3.0+ds1-2) unstable; urgency=low
 

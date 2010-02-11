@@ -1,20 +1,10 @@
 TODO.Debian for solr
 --------------------
 
-Before 1.4.0 release:
-
-- Review web.xml. 
 - enable junit tests on build?
 - Build javadocs?
-- Decide, where dist/apache-solr-dataimporthandler-1.4.0.jar should go:
-  - /usr/share/solr/WEB-INF/lib/
-  - /usr/share/java
-  Or should maybe all jars go to /usr/share/java and be symlinked?
 - Review debian/tomcat.policy
 - Delete obsolete topgit branches from 1.3
-
-someday:
-
 - What to do with the replication scripts? Fix them to be FHS compliant or
   ignore them, because there is a java alternative in solr 1.4?
 - Use minimal default configuration instead of everything from the example
