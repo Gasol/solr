@@ -63,7 +63,7 @@ Description: enterprise search server based on Lucene - common files
 Package: solr-tomcat
 Architecture: all
 Depends: ${misc:Depends}, solr-common (= ${binary:Version}), tomcat6 (>= 6.0.20)
-Conflicts: solr-jetty
+Conflicts: solr-jetty, solr-tomcat6
 Description: enterprise search server based on Lucene - Tomcat integration
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 

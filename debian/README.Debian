@@ -21,6 +21,21 @@ your own configuration in /etc/solr.
 Certain features of the admin interface are disabled by tomcat policies.
 Have a look at /etc/solr/tomcat.policy if you want to enable them.
 
+MultiCore
+^^^^^^^^^
+
+Solr upstream does not really support the seperation of the application and
+configuration directory, but knows only a Solr "homedir". We could partly
+handle this by placing a symlink conf to /etc/solr/conf in /usr/share/solr.
+However the solr.xml file necessary to configure multicore must be placed
+directly into /usr/share/solr.
+So to avoid having a configuration file outside /etc it's recommended to place
+a symlink from /usr/share/solr/solr.xml to /etc/solr/solr.xml.
+
+If you want to use the dataDir parameter in the dynamic core admin interface
+make sure, that no datadir is specified in /etc/solr/conf/solrconfig.xml.
+Otherwise the latter one will always be taken.
+
 Replication
 -----------
 
