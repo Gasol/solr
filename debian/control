@@ -9,7 +9,7 @@ Vcs-Browser: http://git.debian.org/?p=pkg-java/solr.git
 Vcs-Git: git://git.debian.org/git/pkg-java/solr.git
 Standards-Version: 3.8.4
 Build-Depends: cdbs, debhelper (>= 7.4.10), po-debconf,
- default-jdk-builddep,
+ default-jdk,
  ant (>= 1.7.0), ant-optional (>= 1.7.0), 
  libcommons-codec-java (>= 1.4),
  libcommons-csv-java (>= 0.1-SNAPSHOT+svn678580),
