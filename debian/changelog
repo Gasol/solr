@@ -3,8 +3,9 @@ solr (1.4.0+ds1-2) unstable; urgency=low
   * Team upload.
   * Explicitely specify lucene_version in debian/ant.properties. (Closes:
     #577357)
+  * Add spanish debconf translation. (Closes: #578614)
 
- -- Torsten Werner <twerner@debian.org>  Sat, 24 Apr 2010 08:58:34 +0200
+ -- Torsten Werner <twerner@debian.org>  Sat, 24 Apr 2010 09:18:07 +0200
 
 solr (1.4.0+ds1-1) unstable; urgency=low
 
