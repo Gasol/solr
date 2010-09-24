@@ -1,3 +1,9 @@
+solr (1.4.0+ds1-3) UNRELEASED; urgency=low
+
+  * Add Danish debconf translation. (Closes: #597763)
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Fri, 24 Sep 2010 11:28:57 +0200
+
 solr (1.4.0+ds1-2) unstable; urgency=low
 
   * Team upload.
