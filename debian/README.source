@@ -24,6 +24,18 @@ original tarballs. You can check them against the appropriate keyring with:
 > gpgv --keyring solr-keyring.gpg debian/signatures/apache-solr-1.4.0.tgz.asc \
                                   solr_1.4.0.orig.tar.gz
 
+git-import-orig
+===============
+
+The git-import-orig options used to import version 1.4.1:
+
+git-import-orig --no-merge --pristine-tar --upstream-version="1.4.1+dfsg1" \
+--filter "*.jar" \
+--filter "*.war" \
+--filter "apache-solr-1.4.1/docs" \
+--filter "apache-solr-1.4.1/src/site/src/documentation/skins/common/scripts" \
+--filter "apache-solr-1.4.1/src/site/src/documentation/content/xdocs/images" \
+
 git-buildpackage
 ================
 
