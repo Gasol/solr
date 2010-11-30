@@ -17,7 +17,7 @@
  limitations under the License.
 -->
 
-<!-- $Id: solrconfig-nocache.xml 630037 2008-02-21 22:44:19Z hossman $
+<!-- $Id: solrconfig-nocache.xml 949888 2010-05-31 23:24:40Z hossman $
      $Source$
      $Name$
   -->
@@ -265,22 +265,6 @@
 
   <requestHandler name="/update"     class="solr.XmlUpdateRequestHandler"          />
   <requestHandler name="/update/csv" class="solr.CSVRequestHandler" startup="lazy" />
-
-  <!-- test elevation -->
-  <searchComponent name="elevate" class="org.apache.solr.handler.component.QueryElevationComponent" >
-    <str name="queryFieldType">string</str>
-    <str name="config-file">elevate.xml</str>
-  </searchComponent>
- 
-  <requestHandler name="/elevate" class="org.apache.solr.handler.component.SearchHandler">
-    <lst name="defaults">
-      <str name="echoParams">explicit</str>
-    </lst>
-    <arr name="last-components">
-      <str>elevate</str>
-    </arr>
-  </requestHandler>
-  
 
   <highlighting>
    <!-- Configure the standard fragmenter -->

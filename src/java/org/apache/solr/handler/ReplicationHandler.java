@@ -60,7 +60,7 @@ import java.util.zip.DeflaterOutputStream;
  * <li>Abort a snap pull (command=abort)</li> <li>Enable/Disable polling the master for new versions (command=enablepoll
  * or command=disablepoll)</li> </ol> </p>
  *
- * @version $Id: ReplicationHandler.java 829682 2009-10-26 00:19:13Z yonik $
+ * @version $Id: ReplicationHandler.java 954709 2010-06-15 05:15:45Z noble $
  * @since solr 1.4
  */
 public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAware {
@@ -451,7 +451,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
   }
 
   public String getSourceId() {
-    return "$Id: ReplicationHandler.java 829682 2009-10-26 00:19:13Z yonik $";
+    return "$Id: ReplicationHandler.java 954709 2010-06-15 05:15:45Z noble $";
   }
 
   public String getSource() {
@@ -459,7 +459,7 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
   }
 
   public String getVersion() {
-    return "$Revision: 829682 $";
+    return "$Revision: 954709 $";
   }
 
   String readableSize(long size) {
@@ -919,7 +919,9 @@ public class ReplicationHandler extends RequestHandlerBase implements SolrCoreAw
         if (getCommit) {
           IndexCommit oldCommitPoint = indexCommitPoint;
           indexCommitPoint = core.getDeletionPolicy().getLatestCommit();
-          core.getDeletionPolicy().saveCommitPoint(indexCommitPoint.getVersion());
+          if(indexCommitPoint != null){
+            core.getDeletionPolicy().saveCommitPoint(indexCommitPoint.getVersion());
+          }
           if(oldCommitPoint != null){
             core.getDeletionPolicy().releaseCommitPoint(oldCommitPoint.getVersion());
           }

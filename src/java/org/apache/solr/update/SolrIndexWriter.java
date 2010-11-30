@@ -40,7 +40,7 @@ import java.util.Date;
 /**
  * An IndexWriter that is configured via Solr config mechanisms.
  *
-* @version $Id: SolrIndexWriter.java 823281 2009-10-08 19:05:06Z yonik $
+* @version $Id: SolrIndexWriter.java 949897 2010-05-31 23:43:26Z hossman $
 * @since solr 0.9
 */
 
@@ -86,8 +86,9 @@ public class SolrIndexWriter extends IndexWriter {
 
       if (getMergePolicy() instanceof LogMergePolicy) {
         setUseCompoundFile(config.useCompoundFile);
+        if (config.mergeFactor != -1) { setMergeFactor(config.mergeFactor); }
       } else  {
-        log.warn("Use of compound file format cannot be configured if merge policy is not an instance " +
+        log.warn("Use of compound file format or mergefactor cannot be configured if merge policy is not an instance " +
                 "of LogMergePolicy. The configured policy's defaults will be used.");
       }
 
@@ -222,7 +223,7 @@ public class SolrIndexWriter extends IndexWriter {
    * }
    * ****
    */
-  private boolean isClosed = false;
+  private volatile boolean isClosed = false;
   public void close() throws IOException {
     log.debug("Closing Writer " + name);
     try {
@@ -230,6 +231,15 @@ public class SolrIndexWriter extends IndexWriter {
       if(infoStream != null) {
         infoStream.close();
       }
+    } finally {
+      isClosed = true;
+    }
+  }
+
+  @Override
+  public void rollback() throws IOException {
+    try {
+      super.rollback();
     } finally {
       isClosed = true;
     }
