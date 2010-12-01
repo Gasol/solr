@@ -16,10 +16,8 @@
  */
 package org.apache.solr.handler.dataimport;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,7 +30,7 @@ import java.util.regex.Pattern;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: TemplateString.java 682376 2008-08-04 13:18:19Z shalin $
+ * @version $Id: TemplateString.java 826732 2009-10-19 17:47:38Z shalin $
  * @since solr 1.3
  */
 public class TemplateString {
@@ -43,7 +41,7 @@ public class TemplateString {
   private Map<String, TemplateString> cache;
 
   public TemplateString() {
-    cache = new HashMap<String, TemplateString>();
+    cache = new ConcurrentHashMap<String, TemplateString>();
   }
 
   private TemplateString(String s) {
@@ -67,6 +65,8 @@ public class TemplateString {
    * @return the string with all variables replaced
    */
   public String replaceTokens(String string, VariableResolver resolver) {
+    if (string == null)
+      return null;
     TemplateString ts = cache.get(string);
     if (ts == null) {
       ts = new TemplateString(string);
@@ -82,7 +82,7 @@ public class TemplateString {
       s[i] = val == null ? "" : getObjectAsString(val);
     }
 
-    StringBuffer sb = new StringBuffer();
+    StringBuilder sb = new StringBuilder();
     for (int i = 0; i < pcs.size(); i++) {
       sb.append(pcs.get(i));
       if (i < s.length) {
@@ -94,9 +94,9 @@ public class TemplateString {
   }
 
   private String getObjectAsString(Object val) {
-    if (val instanceof java.sql.Date) {
-      java.sql.Date d = (java.sql.Date) val;
-      return DataImporter.DATE_TIME_FORMAT.format(d);
+    if (val instanceof Date) {
+      Date d = (Date) val;
+      return DataImporter.DATE_TIME_FORMAT.get().format(d);
     }
     return val.toString();
   }

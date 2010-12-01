@@ -17,14 +17,15 @@
 
 package org.apache.solr.search;
 
-import org.apache.solr.util.OpenBitSet;
-import org.apache.solr.util.BitSetIterator;
+import org.apache.lucene.util.OpenBitSet;
+import org.apache.lucene.util.OpenBitSetIterator;
+import org.apache.lucene.search.DocIdSetIterator;
 
 /**
  * <code>BitDocSet</code> represents an unordered set of Lucene Document Ids
  * using a BitSet.  A set bit represents inclusion in the set for that document.
  *
- * @version $Id: BitDocSet.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: BitDocSet.java 794328 2009-07-15 17:21:04Z shalin $
  * @since solr 0.9
  */
 public class BitDocSet extends DocSetBase {
@@ -81,10 +82,10 @@ public class BitDocSet extends DocSetBase {
 
   public DocIterator iterator() {
     return new DocIterator() {
-      private final BitSetIterator iter = new BitSetIterator(bits);
-      private int pos = iter.next();
+      private final OpenBitSetIterator iter = new OpenBitSetIterator(bits);
+      private int pos = iter.nextDoc();
       public boolean hasNext() {
-        return pos>=0;
+        return pos != DocIdSetIterator.NO_MORE_DOCS;
       }
 
       public Integer next() {
@@ -97,7 +98,7 @@ public class BitDocSet extends DocSetBase {
 
       public int nextDoc() {
         int old=pos;
-        pos=iter.next();
+        pos=iter.nextDoc();
         return old;
       }
 
@@ -179,7 +180,7 @@ public class BitDocSet extends DocSetBase {
   @Override
    public DocSet andNot(DocSet other) {
     OpenBitSet newbits = (OpenBitSet)(bits.clone());
-     if (other instanceof OpenBitSet) {
+     if (other instanceof BitDocSet) {
        newbits.andNot(((BitDocSet)other).bits);
      } else {
        DocIterator iter = other.iterator();

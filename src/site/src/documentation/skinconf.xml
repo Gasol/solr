@@ -35,7 +35,7 @@ which will be used to configure the chosen Forrest skin.
     no search box. @domain will enable sitesearch for the specific domain with google.
     In other words google will search the @domain for the query string.
   -->
-  <search name="Solr" domain="lucene.apache.org" provider="google"/>
+  <search name="Solr" provider="Solr"/>
 
   <!-- Disable the print link? If enabled, invalid HTML 4.0.1 -->
   <disable-print-link>true</disable-print-link>  
@@ -74,7 +74,7 @@ which will be used to configure the chosen Forrest skin.
   <project-name>Solr</project-name>
   <project-description>Solr Description</project-description>
   <project-url>http://lucene.apache.org/solr/</project-url>
-  <project-logo>images/solr.png</project-logo>
+  <project-logo>images/solr.jpg</project-logo>
   <!-- Alternative static image:
   <project-logo>images/project-logo.gif</project-logo> -->
 
@@ -437,6 +437,15 @@ which will be used to configure the chosen Forrest skin.
       <width>88</width>
       <height>31</height>
     </credit>
+
+    <credit box-location="alt2">
+      <name>Book: Solr 1.4 Enterprise Search Server</name>
+      <url>http://www.packtpub.com/solr-1-4-enterprise-search-server?utm_source=http%3A%2F%2Flucene.apache.org%2Fsolr%2F&amp;utm_medium=spons&amp;utm_content=pod&amp;utm_campaign=mdb_000275</url>
+      <image>images/solr-book-image.jpg</image>
+      <width>150</width>
+      <height>185</height>
+    </credit>
+
     <!-- A credit with @role="pdf" will be used to compose a footer
      for each page in the PDF, using either "name" or "url" or both.
     -->

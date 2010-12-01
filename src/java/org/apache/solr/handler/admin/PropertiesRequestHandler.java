@@ -25,7 +25,7 @@ import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
 
 /**
- * @version $Id: PropertiesRequestHandler.java 565144 2007-08-12 20:47:42Z ryan $
+ * @version $Id: PropertiesRequestHandler.java 790580 2009-07-02 13:20:22Z markrmiller $
  * @since solr 1.2
  */
 public class PropertiesRequestHandler extends RequestHandlerBase
@@ -44,6 +44,7 @@ public class PropertiesRequestHandler extends RequestHandlerBase
       props = System.getProperties();
     }
     rsp.add( "system.properties", props );
+    rsp.setHttpCaching(false);
   }
   
   //////////////////////// SolrInfoMBeans methods //////////////////////
@@ -55,16 +56,16 @@ public class PropertiesRequestHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-      return "$Revision: 565144 $";
+      return "$Revision: 790580 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: PropertiesRequestHandler.java 565144 2007-08-12 20:47:42Z ryan $";
+    return "$Id: PropertiesRequestHandler.java 790580 2009-07-02 13:20:22Z markrmiller $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/admin/PropertiesRequestHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/admin/PropertiesRequestHandler.java $";
   }
 }

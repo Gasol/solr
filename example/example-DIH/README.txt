@@ -16,13 +16,7 @@
 Solr DataImportHandler example configuration
 --------------------------------------------
 
-To run this example configuration, unzip the hsqldb.zip to the current directory.
-
-> gunzip hsqldb.zip
-
-Download the hsqldb jar from http://hsqldb.org/ and place it in solr/db/lib directory.
-
-Change to the parent folder. Start solr by executing the following command 
+Change to the parent (example) directory. Start solr by executing the following command 
 
 > cd ..
 > java -Dsolr.solr.home="./example-DIH/solr/" -jar start.jar
@@ -38,6 +32,11 @@ To import data from the hsqldb database, connect to
 To import data from the slashdot feed, connect to
 
   http://localhost:8983/solr/rss/dataimport?command=full-import
+
+To import data from your imap server
+
+1. Edit the example-DIH/solr/mail/conf/data-config.xml and add details about username, password, imap server
+2. Connect to http://localhost:8983/solr/mail/dataimport?command=full-import
 
 See also README.txt in the solr subdirectory, and check
 http://wiki.apache.org/solr/DataImportHandler for detailed

@@ -29,12 +29,10 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
 import org.apache.solr.common.SolrInputField;
-import org.apache.solr.schema.DateField;
-import org.apache.solr.schema.IndexSchema;
-import org.apache.solr.schema.SchemaField;
+import org.apache.solr.schema.*;
 
 /**
- * @version $Id: DocumentBuilder.java 651437 2008-04-24 22:04:30Z gsingers $
+ * @version $Id: DocumentBuilder.java 949894 2010-05-31 23:36:01Z hossman $
  */
 
 
@@ -120,15 +118,15 @@ public class DocumentBuilder {
 
     // Check if we should copy this field to any other fields.
     // This could happen whether it is explicit or not.
-    SchemaField[] destArr = schema.getCopyFields(name);
-    if (destArr != null) {
-      for (SchemaField destField : destArr) {
-        addSingleField(destField,val,boost);
+    final List<CopyField> copyFields = schema.getCopyFieldsList(name);
+    if (copyFields != null) {
+      for(CopyField cf : copyFields) {
+        addSingleField(cf.getDestination(), cf.getLimitedValue( val ), boost);
       }
     }
 
     // error if this field name doesn't match anything
-    if (sfield==null && (destArr==null || destArr.length==0)) {
+    if (sfield==null && (copyFields==null || copyFields.size()==0)) {
       throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"ERROR:unknown field '" + name + "'");
     }
   }
@@ -183,7 +181,7 @@ public class DocumentBuilder {
   /**
    * Convert a SolrInputDocument to a lucene Document.
    * 
-   * This function shoould go elsewhere.  This builds the Document without an
+   * This function should go elsewhere.  This builds the Document without an
    * extra Map<> checking for multiple values.  For more discussion, see:
    * http://www.nabble.com/Re%3A-svn-commit%3A-r547493---in--lucene-solr-trunk%3A-.--src-java-org-apache-solr-common--src-java-org-apache-solr-schema--src-java-org-apache-solr-update--src-test-org-apache-solr-common--tf3931539.html
    * 
@@ -218,8 +216,7 @@ public class DocumentBuilder {
               sfield.getName() + ": " +field.getValue() );
       }
       
-      SchemaField[] destArr = schema.getCopyFields(name);
-      
+
       // load each field value
       boolean hasField = false;
       for( Object v : field ) {
@@ -228,37 +225,55 @@ public class DocumentBuilder {
         }
         String val = null;
         hasField = true;
-        
-        // TODO!!! HACK -- date conversion
-        if( sfield != null && v instanceof Date && sfield.getType() instanceof DateField ) {
-          DateField df = (DateField)sfield.getType();
-          val = df.toInternal( (Date)v )+'Z';
-        }
-        else if (v != null) {
-          val = v.toString();
-        }
-        
-        if( sfield != null ) {
+        boolean isBinaryField = false;
+        if (sfield != null && sfield.getType() instanceof BinaryField) {
+          isBinaryField = true;
+          BinaryField binaryField = (BinaryField) sfield.getType();
+          Field f = binaryField.createField(sfield,v,boost);
+          if(f != null) out.add(f);
           used = true;
-          Field f = sfield.createField( val, boost );
-          if( f != null ) { // null fields are not added
-            out.add( f );
+        } else {
+          // TODO!!! HACK -- date conversion
+          if (sfield != null && v instanceof Date && sfield.getType() instanceof DateField) {
+            DateField df = (DateField) sfield.getType();
+            val = df.toInternal((Date) v) + 'Z';
+          } else if (v != null) {
+            val = v.toString();
+          }
+
+          if (sfield != null) {
+            used = true;
+            Field f = sfield.createField(val, boost);
+            if (f != null) { // null fields are not added
+              out.add(f);
+            }
           }
         }
-        
-        // Add the copy fields
-        for( SchemaField sf : destArr ) {
+
+        // Check if we should copy this field to any other fields.
+        // This could happen whether it is explicit or not.
+        List<CopyField> copyFields = schema.getCopyFieldsList(name);
+        for (CopyField cf : copyFields) {
+          SchemaField destinationField = cf.getDestination();
           // check if the copy field is a multivalued or not
-          if( !sf.multiValued() && out.get( sf.getName() ) != null ) {
-            throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,
-                "ERROR: multiple values encountered for non multiValued copy field " + 
-                  sf.getName() + ": " +val ); 
+          if (!destinationField.multiValued() && out.get(destinationField.getName()) != null) {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
+                    "ERROR: multiple values encountered for non multiValued copy field " +
+                            destinationField.getName() + ": " + val);
           }
-          
+
           used = true;
-          Field f = sf.createField( val, boost );
-          if( f != null ) { // null fields are not added
-            out.add( f );
+          Field f = null;
+          if (isBinaryField) {
+            if (destinationField.getType() instanceof BinaryField) {
+              BinaryField binaryField = (BinaryField) destinationField.getType();
+              f = binaryField.createField(destinationField, v, boost);
+            }
+          } else {
+            f = destinationField.createField(cf.getLimitedValue(val), boost);
+          }
+          if (f != null) { // null fields are not added
+            out.add(f);
           }
         }
         
@@ -271,7 +286,8 @@ public class DocumentBuilder {
       
       // make sure the field was used somehow...
       if( !used && hasField ) {
-        throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"ERROR:unknown field '" + name + "'");
+        throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"ERROR:unknown field '" +
+                name + "'");
       }
     }
     

@@ -30,7 +30,7 @@ package org.apache.solr.handler.dataimport;
  * </p>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: Evaluator.java 684025 2008-08-08 17:50:11Z shalin $
+ * @version $Id: Evaluator.java 745734 2009-02-19 05:28:48Z shalin $
  * @since solr 1.3
  */
 public abstract class Evaluator {
@@ -39,9 +39,9 @@ public abstract class Evaluator {
    * Return a String after processing an expression and a VariableResolver
    *
    * @see org.apache.solr.handler.dataimport.VariableResolver
-   * @param resolver the VariableResolver instance to be used for evaluation
    * @param expression string to be evaluated
+   * @param context instance
    * @return the value of the given expression evaluated using the resolver
    */
-  public abstract String evaluate(VariableResolver resolver, String expression);
+  public abstract String evaluate(String expression, Context context);
 }

@@ -29,8 +29,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -39,9 +39,9 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.TermEnum;
 import org.apache.lucene.index.TermFreqVector;
-import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.ConstantScoreRangeQuery;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.PriorityQueue;
 import org.apache.solr.analysis.TokenFilterFactory;
@@ -53,16 +53,14 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
+import org.apache.solr.common.util.Base64;
 import org.apache.solr.handler.RequestHandlerBase;
-import org.apache.solr.handler.RequestHandlerUtils;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
-import org.apache.solr.search.DocList;
 import org.apache.solr.search.SolrIndexSearcher;
-import org.apache.solr.search.SolrQueryParser;
 
 /**
  * This handler exposes the internal lucene index.  It is inspired by and 
@@ -77,12 +75,12 @@ import org.apache.solr.search.SolrQueryParser;
  * For more documentation see:
  *  http://wiki.apache.org/solr/LukeRequestHandler
  * 
- * @version $Id: LukeRequestHandler.java 690026 2008-08-28 22:20:00Z yonik $
+ * @version $Id: LukeRequestHandler.java 949889 2010-05-31 23:27:44Z hossman $
  * @since solr 1.2
  */
 public class LukeRequestHandler extends RequestHandlerBase 
 {
-  private static Logger log = Logger.getLogger(LukeRequestHandler.class.getName());
+  private static Logger log = LoggerFactory.getLogger(LukeRequestHandler.class);
   
   public static final String NUMTERMS = "numTerms";
   public static final String DOC_ID = "docId";
@@ -152,6 +150,7 @@ public class LukeRequestHandler extends RequestHandlerBase
     info.add( "key", getFieldFlagsKey() );
     info.add( "NOTE", "Document Frequency (df) is not updated when a document is marked for deletion.  df values include deleted documents." ); 
     rsp.add( "info", info );
+    rsp.setHttpCaching(false);
   }
 
   
@@ -198,6 +197,7 @@ public class LukeRequestHandler extends RequestHandlerBase
     flags.append( (f != null && f.storeTermOffsets() )   ? FieldFlag.TERM_VECTOR_OFFSET.getAbbreviation() : '-' );
     flags.append( (f != null && f.storeTermPositions() ) ? FieldFlag.TERM_VECTOR_POSITION.getAbbreviation() : '-' );
     flags.append( (f != null && f.omitNorms())           ? FieldFlag.OMIT_NORMS.getAbbreviation() : '-' );
+    flags.append( (f != null && f.omitTf())              ? FieldFlag.OMIT_TF.getAbbreviation() : '-' );
     flags.append( (lazy)                                 ? FieldFlag.LAZY.getAbbreviation() : '-' );
     flags.append( (binary)                               ? FieldFlag.BINARY.getAbbreviation() : '-' );
     flags.append( (f != null && f.isCompressed())        ? FieldFlag.COMPRESSED.getAbbreviation() : '-' );
@@ -241,12 +241,20 @@ public class LukeRequestHandler extends RequestHandlerBase
       f.add( "type", (ftype==null)?null:ftype.getTypeName() );
       f.add( "schema", getFieldFlags( sfield ) );
       f.add( "flags", getFieldFlags( fieldable ) );
-      
-      Term t = new Term( fieldable.name(), fieldable.stringValue() );
+
+      Term t = new Term(fieldable.name(), ftype!=null ? ftype.storedToIndexed(fieldable) : fieldable.stringValue());
+
       f.add( "value", (ftype==null)?null:ftype.toExternal( fieldable ) );
+
+      // TODO: this really should be "stored"
       f.add( "internal", fieldable.stringValue() );  // may be a binary number
+
+      byte[] arr = fieldable.getBinaryValue();
+      if (arr != null) {
+        f.add( "binary", Base64.byteArrayToBase64(arr, 0, arr.length));
+      }
       f.add( "boost", fieldable.getBoost() );
-      f.add( "docFreq", reader.docFreq( t ) ); // this can be 0 for non-indexed fields
+      f.add( "docFreq", t.text()==null ? 0 : reader.docFreq( t ) ); // this can be 0 for non-indexed fields
             
       // If we have a term vector, return that
       if( fieldable.isTermVectorStored() ) {
@@ -261,7 +269,7 @@ public class LukeRequestHandler extends RequestHandlerBase
           }
         }
         catch( Exception ex ) {
-          log.log( Level.WARNING, "error writing term vector", ex );
+          log.warn( "error writing term vector", ex );
         }
       }
       
@@ -274,8 +282,6 @@ public class LukeRequestHandler extends RequestHandlerBase
   private static SimpleOrderedMap<Object> getIndexedFieldsInfo( 
     final SolrIndexSearcher searcher, final Set<String> fields, final int numTerms ) 
     throws Exception {
-    Query matchAllDocs = new MatchAllDocsQuery();
-    SolrQueryParser qp = searcher.getSchema().getSolrQueryParser(null);
 
     IndexReader reader = searcher.getReader();
     IndexSchema schema = searcher.getSchema();
@@ -299,19 +305,18 @@ public class LukeRequestHandler extends RequestHandlerBase
 
       f.add( "type", (ftype==null)?null:ftype.getTypeName() );
       f.add( "schema", getFieldFlags( sfield ) );
-      if (sfield != null && schema.getDynamicPattern(sfield.getName()) != null) {
+      if (sfield != null && schema.isDynamicField(sfield.getName()) && schema.getDynamicPattern(sfield.getName()) != null) {
     	  f.add("dynamicBase", schema.getDynamicPattern(sfield.getName()));
       }
 
       // If numTerms==0, the call is just asking for a quick field list
       if( ttinfo != null && sfield != null && sfield.indexed() ) {
-        Query q = qp.parse( fieldName+":[* TO *]" ); 
-        int docCount = searcher.numDocs( q, matchAllDocs );
-        if( docCount > 0 ) {
+        Query q = new ConstantScoreRangeQuery(fieldName,null,null,false,false); 
+        TopDocs top = searcher.search( q, 1 );
+        if( top.totalHits > 0 ) {
           // Find a document with this field
-          DocList ds = searcher.getDocList( q, (Query)null, (Sort)null, 0, 1 );
           try {
-            Document doc = searcher.doc( ds.iterator().next() );
+            Document doc = searcher.doc( top.scoreDocs[0].doc );
             Fieldable fld = doc.getFieldable( fieldName );
             if( fld != null ) {
               f.add( "index", getFieldFlags( fld ) );
@@ -322,11 +327,10 @@ public class LukeRequestHandler extends RequestHandlerBase
             }
           }
           catch( Exception ex ) {
-            log.warning( "error reading field: "+fieldName );
+            log.warn( "error reading field: "+fieldName );
           }
-          // Find one document so we can get the fieldable
         }
-        f.add( "docs", docCount );
+        f.add( "docs", top.totalHits );
         
         TopTermQueue topTerms = ttinfo.get( fieldName );
         if( topTerms != null ) {
@@ -375,7 +379,8 @@ public class LukeRequestHandler extends RequestHandlerBase
     SimpleOrderedMap<Object> finfo = new SimpleOrderedMap<Object>();
     finfo.add("fields", fields);
     finfo.add("dynamicFields", dynamicFields);
-    finfo.add("uniqueKeyField", uniqueField.getName());
+    finfo.add("uniqueKeyField", 
+              null == uniqueField ? null : uniqueField.getName());
     finfo.add("defaultSearchField", schema.getDefaultSearchFieldName());
     finfo.add("types", types);
     return finfo;
@@ -482,17 +487,17 @@ public class LukeRequestHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-    return "$Revision: 690026 $";
+    return "$Revision: 949889 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: LukeRequestHandler.java 690026 2008-08-28 22:20:00Z yonik $";
+    return "$Id: LukeRequestHandler.java 949889 2010-05-31 23:27:44Z hossman $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/admin/LukeRequestHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/admin/LukeRequestHandler.java $";
   }
 
   @Override
@@ -505,7 +510,7 @@ public class LukeRequestHandler extends RequestHandlerBase
 
   ///////////////////////////////////////////////////////////////////////////////////////
   
-  private static class TermHistogram 
+  static class TermHistogram 
   {
     int maxBucket = -1;
     public Map<Integer,Integer> hist = new HashMap<Integer, Integer>();
@@ -513,8 +518,7 @@ public class LukeRequestHandler extends RequestHandlerBase
     private static final double LOG2 = Math.log( 2 );
     public static int getPowerOfTwoBucket( int num )
     {
-      int exp = (int)Math.ceil( (Math.log( num ) / LOG2 ) );
-      return (int) Math.pow( 2, exp );
+      return Math.max(1, Integer.highestOneBit(num-1) << 1);
     }
     
     public void add( int df )
@@ -536,7 +540,7 @@ public class LukeRequestHandler extends RequestHandlerBase
     public NamedList<Integer> toNamedList()
     {
       NamedList<Integer> nl = new NamedList<Integer>();
-      for( int bucket = 2; bucket <= maxBucket; bucket *= 2 ) {
+      for( int bucket = 1; bucket <= maxBucket; bucket *= 2 ) {
         Integer val = hist.get( bucket );
         if( val == null ) {
           val = 0;

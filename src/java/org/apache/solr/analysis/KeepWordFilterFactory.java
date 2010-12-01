@@ -22,6 +22,7 @@ import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.util.plugin.ResourceLoaderAware;
 import org.apache.lucene.analysis.StopFilter;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.CharArraySet;
 
 import java.util.HashSet;
 import java.util.List;
@@ -31,36 +32,30 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * @version $Id: KeepWordFilterFactory.java 680935 2008-07-30 08:11:56Z shalin $
+ * @version $Id: KeepWordFilterFactory.java 761036 2009-04-01 20:07:44Z gsingers $
  * @since solr 1.3
  */
 public class KeepWordFilterFactory extends BaseTokenFilterFactory implements ResourceLoaderAware {
 
-  private Set<String> words;
+  private CharArraySet words;
   private boolean ignoreCase;
 
   @SuppressWarnings("unchecked")
   public void inform(ResourceLoader loader) {
     String wordFiles = args.get("words");
-    ignoreCase = getBoolean("ignoreCase",false);
-
+    ignoreCase = getBoolean("ignoreCase", false);
     if (wordFiles != null) {
-      if (words == null)
-        words = new HashSet<String>();
       try {
-        java.io.File keepWordsFile = new File(wordFiles);
-        if (keepWordsFile.exists()) {
-          List<String> wlist = loader.getLines(wordFiles);
-          words = StopFilter.makeStopSet(
-              (String[])wlist.toArray(new String[0]), ignoreCase);
-        } else  {
-          List<String> files = StrUtils.splitFileNames(wordFiles);
-          for (String file : files) {
-            List<String> wlist = loader.getLines(file.trim());
-            words.addAll(StopFilter.makeStopSet((String[])wlist.toArray(new String[0]), ignoreCase));
-          }
+        List<String> files = StrUtils.splitFileNames(wordFiles);
+        if (words == null && files.size() > 0){
+          words = new CharArraySet(files.size() * 10, ignoreCase);
         }
-      } 
+        for (String file : files) {
+          List<String> wlist = loader.getLines(file.trim());
+          //TODO: once StopFilter.makeStopSet(List) method is available, switch to using that so we can avoid a toArray() call
+          words.addAll(StopFilter.makeStopSet((String[]) wlist.toArray(new String[0]), ignoreCase));
+        }
+      }
       catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -72,15 +67,22 @@ public class KeepWordFilterFactory extends BaseTokenFilterFactory implements Res
    * NOTE: if ignoreCase==true, the words are expected to be lowercase
    */
   public void setWords(Set<String> words) {
-    this.words = words;
+    this.words = new CharArraySet(words, ignoreCase);
   }
 
   public void setIgnoreCase(boolean ignoreCase) {
     this.ignoreCase = ignoreCase;
   }
-  
+
   public KeepWordFilter create(TokenStream input) {
-    return new KeepWordFilter(input,words,ignoreCase);
+    return new KeepWordFilter(input, words, ignoreCase);
   }
 
+  public CharArraySet getWords() {
+    return words;
+  }
+
+  public boolean isIgnoreCase() {
+    return ignoreCase;
+  }
 }

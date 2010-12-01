@@ -22,7 +22,6 @@ import org.w3c.dom.NodeList;
 
 import java.util.Map;
 
-import org.apache.solr.common.ResourceLoader;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.DOMUtil;
 import org.apache.solr.core.SolrConfig;
@@ -35,19 +34,28 @@ import javax.xml.xpath.XPathConstants;
  * stored in the solrconfig.xml file, and implements a
  * factory to create caches.
  *
- * @version $Id: CacheConfig.java 597847 2007-11-24 13:51:46Z ryan $
+ * @version $Id: CacheConfig.java 818808 2009-09-25 10:24:58Z shalin $
  */
 public class CacheConfig {
   private String nodeName;
+
+  private Class clazz;
   private Map<String,String> args;
+  private CacheRegenerator regenerator;
 
   private String cacheImpl;
-  private Class clazz;
 
   private Object[] persistence = new Object[1];
 
   private String regenImpl;
-  private CacheRegenerator regenerator;
+
+  public CacheConfig() {}
+
+  public CacheConfig(Class clazz, Map<String,String> args, CacheRegenerator regenerator) {
+    this.clazz = clazz;
+    this.args = args;
+    this.regenerator = regenerator;
+  }
 
   public CacheRegenerator getRegenerator() {
     return regenerator;
@@ -69,7 +77,7 @@ public class CacheConfig {
 
 
   public static CacheConfig getConfig(SolrConfig solrConfig, String xpath) {
-    Node node = (Node)solrConfig.getNode(xpath, false);
+    Node node = solrConfig.getNode(xpath, false);
     return getConfig(solrConfig, node);
   }
 
@@ -79,14 +87,14 @@ public class CacheConfig {
     CacheConfig config = new CacheConfig();
     config.nodeName = node.getNodeName();
     config.args = DOMUtil.toMap(node.getAttributes());
-    String nameAttr = (String)config.args.get("name");  // OPTIONAL
+    String nameAttr = config.args.get("name");  // OPTIONAL
     if (nameAttr==null) {
       config.args.put("name",config.nodeName);
     }
 
     SolrResourceLoader loader = solrConfig.getResourceLoader();
-    config.cacheImpl = (String)config.args.get("class");
-    config.regenImpl = (String)config.args.get("regenerator");
+    config.cacheImpl = config.args.get("class");
+    config.regenImpl = config.args.get("regenerator");
     config.clazz = loader.findClass(config.cacheImpl);
     if (config.regenImpl != null) {
       config.regenerator = (CacheRegenerator) loader.newInstance(config.regenImpl);

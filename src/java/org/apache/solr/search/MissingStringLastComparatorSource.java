@@ -23,18 +23,7 @@ import org.apache.lucene.index.IndexReader;
 import java.io.IOException;
 
 
-/**
- * A {@link SortComparatorSource} for strings that orders null values after non-null values.
- * Based on FieldSortedHitQueue.comparatorString
- * <p>
- *
- * @version $Id: MissingStringLastComparatorSource.java 631357 2008-02-26 19:47:07Z yonik $
- *
- */
-
-// move to apache package and make public if it is accepted as a patch
-public class MissingStringLastComparatorSource implements SortComparatorSource {
-
+public class MissingStringLastComparatorSource extends FieldComparatorSource {
   public static final String bigString="\uffff\uffff\uffff\uffff\uffff\uffff\uffff\uffffNULL_VAL";
 
   private final String missingValueProxy;
@@ -43,16 +32,7 @@ public class MissingStringLastComparatorSource implements SortComparatorSource {
     this(bigString);
   }
 
-  /**
-	 * Returns the value used to sort the given document.  The
-	 * object returned must implement the java.io.Serializable
-	 * interface.  This is used by multisearchers to determine how to collate results from their searchers.
-	 * @see FieldDoc
-	 * @param i Document
-	 * @return Serializable object
-	 */
-
-  /** Creates a {@link SortComparatorSource} that uses <tt>missingValueProxy</tt> as the value to return from ScoreDocComparator.sortValue()
+  /** Creates a {@link FieldComparatorSource} that uses <tt>missingValueProxy</tt> as the value to return from ScoreDocComparator.sortValue()
    * which is only used my multisearchers to determine how to collate results from their searchers.
    *
    * @param missingValueProxy   The value returned when sortValue() is called for a document missing the sort field.
@@ -62,53 +42,158 @@ public class MissingStringLastComparatorSource implements SortComparatorSource {
     this.missingValueProxy=missingValueProxy;
   }
 
-  public ScoreDocComparator newComparator(final IndexReader reader,
-                                          final String fieldname)
-          throws IOException {
-
-    final String field = fieldname.intern();
-    final FieldCache.StringIndex index =
-            FieldCache.DEFAULT.getStringIndex (reader, field);
-
-    // :HACK:
-    // final String lastString =
-    // (index.lookup[index.lookup.length-1]+"X").intern();
-    //
-    // Note: basing lastStringValue on the StringIndex won't work
-    // with a multisearcher.
-
-
-    return new ScoreDocComparator () {
-
-      public final int compare (final ScoreDoc i, final ScoreDoc j) {
-        final int fi = index.order[i.doc];
-        final int fj = index.order[j.doc];
-
-        // 0 is the magic position of null
-
-        /**** alternate logic
-         if (fi < fj && fi != 0) return -1;
-         if (fj < fi && fj != 0) return 1;
-         if (fi==fj) return 0;
-         return fi==0 ? 1 : -1;
-         ****/
-
-        if (fi==fj) return 0;
-        if (fi==0) return 1;
-        if (fj==0) return -1;
-        return fi < fj ? -1 : 1;
-
-      }
-
-      public Comparable sortValue (final ScoreDoc i) {
-        int f = index.order[i.doc];
-        return (0 == f) ? missingValueProxy : index.lookup[f];
-      }
-
-      public int sortType() {
-        return SortField.CUSTOM;
-      }
-    };
-
+  public FieldComparator newComparator(String fieldname, int numHits, int sortPos, boolean reversed) throws IOException {
+    return new MissingLastOrdComparator(numHits, fieldname, sortPos, reversed, missingValueProxy);
   }
+
 }
+
+
+// Copied from Lucene and modified since the Lucene version couldn't
+// be extended or have it's values accessed.
+ class MissingLastOrdComparator extends FieldComparator {
+    private static final int NULL_ORD = Integer.MAX_VALUE;
+    private final String nullVal; 
+
+    private final int[] ords;
+    private final String[] values;
+    private final int[] readerGen;
+
+    private int currentReaderGen = -1;
+    private String[] lookup;
+    private int[] order;
+    private final String field;
+
+    private int bottomSlot = -1;
+    private int bottomOrd;
+    private String bottomValue;
+    private final boolean reversed;
+    private final int sortPos;
+
+   public MissingLastOrdComparator(int numHits, String field, int sortPos, boolean reversed, String nullVal) {
+      ords = new int[numHits];
+      values = new String[numHits];
+      readerGen = new int[numHits];
+      this.sortPos = sortPos;
+      this.reversed = reversed;
+      this.field = field;
+      this.nullVal = nullVal;
+    }
+
+    public int compare(int slot1, int slot2) {
+      if (readerGen[slot1] == readerGen[slot2]) {
+        int cmp = ords[slot1] - ords[slot2];
+        if (cmp != 0) {
+          return cmp;
+        }
+      }
+
+      final String val1 = values[slot1];
+      final String val2 = values[slot2];
+
+      if (val1 == null) {
+        if (val2 == null) {
+          return 0;
+        }
+        return 1;
+      } else if (val2 == null) {
+        return -1;
+      }
+      return val1.compareTo(val2);
+    }
+
+    public int compareBottom(int doc) {
+      assert bottomSlot != -1;
+      int order = this.order[doc];
+      int ord = (order == 0) ? NULL_ORD : order;
+      final int cmp = bottomOrd - ord;
+      if (cmp != 0) {
+        return cmp;
+      }
+
+      final String val2 = lookup[order];
+
+      // take care of the case where both vals are null
+      if (bottomValue == val2) return 0;
+ 
+      return bottomValue.compareTo(val2);
+    }
+
+    private void convert(int slot) {
+      readerGen[slot] = currentReaderGen;
+      int index = 0;
+      String value = values[slot];
+      if (value == null) {
+        // should already be done
+        // ords[slot] = NULL_ORD;
+        return;
+      }
+
+      if (sortPos == 0 && bottomSlot != -1 && bottomSlot != slot) {
+        // Since we are the primary sort, the entries in the
+        // queue are bounded by bottomOrd:
+        assert bottomOrd < lookup.length;
+        if (reversed) {
+          index = binarySearch(lookup, value, bottomOrd, lookup.length-1);
+        } else {
+          index = binarySearch(lookup, value, 0, bottomOrd);
+        }
+      } else {
+        // Full binary search
+        index = binarySearch(lookup, value);
+      }
+
+      if (index < 0) {
+        index = -index - 2;
+      }
+      ords[slot] = index;
+    }
+
+    public void copy(int slot, int doc) {
+      final int ord = order[doc];
+      ords[slot] = ord == 0 ? NULL_ORD : ord;
+      assert ord >= 0;
+      values[slot] = lookup[ord];
+      readerGen[slot] = currentReaderGen;
+    }
+
+    public void setNextReader(IndexReader reader, int docBase) throws IOException {
+      FieldCache.StringIndex currentReaderValues = FieldCache.DEFAULT.getStringIndex(reader, field);
+      currentReaderGen++;
+      order = currentReaderValues.order;
+      lookup = currentReaderValues.lookup;
+      assert lookup.length > 0;
+      if (bottomSlot != -1) {
+        convert(bottomSlot);
+        bottomOrd = ords[bottomSlot];
+      }
+    }
+
+    public void setBottom(final int bottom) {
+      bottomSlot = bottom;
+      if (readerGen[bottom] != currentReaderGen) {
+        convert(bottomSlot);
+      }
+      bottomOrd = ords[bottom];
+      assert bottomOrd >= 0;
+      // assert bottomOrd < lookup.length;
+      bottomValue = values[bottom];
+    }
+
+    public Comparable value(int slot) {
+      Comparable v = values[slot];
+      return v==null ? nullVal : v;
+    }
+
+    public String[] getValues() {
+      return values;
+    }
+
+    public int getBottomSlot() {
+      return bottomSlot;
+    }
+
+    public String getField() {
+      return field;
+    }
+  }

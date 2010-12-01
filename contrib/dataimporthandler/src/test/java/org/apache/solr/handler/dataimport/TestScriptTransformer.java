@@ -39,7 +39,7 @@ import java.util.Map;
  * All tests in this have been ignored because script support is only available
  * in Java 1.6+
  *
- * @version $Id: TestScriptTransformer.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: TestScriptTransformer.java 766608 2009-04-20 07:36:55Z shalin $
  * @since solr 1.3
  */
 public class TestScriptTransformer {
@@ -52,7 +52,7 @@ public class TestScriptTransformer {
     Context context = getContext("f1", script);
     Map<String, Object> map = new HashMap<String, Object>();
     map.put("name", "Scott");
-    SqlEntityProcessor sep = new SqlEntityProcessor();
+    EntityProcessorWrapper sep = new EntityProcessorWrapper(new SqlEntityProcessor(), null);
     sep.init(context);
     sep.applyTransformer(map);
     Assert.assertEquals(map.get("name"), "Hello Scott");
@@ -64,14 +64,11 @@ public class TestScriptTransformer {
     Map<String, String> entity = new HashMap<String, String>();
     entity.put("name", "hello");
     entity.put("transformer", "script:" + funcName);
-    Map<String, Object> dataImporterNs = new HashMap<String, Object>();
-    dataImporterNs.put(DataConfig.SCRIPT_LANG, "JavaScript");
-    dataImporterNs.put(DataConfig.SCRIPT, script);
-    VariableResolverImpl vr = new VariableResolverImpl();
-    vr.addNamespace(DataConfig.IMPORTER_NS, dataImporterNs);
 
-    Context context = AbstractDataImportHandlerTest.getContext(null, vr, null,
-            0, fields, entity);
+    AbstractDataImportHandlerTest.TestContext context = AbstractDataImportHandlerTest.getContext(null, null, null,
+            Context.FULL_DUMP, fields, entity);
+    context.script = script;
+    context.scriptlang = "JavaScript";
     return context;
   }
 
@@ -85,7 +82,7 @@ public class TestScriptTransformer {
     Context context = getContext("f1", script);
     Map<String, Object> map = new HashMap<String, Object>();
     map.put("name", "Scott");
-    SqlEntityProcessor sep = new SqlEntityProcessor();
+    EntityProcessorWrapper sep = new EntityProcessorWrapper(new SqlEntityProcessor(), null);
     sep.init(context);
     sep.applyTransformer(map);
     Assert.assertEquals(map.get("name"), "Hello Scott");
@@ -101,7 +98,7 @@ public class TestScriptTransformer {
     DataConfig config = new DataConfig();
     config.readFromXml((Element) document.getElementsByTagName("dataConfig")
             .item(0));
-    Assert.assertTrue(config.script.script.indexOf("checkNextToken") > -1);
+    Assert.assertTrue(config.script.text.indexOf("checkNextToken") > -1);
   }
 
   @Test
@@ -114,11 +111,11 @@ public class TestScriptTransformer {
     config.readFromXml((Element) document.getElementsByTagName("dataConfig")
             .item(0));
 
-    Context c = getContext("checkNextToken", config.script.script);
+    Context c = getContext("checkNextToken", config.script.text);
 
     Map map = new HashMap();
     map.put("nextToken", "hello");
-    SqlEntityProcessor sep = new SqlEntityProcessor();
+    EntityProcessorWrapper sep = new EntityProcessorWrapper(new SqlEntityProcessor(), null);
     sep.init(c);
     sep.applyTransformer(map);
     Assert.assertEquals("true", map.get("$hasMore"));

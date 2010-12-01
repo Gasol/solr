@@ -18,8 +18,8 @@ package org.apache.solr.handler.dataimport;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,12 +38,11 @@ import java.util.regex.Pattern;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: SqlEntityProcessor.java 681182 2008-07-30 19:35:58Z shalin $
+ * @version $Id: SqlEntityProcessor.java 800204 2009-08-03 05:51:59Z noble $
  * @since solr 1.3
  */
 public class SqlEntityProcessor extends EntityProcessorBase {
-  private static final Logger LOG = Logger.getLogger(SqlEntityProcessor.class
-          .getName());
+  private static final Logger LOG = LoggerFactory.getLogger(SqlEntityProcessor.class);
 
   protected DataSource<Iterator<Map<String, Object>>> dataSource;
 
@@ -61,27 +60,17 @@ public class SqlEntityProcessor extends EntityProcessorBase {
     } catch (DataImportHandlerException e) {
       throw e;
     } catch (Exception e) {
-      LOG.log(Level.SEVERE, "The query failed '" + q + "'", e);
+      LOG.error( "The query failed '" + q + "'", e);
       throw new DataImportHandlerException(DataImportHandlerException.SEVERE, e);
     }
   }
 
-  public Map<String, Object> nextRow() {
-    if (rowcache != null)
-      return getFromRowCache();
+  public Map<String, Object> nextRow() {    
     if (rowIterator == null) {
       String q = getQuery();
       initQuery(resolver.replaceTokens(q));
     }
-    while (true) {
-      Map<String, Object> r = getNext();
-      if (r == null)
-        return null;
-      r = applyTransformer(r);
-      if (r != null)
-        return r;
-    }
-
+    return getNext();
   }
 
   public Map<String, Object> nextModifiedRowKey() {
@@ -118,15 +107,19 @@ public class SqlEntityProcessor extends EntityProcessorBase {
 
   public String getQuery() {
     String queryString = context.getEntityAttribute(QUERY);
-    if (context.currentProcess() == Context.FULL_DUMP
-            || !context.isRootEntity()) {
+    if (Context.FULL_DUMP.equals(context.currentProcess())) {
       return queryString;
     }
+    if (Context.DELTA_DUMP.equals(context.currentProcess())) {
+      String deltaImportQuery = context.getEntityAttribute(DELTA_IMPORT_QUERY);
+      if(deltaImportQuery != null) return deltaImportQuery;
+    }
+    LOG.warn("'deltaImportQuery' attribute is not specified for entity : "+ entityName);
     return getDeltaImportQuery(queryString);
   }
 
-  public String getDeltaImportQuery(String queryString) {
-    StringBuffer sb = new StringBuffer(queryString);
+  public String getDeltaImportQuery(String queryString) {    
+    StringBuilder sb = new StringBuilder(queryString);
     if (SELECT_WHERE_PATTERN.matcher(queryString).find()) {
       sb.append(" and ");
     } else {
@@ -162,6 +155,8 @@ public class SqlEntityProcessor extends EntityProcessorBase {
   public static final String QUERY = "query";
 
   public static final String DELTA_QUERY = "deltaQuery";
+
+  public static final String DELTA_IMPORT_QUERY = "deltaImportQuery";
 
   public static final String PARENT_DELTA_QUERY = "parentDeltaQuery";
 

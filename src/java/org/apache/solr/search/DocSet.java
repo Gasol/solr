@@ -18,7 +18,13 @@
 package org.apache.solr.search;
 
 import org.apache.solr.common.SolrException;
-import org.apache.solr.util.OpenBitSet;
+import org.apache.lucene.util.OpenBitSet;
+import org.apache.lucene.search.DocIdSet;
+import org.apache.lucene.search.Filter;
+import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.index.IndexReader;
+
+import java.io.IOException;
 
 /**
  * <code>DocSet</code> represents an unordered set of Lucene Document Ids.
@@ -28,7 +34,7 @@ import org.apache.solr.util.OpenBitSet;
  * a cache and could be shared.
  * </p>
  *
- * @version $Id: DocSet.java 684908 2008-08-11 20:37:36Z gsingers $
+ * @version $Id: DocSet.java 816834 2009-09-19 00:34:01Z yonik $
  * @since solr 0.9
  */
 public interface DocSet /* extends Collection<Integer> */ {
@@ -135,6 +141,13 @@ public interface DocSet /* extends Collection<Integer> */ {
    * Returns the number of documents in this set that are not in the other set.
    */
   public int andNotSize(DocSet other);
+
+  /**
+   * Returns a Filter for use in Lucene search methods, assuming this DocSet
+   * was generated from the top-level MultiReader that the Lucene search
+   * methods will be invoked with.
+   */
+  public Filter getTopFilter();
 }
 
 /** A base class that may be usefull for implementing DocSets */
@@ -149,7 +162,7 @@ abstract class DocSetBase implements DocSet {
     if (this instanceof DocList && other instanceof DocList) {
       // compare ordering
       DocIterator i1=this.iterator();
-      DocIterator i2=this.iterator();
+      DocIterator i2=other.iterator();
       while(i1.hasNext() && i2.hasNext()) {
         if (i1.nextDoc() != i2.nextDoc()) return false;
       }
@@ -189,10 +202,9 @@ abstract class DocSetBase implements DocSet {
   };
 
   public DocSet intersection(DocSet other) {
-    // intersection is overloaded in HashDocSet to be more
-    // efficient, so if "other" is a HashDocSet, dispatch off
-    // of it instead.
-    if (other instanceof HashDocSet) {
+    // intersection is overloaded in the smaller DocSets to be more
+    // efficient, so dispatch off of it instead.
+    if (!(other instanceof BitDocSet)) {
       return other.intersection(this);
     }
 
@@ -209,10 +221,9 @@ abstract class DocSetBase implements DocSet {
   }
 
   public int intersectionSize(DocSet other) {
-    // intersectionSize is overloaded in HashDocSet to be more
-    // efficient, so if "other" is a HashDocSet, dispatch off
-    // of it instead.
-    if (other instanceof HashDocSet) {
+    // intersection is overloaded in the smaller DocSets to be more
+    // efficient, so dispatch off of it instead.
+    if (!(other instanceof BitDocSet)) {
       return other.intersectionSize(this);
     }
     // less efficient way: do the intersection then get it's size
@@ -231,6 +242,61 @@ abstract class DocSetBase implements DocSet {
 
   public int andNotSize(DocSet other) {
     return this.size() - this.intersectionSize(other);
+  }
+
+  public Filter getTopFilter() {
+    final OpenBitSet bs = getBits();
+
+    return new Filter() {
+      @Override
+      public DocIdSet getDocIdSet(IndexReader reader) throws IOException {
+        int offset = 0;
+        SolrIndexReader r = (SolrIndexReader)reader;
+        while (r.getParent() != null) {
+          offset += r.getBase();
+          r = r.getParent();
+        }
+
+        if (r==reader) return bs;
+
+        final int base = offset;
+        final int maxDoc = reader.maxDoc();
+        final int max = base + maxDoc;   // one past the max doc in this segment.
+
+        return new DocIdSet() {
+          public DocIdSetIterator iterator() throws IOException {
+            return new DocIdSetIterator() {
+              int pos=base-1;
+              int adjustedDoc=-1;
+
+              @Override
+              public int docID() {
+                return adjustedDoc;
+              }
+
+              @Override
+              public int nextDoc() throws IOException {
+                pos = bs.nextSetBit(pos+1);
+                return adjustedDoc = (pos>=0 && pos<max) ? pos-base : NO_MORE_DOCS;
+              }
+
+              @Override
+              public int advance(int target) throws IOException {
+                if (target==NO_MORE_DOCS) return adjustedDoc=NO_MORE_DOCS;
+                pos = bs.nextSetBit(target+base);
+                return adjustedDoc = (pos>=0 && pos<max) ? pos-base : NO_MORE_DOCS;
+              }
+            };
+          }
+
+          @Override
+          public boolean isCacheable() {
+            return true;
+          }
+
+        };
+      }
+    };
   }
 }
 

@@ -30,7 +30,6 @@ import org.apache.lucene.search.Query;
 import java.util.HashSet;
 import java.util.concurrent.Future;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Level;
 import java.io.IOException;
 import java.net.URL;
 
@@ -47,7 +46,7 @@ import org.apache.solr.core.SolrCore;
  * directly to the main lucene index as opposed to adding to a separate smaller index.
  * For this reason, not all combinations to/from pending and committed are supported.
  *
- * @version $Id: DirectUpdateHandler.java 672031 2008-06-26 21:14:06Z gsingers $
+ * @version $Id: DirectUpdateHandler.java 805774 2009-08-19 12:21:22Z noble $
  * @since solr 0.9
  *
  * @deprecated Use {@link DirectUpdateHandler2} instead.  This is only kept around for back-compatibility (way back).
@@ -136,8 +135,8 @@ public class DirectUpdateHandler extends UpdateHandler {
     try {
       Term term = new Term(idField.getName(), indexedId);
       num = ir.deleteDocuments(term);
-      if (core.log.isLoggable(Level.FINEST)) {
-        core.log.finest( core.getLogId()+"deleted " + num + " docs matching id " + idFieldType.indexedToReadable(indexedId));
+      if (core.log.isTraceEnabled()) {
+        core.log.trace( core.getLogId()+"deleted " + num + " docs matching id " + idFieldType.indexedToReadable(indexedId));
       }
     } finally {
       try { if (tdocs != null) tdocs.close(); } catch (Exception e) {}
@@ -189,7 +188,7 @@ public class DirectUpdateHandler extends UpdateHandler {
     if (!cmd.fromPending && !cmd.fromCommitted)
       throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"meaningless command: " + cmd);
     if (!cmd.fromPending || !cmd.fromCommitted)
-      throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"operation not supported" + cmd);
+      throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,"operation not supported: " + cmd);
 
     Query q = QueryParsing.parseQuery(cmd.query, schema);
 
@@ -204,8 +203,8 @@ public class DirectUpdateHandler extends UpdateHandler {
       totDeleted = deleter.deleted;
     }
 
-    if (core.log.isLoggable(Level.FINE)) {
-      core.log.fine(core.getLogId()+"docs deleted:" + totDeleted);
+    if (core.log.isDebugEnabled()) {
+      core.log.debug(core.getLogId()+"docs deleted:" + totDeleted);
     }
 
   }
@@ -227,6 +226,12 @@ public class DirectUpdateHandler extends UpdateHandler {
   }
   ***************************/
 
+  public int mergeIndexes(MergeIndexesCommand cmd) throws IOException {
+    throw new SolrException(
+        SolrException.ErrorCode.BAD_REQUEST,
+        "DirectUpdateHandler doesn't support mergeIndexes. Use DirectUpdateHandler2 instead.");
+  }
+
   public void commit(CommitUpdateCommand cmd) throws IOException {
     Future[] waitSearcher = null;
     if (cmd.waitSearcher) {
@@ -236,9 +241,10 @@ public class DirectUpdateHandler extends UpdateHandler {
     synchronized (this) {
       pset.clear();
       closeSearcher();  // flush any deletes
-      if (cmd.optimize) {
+      if (cmd.optimize || cmd.expungeDeletes) {
         openWriter();  // writer needs to be open to optimize
-        writer.optimize(cmd.maxOptimizeSegments);
+        if(cmd.optimize) writer.optimize(cmd.maxOptimizeSegments);
+        if(cmd.expungeDeletes) writer.expungeDeletes(cmd.expungeDeletes);
       }
       closeWriter();
 
@@ -263,6 +269,13 @@ public class DirectUpdateHandler extends UpdateHandler {
     return;
   }
 
+  /**
+   * @since Solr 1.4
+   */
+  public void rollback(RollbackUpdateCommand cmd) throws IOException {
+    throw new SolrException( SolrException.ErrorCode.BAD_REQUEST,
+        "DirectUpdateHandler doesn't support rollback. Use DirectUpdateHandler2 instead.");
+  }
 
 
   ///////////////////////////////////////////////////////////////////
@@ -371,11 +384,11 @@ public class DirectUpdateHandler extends UpdateHandler {
   }
 
   public String getSourceId() {
-    return "$Id: DirectUpdateHandler.java 672031 2008-06-26 21:14:06Z gsingers $";
+    return "$Id: DirectUpdateHandler.java 805774 2009-08-19 12:21:22Z noble $";
   }
 
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/update/DirectUpdateHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/update/DirectUpdateHandler.java $";
   }
 
   public URL[] getDocs() {

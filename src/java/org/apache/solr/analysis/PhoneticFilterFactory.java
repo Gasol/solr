@@ -17,10 +17,10 @@
 
 package org.apache.solr.analysis;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.solr.core.SolrConfig;
 import org.apache.commons.codec.Encoder;
 import org.apache.commons.codec.language.DoubleMetaphone;
 import org.apache.commons.codec.language.Metaphone;
@@ -39,7 +39,7 @@ import org.apache.solr.common.SolrException;
  * 
  * "inject" (default=true) add tokens to the stream with the offset=0
  * 
- * @version $Id: PhoneticFilterFactory.java 597847 2007-11-24 13:51:46Z ryan $
+ * @version $Id: PhoneticFilterFactory.java 764276 2009-04-12 02:24:01Z yonik $
  * @see PhoneticFilter
  */
 public class PhoneticFilterFactory extends BaseTokenFilterFactory 
@@ -63,10 +63,8 @@ public class PhoneticFilterFactory extends BaseTokenFilterFactory
   @Override
   public void init(Map<String,String> args) {
     super.init( args );
-    
-    if( args.get( "inject" ) != null ) {
-      inject = Boolean.getBoolean( args.get( INJECT ) );
-    }
+
+    inject = getBoolean(INJECT, true);
     
     String name = args.get( ENCODER );
     if( name == null ) {
@@ -80,9 +78,16 @@ public class PhoneticFilterFactory extends BaseTokenFilterFactory
     
     try {
       encoder = clazz.newInstance();
+      
+      // Try to set the maxCodeLength
+      String v = args.get( "maxCodeLength" );
+      if( v != null ) {
+        Method setter = encoder.getClass().getMethod( "setMaxCodeLen", int.class );
+        setter.invoke( encoder, Integer.parseInt( v ) );
+      }
     } 
     catch (Exception e) {
-      throw new SolrException( SolrException.ErrorCode.SERVER_ERROR, "Error initializing: "+name + "/"+clazz, e );
+      throw new SolrException( SolrException.ErrorCode.SERVER_ERROR, "Error initializing: "+name + "/"+clazz, e , false);
     }
   }
   

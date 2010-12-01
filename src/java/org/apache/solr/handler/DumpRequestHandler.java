@@ -18,6 +18,7 @@
 package org.apache.solr.handler;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 
 import org.apache.commons.io.IOUtils;
@@ -42,10 +43,15 @@ public class DumpRequestHandler extends RequestHandlerBase
       for( ContentStream content : req.getContentStreams() ) {
         NamedList<Object> stream = new SimpleOrderedMap<Object>();
         stream.add( "name", content.getName() );
-        stream.add( "fieldName", content.getSourceInfo() );
+        stream.add( "sourceInfo", content.getSourceInfo() );
         stream.add( "size", content.getSize() );
         stream.add( "contentType", content.getContentType() );
-        stream.add( "stream", IOUtils.toString( content.getStream() ) );
+        InputStream is = content.getStream();
+        try {
+          stream.add( "stream", IOUtils.toString(is) );
+        } finally {
+          is.close();
+        }
         streams.add( stream );
       }
       rsp.add( "streams", streams );
@@ -63,16 +69,16 @@ public class DumpRequestHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-      return "$Revision: 547101 $";
+      return "$Revision: 954340 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: DumpRequestHandler.java 547101 2007-06-14 03:26:18Z ryan $";
+    return "$Id: DumpRequestHandler.java 954340 2010-06-14 01:23:34Z hossman $";
   }
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/DumpRequestHandler.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/DumpRequestHandler.java $";
   }
 }

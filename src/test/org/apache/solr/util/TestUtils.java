@@ -29,7 +29,7 @@ import org.apache.solr.common.util.StrUtils;
 import org.junit.Assert;
 
 /**
- * @version $Id: TestUtils.java 680935 2008-07-30 08:11:56Z shalin $
+ * @version $Id: TestUtils.java 761036 2009-04-01 20:07:44Z gsingers $
  */
 public class TestUtils extends TestCase {
   public static void testSplitEscaping() {
@@ -67,6 +67,10 @@ public class TestUtils extends TestCase {
     assertEquals(2,arr.size());
     assertEquals("/h/s",arr.get(0));
     assertEquals("/h/,s",arr.get(1));
+
+    arr = StrUtils.splitFileNames("/h/s");
+    assertEquals(1,arr.size());
+    assertEquals("/h/s",arr.get(0));
   }
 
   public void testNamedLists()
@@ -126,25 +130,5 @@ public class TestUtils extends TestCase {
     sortable = NumberUtils.long2sortableStr( num );
     assertEquals( num, NumberUtils.SortableStr2long(sortable, 0, sortable.length() ) );
     assertEquals( Long.toString(num), NumberUtils.SortableStr2long(sortable) );
-  }
-  
-  public void testBitUtils()
-  {
-    long num = 100000;
-    assertEquals( 5, BitUtil.ntz(num) );
-    assertEquals( 5, BitUtil.ntz2(num) );
-    assertEquals( 5, BitUtil.ntz3(num) );
-    
-    num = 10;
-    assertEquals( 1, BitUtil.ntz(num) );
-    assertEquals( 1, BitUtil.ntz2(num) );
-    assertEquals( 1, BitUtil.ntz3(num) );
-
-    for (int i=0; i<64; i++) {
-      num = 1L << i;
-      assertEquals( i, BitUtil.ntz(num) );
-      assertEquals( i, BitUtil.ntz2(num) );
-      assertEquals( i, BitUtil.ntz3(num) );
-    }
   }
 }

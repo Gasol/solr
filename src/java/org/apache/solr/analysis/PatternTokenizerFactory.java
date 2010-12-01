@@ -17,20 +17,17 @@
 
 package org.apache.solr.analysis;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.lucene.analysis.Token;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.solr.common.SolrException;
-import org.apache.solr.core.SolrConfig;
-
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.lucene.analysis.Token;
+import org.apache.lucene.analysis.Tokenizer;
+import org.apache.solr.common.SolrException;
 
 
 /**
@@ -43,9 +40,8 @@ import java.util.regex.Pattern;
  *  </ul>
  * <p>
  * group=-1 (the default) is equivalent to "split".  In this case, the tokens will
- * be equivalent to the output from:
- *
- * http://java.sun.com/j2se/1.4.2/docs/api/java/lang/String.html#split(java.lang.String)
+ * be equivalent to the output from (without empty tokens):
+ * {@link String#split(java.lang.String)}
  * </p>
  * <p>
  * Using group >= 0 selects the matching group as the token.  For example, if you have:<br/>
@@ -57,7 +53,9 @@ import java.util.regex.Pattern;
  * the output will be two tokens: 'bbb' and 'ccc' (including the ' marks).  With the same input
  * but using group=1, the output would be: bbb and ccc (no ' marks)
  * </p>
+ * <p>NOTE: This Tokenizer does not output tokens that are of zero length.</p>
  *
+ * @see PatternTokenizer
  * @since solr1.2
  * @version $Id:$
  */
@@ -66,7 +64,6 @@ public class PatternTokenizerFactory extends BaseTokenizerFactory
   public static final String PATTERN = "pattern";
   public static final String GROUP = "group";
  
-  protected Map<String,String> args;
   protected Pattern pattern;
   protected int group;
   
@@ -99,28 +96,10 @@ public class PatternTokenizerFactory extends BaseTokenizerFactory
   /**
    * Split the input using configured pattern
    */
-  public TokenStream create(Reader input) {
+  public Tokenizer create(final Reader in) {
     try {
-      // Read the input into a single string
-      String str = IOUtils.toString( input );
-      
-      Matcher matcher = pattern.matcher( str );
-      List<Token> tokens = (group < 0 ) 
-        ? split( matcher, str )
-        : group( matcher, str, group );
-        
-      final Iterator<Token> iter = tokens.iterator();
-      return new TokenStream() {
-        @Override
-        public Token next() throws IOException {
-          if( iter.hasNext() ) {
-            return iter.next();
-          }
-          return null;
-        }
-      };
-    }
-    catch( IOException ex ) {
+      return new PatternTokenizer(in, pattern, group);
+    } catch( IOException ex ) {
       throw new SolrException( SolrException.ErrorCode.SERVER_ERROR, ex );
     }
   }
@@ -128,7 +107,10 @@ public class PatternTokenizerFactory extends BaseTokenizerFactory
   /**
    * This behaves just like String.split( ), but returns a list of Tokens
    * rather then an array of strings
+   * NOTE: This method is not used in 1.4.
+   * @deprecated
    */
+  @Deprecated
   public static List<Token> split( Matcher matcher, String input )
   {
     int index = 0;
@@ -164,10 +146,12 @@ public class PatternTokenizerFactory extends BaseTokenizerFactory
     return matchList;
   }
   
-
   /**
    * Create tokens from the matches in a matcher 
+   * NOTE: This method is not used in 1.4.
+   * @deprecated
    */
+  @Deprecated
   public static List<Token> group( Matcher matcher, String input, int group )
   {
     ArrayList<Token> matchList = new ArrayList<Token>();

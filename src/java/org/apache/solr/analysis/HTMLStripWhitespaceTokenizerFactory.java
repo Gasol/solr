@@ -18,15 +18,24 @@
 package org.apache.solr.analysis;
 
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.WhitespaceTokenizer;
 
 import java.io.Reader;
+import java.io.IOException;
 
 /**
- * @version $Id: HTMLStripWhitespaceTokenizerFactory.java 555343 2007-07-11 17:46:25Z hossman $
+ * @version $Id: HTMLStripWhitespaceTokenizerFactory.java 807338 2009-08-24 18:58:22Z ryan $
+ * @deprecated Use {@link HTMLStripCharFilterFactory} and {@link WhitespaceTokenizerFactory}
  */
+@Deprecated
 public class HTMLStripWhitespaceTokenizerFactory extends BaseTokenizerFactory {
-  public TokenStream create(Reader input) {
-    return new WhitespaceTokenizer(new HTMLStripReader(input));
+  public Tokenizer create(Reader input) {
+    return new WhitespaceTokenizer(new HTMLStripReader(input)) {
+      @Override
+      public void reset(Reader input) throws IOException {
+        super.reset(new HTMLStripReader(input));
+      }
+    };
   }
 }

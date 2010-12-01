@@ -17,7 +17,6 @@
 
 package org.apache.solr.search;
 
-import org.apache.lucene.document.Field;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryParser.ParseException;
 import org.apache.lucene.queryParser.QueryParser;
@@ -37,23 +36,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 /**
  * Collection of static utilities useful for query parsing.
  *
- * @version $Id: QueryParsing.java 652124 2008-04-29 21:07:25Z yonik $
+ * @version $Id: QueryParsing.java 831175 2009-10-30 01:01:27Z markrmiller $
  */
 public class QueryParsing {
-  /** the SolrParam used to override the QueryParser "default operator" */
-  public static final String OP = "q.op";
+  public static final String OP = "q.op";  // the SolrParam used to override the QueryParser "default operator"
   public static final String V = "v";      // value of this parameter
   public static final String F = "f";      // field that a query or command pertains to
   public static final String TYPE = "type";// type of this query or command
   public static final String DEFTYPE = "defType"; // default type for any direct subqueries
   public static final String LOCALPARAM_START = "{!";
   public static final char LOCALPARAM_END = '}';
+  public static final String DOCID = "_docid_";
 
   /** 
    * Helper utility for parsing a query using the Lucene QueryParser syntax. 
@@ -74,8 +72,8 @@ public class QueryParsing {
     try {
       Query query = schema.getSolrQueryParser(defaultField).parse(qs);
 
-      if (SolrCore.log.isLoggable(Level.FINEST)) {
-        SolrCore.log.finest("After QueryParser:" + query);
+      if (SolrCore.log.isTraceEnabled() ) {
+        SolrCore.log.trace("After QueryParser:" + query);
       }
 
       return query;
@@ -102,8 +100,8 @@ public class QueryParsing {
       }
       Query query = parser.parse(qs);
 
-      if (SolrCore.log.isLoggable(Level.FINEST)) {
-        SolrCore.log.finest("After QueryParser:" + query);
+      if (SolrCore.log.isTraceEnabled() ) {
+        SolrCore.log.trace("After QueryParser:" + query);
       }
 
       return query;
@@ -267,7 +265,9 @@ public class QueryParsing {
         else {
           lst[i] = new SortField(null, SortField.SCORE, true);
         }
-      } 
+      } else if (DOCID.equals(part)) {
+        lst[i] = new SortField(null, SortField.DOC, top);
+      }
       else {
         // getField could throw an exception if the name isn't found
         SchemaField f = null;
@@ -304,7 +304,13 @@ public class QueryParsing {
 
   static void writeFieldVal(String val, FieldType ft, Appendable out, int flags) throws IOException {
     if (ft!=null) {
-      out.append(ft.toExternal(new Field("",val, Field.Store.YES, Field.Index.UN_TOKENIZED)));
+      try {
+        out.append(ft.indexedToReadable(val));
+      } catch (Exception e) {
+        out.append("EXCEPTION(val=");
+        out.append(val);
+        out.append(")");
+      }
     } else {
       out.append(val);
     }
@@ -318,36 +324,13 @@ public class QueryParsing {
       Term t = q.getTerm();
       FieldType ft = writeFieldName(t.field(), schema, out, flags);
       writeFieldVal(t.text(), ft, out, flags);
-    } else if (query instanceof RangeQuery) {
-      RangeQuery q = (RangeQuery)query;
-      String fname = q.getField();
-      FieldType ft = writeFieldName(fname, schema, out, flags);
-      out.append( q.isInclusive() ? '[' : '{' );
-      Term lt = q.getLowerTerm();
-      Term ut = q.getUpperTerm();
-      if (lt==null) {
-        out.append('*');
-      } else {
-        writeFieldVal(lt.text(), ft, out, flags);
-      }
-
-      out.append(" TO ");
-
-      if (ut==null) {
-        out.append('*');
-      } else {
-        writeFieldVal(ut.text(), ft, out, flags);
-      }
-
-      out.append( q.isInclusive() ? ']' : '}' );
-
-    } else if (query instanceof ConstantScoreRangeQuery) {
-      ConstantScoreRangeQuery q = (ConstantScoreRangeQuery)query;
+    } else if (query instanceof TermRangeQuery) {
+      TermRangeQuery q = (TermRangeQuery)query;
       String fname = q.getField();
       FieldType ft = writeFieldName(fname, schema, out, flags);
       out.append( q.includesLower() ? '[' : '{' );
-      String lt = q.getLowerVal();
-      String ut = q.getUpperVal();
+      String lt = q.getLowerTerm();
+      String ut = q.getUpperTerm();
       if (lt==null) {
         out.append('*');
       } else {
@@ -363,6 +346,28 @@ public class QueryParsing {
       }
 
       out.append( q.includesUpper() ? ']' : '}' );
+    } else if (query instanceof NumericRangeQuery) {
+      NumericRangeQuery q = (NumericRangeQuery)query;
+      String fname = q.getField();
+      FieldType ft = writeFieldName(fname, schema, out, flags);
+      out.append( q.includesMin() ? '[' : '{' );
+      Number lt = q.getMin();
+      Number ut = q.getMax();
+      if (lt==null) {
+        out.append('*');
+      } else {
+        out.append(lt.toString());
+      }
+
+      out.append(" TO ");
+
+      if (ut==null) {
+        out.append('*');
+      } else {
+        out.append(ut.toString());
+      }
+
+      out.append( q.includesMax() ? ']' : '}' );
     } else if (query instanceof BooleanQuery) {
       BooleanQuery q = (BooleanQuery)query;
       boolean needParens=false;
@@ -471,20 +476,20 @@ public class QueryParsing {
     }
   }
 
-
-
-
-  // simple class to help with parsing a string
-  static class StrParser {
+  /**
+   * Simple class to help with parsing a string
+   * <b>Note: This API is experimental and may change in non backward-compatible ways in the future</b>
+   */
+  public static class StrParser {
     String val;
     int pos;
     int end;
 
-    StrParser(String val) {
+    public StrParser(String val) {
       this(val,0,val.length());
     }
 
-    StrParser(String val, int start, int end) {
+    public StrParser(String val, int start, int end) {
       this.val = val;
       this.pos = start;
       this.end = end;

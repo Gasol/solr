@@ -39,6 +39,7 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
     SolrQueryRequest req = null;
     Map<String,String> args = new HashMap<String,String>();
     lrf.args.put("version","2.0");
+    lrf.args.put("defType","lucenePlusSort");
 
     // compact the index, keep things from getting out of hand
 
@@ -222,6 +223,7 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
             );
     args = new HashMap<String,String>();
     args.put("version","2.0");
+    args.put("defType","lucenePlusSort");
     req = new LocalSolrQueryRequest(h.getCore(), "val_s:[a TO z];val_s asc",
                                     "standard", 0, 0 , args);
     assertQ(req
@@ -230,6 +232,7 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
             );
     args = new HashMap<String,String>();
     args.put("version","2.0");
+    args.put("defType","lucenePlusSort");
     req = new LocalSolrQueryRequest(h.getCore(), "val_s:[a TO z];val_s desc",
                                     "standard", 0, 0 , args);
     assertQ(req
@@ -588,47 +591,47 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
     // test binary float ranges and sorting
 
     assertU("<delete><id>44</id></delete>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">1.4142135</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">Infinity</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">-Infinity</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">NaN</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">2</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">-1</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">-987654321</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">-999999.99</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">-1e20</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_f\">0</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">1.4142135</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">Infinity</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">-Infinity</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">NaN</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">2</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">-1</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">-987654321</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">-999999.99</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">-1e20</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sf\">0</field></doc></add>");
     assertU("<commit/>");
     assertQ(req("id:44")
             ,"*[count(//doc)=10]"
             );
-    assertQ(req("num_f:Infinity")
+    assertQ(req("num_sf:Infinity")
             ,"//@numFound[.='1']  "
             ,"//float[.='Infinity']"
             );
-    assertQ(req("num_f:\"-Infinity\"")
+    assertQ(req("num_sf:\"-Infinity\"")
             ,"//@numFound[.='1']  "
             ,"//float[.='-Infinity']"
             );
-    assertQ(req("num_f:\"NaN\"")
+    assertQ(req("num_sf:\"NaN\"")
             ,"//@numFound[.='1']  "
             ,"//float[.='NaN']"
             );
-    assertQ(req("num_f:\"-1e20\"")
+    assertQ(req("num_sf:\"-1e20\"")
             ,"//@numFound[.='1']"
             );
-    assertQ(req("id:44;num_f asc;")
+    assertQ(req("id:44;num_sf asc;")
             ,"//doc[1]/float[.='-Infinity'] "
             ,"//doc[last()]/float[.='NaN']"
             );
-    assertQ(req("id:44;num_f desc;")
+    assertQ(req("id:44;num_sf desc;")
             ,"//doc[1]/float[.='NaN'] "
             ,"//doc[last()]/float[.='-Infinity']"
             );
-    assertQ(req("num_f:[-1 TO 2]")
+    assertQ(req("num_sf:[-1 TO 2]")
             ,"*[count(//doc)=4]"
             );
-    assertQ(req("num_f:[-Infinity TO Infinity]")
+    assertQ(req("num_sf:[-Infinity TO Infinity]")
             ,"*[count(//doc)=9]"
             );
 
@@ -637,50 +640,50 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
     // test binary double ranges and sorting
 
     assertU("<delete><id>44</id></delete>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">1.4142135</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">Infinity</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">-Infinity</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">NaN</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">2</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">-1</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">1e-100</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">-999999.99</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">-1e100</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_d\">0</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">1.4142135</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">Infinity</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">-Infinity</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">NaN</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">2</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">-1</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">1e-100</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">-999999.99</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">-1e100</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id\">44</field><field name=\"num_sd\">0</field></doc></add>");
     assertU("<commit/>");
     assertQ(req("id:44")
             ,"*[count(//doc)=10]"
             );
-    assertQ(req("num_d:Infinity")
+    assertQ(req("num_sd:Infinity")
             ,"//@numFound[.='1']  "
             ,"//double[.='Infinity']"
             );
-    assertQ(req("num_d:\"-Infinity\"")
+    assertQ(req("num_sd:\"-Infinity\"")
             ,"//@numFound[.='1']  "
             ,"//double[.='-Infinity']"
             );
-    assertQ(req("num_d:\"NaN\"")
+    assertQ(req("num_sd:\"NaN\"")
             ,"//@numFound[.='1']  "
             ,"//double[.='NaN']"
             );
-    assertQ(req("num_d:\"-1e100\"")
+    assertQ(req("num_sd:\"-1e100\"")
             ,"//@numFound[.='1']"
             );
-    assertQ(req("num_d:\"1e-100\"")
+    assertQ(req("num_sd:\"1e-100\"")
             ,"//@numFound[.='1']"
             );
-    assertQ(req("id:44;num_d asc;")
+    assertQ(req("id:44;num_sd asc;")
             ,"//doc[1]/double[.='-Infinity'] "
             ,"//doc[last()]/double[.='NaN']"
             );
-    assertQ(req("id:44;num_d desc;")
+    assertQ(req("id:44;num_sd desc;")
             ,"//doc[1]/double[.='NaN'] "
             ,"//doc[last()]/double[.='-Infinity']"
             );
-    assertQ(req("num_d:[-1 TO 2]")
+    assertQ(req("num_sd:[-1 TO 2]")
             ,"*[count(//doc)=5]"
             );
-    assertQ(req("num_d:[-Infinity TO Infinity]")
+    assertQ(req("num_sd:[-Infinity TO Infinity]")
             ,"*[count(//doc)=9]"
             );
 
@@ -733,32 +736,32 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
     assertU("<delete><query>id_i:[1000 TO 1010]</query></delete>");
     assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1000</field><field name=\"a_i\">1</field><field name=\"nullfirst\">Z</field></doc></add>");
     assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1001</field><field name=\"a_i\">10</field><field name=\"nullfirst\">A</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1002</field><field name=\"a_i\">1</field><field name=\"b_i\">100</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1002</field><field name=\"a_i\">1</field><field name=\"b_si\">100</field></doc></add>");
     assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1003</field><field name=\"a_i\">-1</field></doc></add>");
     assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1004</field><field name=\"a_i\">15</field></doc></add>");
-    assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1005</field><field name=\"a_i\">1</field><field name=\"b_i\">50</field></doc></add>");
+    assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1005</field><field name=\"a_i\">1</field><field name=\"b_si\">50</field></doc></add>");
     assertU("<add allowDups=\"true\"><doc><field name=\"id_i\">1006</field><field name=\"a_i\">0</field></doc></add>");
     assertU("<commit/>");
     assertQ(req("id_i:[1000 TO 1010]")
             ,"*[count(//doc)=7]"
             );
-    assertQ(req("id_i:[1000 TO 1010]; b_i asc")
+    assertQ(req("id_i:[1000 TO 1010]; b_si asc")
             ,"*[count(//doc)=7] "
             ,"//doc[1]/int[.='50'] "
             ,"//doc[2]/int[.='100']"
             );
-    assertQ(req("id_i:[1000 TO 1010]; b_i desc")
+    assertQ(req("id_i:[1000 TO 1010]; b_si desc")
             ,"*[count(//doc)=7] "
             ,"//doc[1]/int[.='100'] "
             ,"//doc[2]/int[.='50']"
             );
-    assertQ(req("id_i:[1000 TO 1010]; a_i asc,b_i desc")
+    assertQ(req("id_i:[1000 TO 1010]; a_i asc,b_si desc")
             ,"*[count(//doc)=7] "
             ,"//doc[3]/int[.='100'] "
             ,"//doc[4]/int[.='50']  "
             ,"//doc[5]/int[.='1000']"
             );
-    assertQ(req("id_i:[1000 TO 1010]; a_i asc,b_i asc")
+    assertQ(req("id_i:[1000 TO 1010]; a_i asc,b_si asc")
             ,"*[count(//doc)=7] "
             ,"//doc[3]/int[.='50'] "
             ,"//doc[4]/int[.='100']  "
@@ -1171,6 +1174,7 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
     args = new HashMap<String,String>();
     args.put("version","2.0");
     args.put("fl","score ");
+    args.put("defType","lucenePlusSort");
     req = new LocalSolrQueryRequest(h.getCore(), "id:44;id desc;",
                                     "standard", 0, 10, args);
     assertQ(req
@@ -1179,6 +1183,7 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
     args = new HashMap<String,String>();
     args.put("version","2.0");
     args.put("fl","score ");
+    args.put("defType","lucenePlusSort");
     req = new LocalSolrQueryRequest(h.getCore(), "id:44;",
                                     "standard", 0, 10, args);
     assertQ(req
@@ -1187,6 +1192,7 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
     args = new HashMap<String,String>();
     args.put("version","2.0");
     args.put("fl","score ");
+    args.put("defType","lucenePlusSort");
     req = new LocalSolrQueryRequest(h.getCore(), "id:44;id desc;",
                                     "standard", 0, 10, args);
     assertQ(req
@@ -1195,6 +1201,7 @@ public class ConvertedLegacyTest extends AbstractSolrTestCase {
     args = new HashMap<String,String>();
     args.put("version","2.0");
     args.put("fl","score");
+    args.put("defType","lucenePlusSort");
     req = new LocalSolrQueryRequest(h.getCore(), "id:44;id desc;",
                                     "standard", 0, 0 , args);
     assertQ(req

@@ -19,6 +19,7 @@ package org.apache.solr.analysis;
 
 import org.apache.lucene.analysis.Token;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.TokenFilter;
 
 import java.io.IOException;
 import java.util.LinkedList;
@@ -45,23 +46,25 @@ import java.util.LinkedList;
  *   public MyTokenStream(TokenStream input) {super(input);}
  *   protected Token process(Token t) throws IOException {
  *     if ("A".equals(t.termText()) && "B".equals(peek(1).termText()))
- *       write(t);
+ *       write((Token)t.clone());
  *     return t;
  *   }
  * }
  * </pre>
  *
- *
+ * NOTE: BufferedTokenStream does not clone() any Tokens. This is instead the 
+ * responsibility of the implementing subclass. In the "A" "B" => "A" "A" "B"
+ * example above, the subclass must clone the additional "A" it creates.
+ * 
  * @version $Id$
  */
-public abstract class BufferedTokenStream extends TokenStream {
+public abstract class BufferedTokenStream extends TokenFilter {
   // in the future, might be faster if we implemented as an array based CircularQueue
   private final LinkedList<Token> inQueue = new LinkedList<Token>();
   private final LinkedList<Token> outQueue = new LinkedList<Token>();
-  private final TokenStream input;
 
   public BufferedTokenStream(TokenStream input) {
-    this.input = input;
+    super(input);
   }
 
   /**
@@ -139,5 +142,11 @@ public abstract class BufferedTokenStream extends TokenStream {
     return outQueue;
   }
 
+  @Override
+  public void reset() throws IOException {
+    super.reset();
+    inQueue.clear();
+    outQueue.clear();
+  }
 
 } 

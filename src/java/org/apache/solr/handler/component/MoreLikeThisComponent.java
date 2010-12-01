@@ -83,7 +83,7 @@ public class MoreLikeThisComponent extends SearchComponent
 
   @Override
   public String getSource() {
-    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.3/src/java/org/apache/solr/handler/component/MoreLikeThisComponent.java $";
+    return "$URL: https://svn.apache.org/repos/asf/lucene/solr/branches/branch-1.4/src/java/org/apache/solr/handler/component/MoreLikeThisComponent.java $";
   }
 
   @Override

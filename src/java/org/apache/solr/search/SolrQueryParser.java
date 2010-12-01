@@ -17,17 +17,26 @@
 
 package org.apache.solr.search;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryParser.ParseException;
 import org.apache.lucene.queryParser.QueryParser;
-import org.apache.lucene.search.ConstantScoreRangeQuery;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.WildcardQuery;
-import org.apache.lucene.search.ConstantScoreQuery;
+import org.apache.lucene.search.*;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.reverse.ReverseStringFilter;
+import org.apache.solr.analysis.ReversedWildcardFilter;
+import org.apache.solr.analysis.ReversedWildcardFilterFactory;
+import org.apache.solr.analysis.TokenFilterFactory;
+import org.apache.solr.analysis.TokenizerChain;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.schema.SchemaField;
+import org.apache.solr.schema.TrieField;
+import org.apache.solr.schema.SchemaField;
 
 // TODO: implement the analysis of simple fields with
 // FieldType.toInternal() instead of going through the
@@ -56,6 +65,8 @@ public class SolrQueryParser extends QueryParser {
   protected final IndexSchema schema;
   protected final QParser parser;
   protected final String defaultField;
+  protected final Map<String, ReversedWildcardFilterFactory> leadingWildcards =
+    new HashMap<String, ReversedWildcardFilterFactory>();
 
   /**
    * Constructs a SolrQueryParser using the schema to understand the
@@ -65,7 +76,7 @@ public class SolrQueryParser extends QueryParser {
    * 
    * @param schema Used for default search field name if defaultField is null and field information is used for analysis
    * @param defaultField default field used for unspecified search terms.  if null, the schema default field is used
-   * @see IndexSchema#getSolrQueryParser(String defaultField)
+   * @see IndexSchema#getDefaultSearchFieldName()
    */
   public SolrQueryParser(IndexSchema schema, String defaultField) {
     super(defaultField == null ? schema.getDefaultSearchFieldName() : defaultField, schema.getQueryAnalyzer());
@@ -73,6 +84,8 @@ public class SolrQueryParser extends QueryParser {
     this.parser  = null;
     this.defaultField = defaultField;
     setLowercaseExpandedTerms(false);
+    setEnablePositionIncrements(true);
+    checkAllowLeadingWildcards();
   }
 
   public SolrQueryParser(QParser parser, String defaultField) {
@@ -85,8 +98,32 @@ public class SolrQueryParser extends QueryParser {
     this.parser = parser;
     this.defaultField = defaultField;
     setLowercaseExpandedTerms(false);
+    setEnablePositionIncrements(true);
+    checkAllowLeadingWildcards();
   }
 
+  protected void checkAllowLeadingWildcards() {
+    boolean allow = false;
+    for (Entry<String, FieldType> e : schema.getFieldTypes().entrySet()) {
+      Analyzer a = e.getValue().getAnalyzer();
+      if (a instanceof TokenizerChain) {
+        // examine the indexing analysis chain if it supports leading wildcards
+        TokenizerChain tc = (TokenizerChain)a;
+        TokenFilterFactory[] factories = tc.getTokenFilterFactories();
+        for (TokenFilterFactory factory : factories) {
+          if (factory instanceof ReversedWildcardFilterFactory) {
+            allow = true;
+            leadingWildcards.put(e.getKey(), (ReversedWildcardFilterFactory)factory);
+          }
+        }
+      }
+    }
+    // XXX should be enabled on a per-field basis
+    if (allow) {
+      setAllowLeadingWildcard(true);
+    }
+  }
+  
   private void checkNullField(String field) throws SolrException {
     if (field == null && defaultField == null) {
       throw new SolrException
@@ -118,12 +155,11 @@ public class SolrQueryParser extends QueryParser {
 
   protected Query getRangeQuery(String field, String part1, String part2, boolean inclusive) throws ParseException {
     checkNullField(field);
-    FieldType ft = schema.getFieldType(field);
-    return new ConstantScoreRangeQuery(
-      field,
-      "*".equals(part1) ? null : ft.toInternal(part1),
-      "*".equals(part2) ? null : ft.toInternal(part2),
-      inclusive, inclusive);
+    SchemaField sf = schema.getField(field);
+    return sf.getType().getRangeQuery(parser, sf,
+            "*".equals(part1) ? null : part1,
+            "*".equals(part2) ? null : part2,
+            inclusive, inclusive);
   }
 
   protected Query getPrefixQuery(String field, String termStr) throws ParseException {
@@ -143,14 +179,27 @@ public class SolrQueryParser extends QueryParser {
     // TODO: throw exception if field type doesn't support prefixes?
     // (sortable numeric types don't do prefixes, but can do range queries)
     Term t = new Term(field, termStr);
-    return new ConstantScorePrefixQuery(t);
+    PrefixQuery prefixQuery = new PrefixQuery(t);
+    return prefixQuery;
   }
 
   protected Query getWildcardQuery(String field, String termStr) throws ParseException {
+    // *:* -> MatchAllDocsQuery
+    if ("*".equals(field) && "*".equals(termStr)) {
+      return newMatchAllDocsQuery();
+    }
+    
+    // can we use reversed wildcards in this field?
+    String type = schema.getFieldType(field).getTypeName();
+    ReversedWildcardFilterFactory factory = leadingWildcards.get(type);
+    if (factory != null && factory.shouldReverse(termStr)) {
+      termStr = ReverseStringFilter.reverse(termStr + factory.getMarkerChar());
+    }
     Query q = super.getWildcardQuery(field, termStr);
     if (q instanceof WildcardQuery) {
       // use a constant score query to avoid overflowing clauses
-      return new ConstantScoreQuery(new WildcardFilter(((WildcardQuery)q).getTerm()));
+      WildcardQuery wildcardQuery = new WildcardQuery(((WildcardQuery)q).getTerm());
+      return  wildcardQuery; 
     }
     return q;
   }

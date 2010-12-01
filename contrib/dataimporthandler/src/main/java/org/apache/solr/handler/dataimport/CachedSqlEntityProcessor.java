@@ -32,7 +32,7 @@ import java.util.Map;
  * <p/>
  * <b>This API is experimental and subject to change</b>
  *
- * @version $Id: CachedSqlEntityProcessor.java 682378 2008-08-04 13:20:27Z shalin $
+ * @version $Id: CachedSqlEntityProcessor.java 766608 2009-04-20 07:36:55Z shalin $
  * @since solr 1.3
  */
 public class CachedSqlEntityProcessor extends SqlEntityProcessor {
@@ -46,7 +46,6 @@ public class CachedSqlEntityProcessor extends SqlEntityProcessor {
   }
 
   public Map<String, Object> nextRow() {
-    if (rowcache != null) return getFromRowCache();
     if (dataSourceRowCache != null)
       return getFromRowCacheTransformed();
     if (!isFirst)
