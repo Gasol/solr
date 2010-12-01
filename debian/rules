@@ -1,13 +1,12 @@
 #!/usr/bin/make -f
 
 export JAVA_HOME=/usr/lib/jvm/default-java/
-#export ANT_OPTS=
 
 %:
 	dh $@
 
 override_dh_auto_build:
-	ant compile
+	ant -Dversion=1.4.1 init-forrest-entities dist-solrj dist-jar dist-contrib compile make-manifest
 
 
 ##!/usr/bin/make -f

@@ -2,13 +2,13 @@ Source: solr
 Section: java
 Priority: optional
 Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
-Uploaders: Jan-Pascal van Best <janpascal@vanbest.org>, Thomas Koch <thomas.koch@ymc.ch>
+Uploaders: Jan-Pascal van Best <janpascal@vanbest.org>, Thomas Koch <thomas@koch.ro>
 DM-Upload-Allowed: yes
 Homepage: http://lucene.apache.org/solr/
 Vcs-Browser: http://git.debian.org/?p=pkg-java/solr.git
 Vcs-Git: git://git.debian.org/git/pkg-java/solr.git
-Standards-Version: 3.8.4
-Build-Depends: debhelper (>= 7.4.10), po-debconf,
+Standards-Version: 3.9.1
+Build-Depends: debhelper (>= 8), po-debconf,
  default-jdk,
  ant (>= 1.7.0), ant-optional (>= 1.7.0), 
  libcommons-codec-java (>= 1.4),

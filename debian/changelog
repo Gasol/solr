@@ -2,7 +2,7 @@ solr (1.4.1+dfsg1-1) unstable; urgency=low
 
   * New upstream release (1.4.1). Closes: #602696.
 
- -- Thomas Koch <thomas.koch@ymc.ch>  Tue, 30 Nov 2010 11:19:37 +0100
+ -- Thomas Koch <thomas@koch.ro>  Tue, 30 Nov 2010 11:19:37 +0100
 
 solr (1.4.0+ds1-3) UNRELEASED; urgency=low
 
