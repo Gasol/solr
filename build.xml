@@ -133,6 +133,7 @@
       <include name="slf4j-api.jar" />
       <include name="xml-apis-ext.jar" />
       <include name="xml-apis.jar" />
+      <include name="junit4.jar" />
     </fileset>
     <pathelement location="${dest}/common"/>
   </path>
