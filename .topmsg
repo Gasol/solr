@@ -1,8 +1,0 @@
-From: Jan-Pascal van Best <janpascal@vanbest.org>
-Subject: [PATCH] debian/use-debian-java-libraries
-
-Link to libraries under /usr/share/java instead of those
-included with upstream tarball. Do not include the libraries
-into the war file.
-
-Signed-off-by: Thomas Koch <thomas.koch@ymc.ch>
