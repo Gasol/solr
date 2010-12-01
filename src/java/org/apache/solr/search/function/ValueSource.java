@@ -31,7 +31,7 @@ import java.util.Map;
  * <br>
  * Often used when creating a {@link FunctionQuery}.
  *
- * @version $Id: ValueSource.java 816328 2009-09-17 18:40:28Z yonik $
+ * @version $Id: ValueSource.java 949467 2010-05-30 04:10:13Z hossman $
  */
 public abstract class ValueSource implements Serializable {
 
@@ -44,7 +44,7 @@ public abstract class ValueSource implements Serializable {
    * passed to createWeight()
    */
   public DocValues getValues(Map context, IndexReader reader) throws IOException {
-    return null;
+    return getValues(reader);
   }
 
   public abstract boolean equals(Object o);

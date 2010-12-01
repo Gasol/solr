@@ -32,7 +32,7 @@ import org.apache.solr.common.SolrInputField;
 import org.apache.solr.schema.*;
 
 /**
- * @version $Id: DocumentBuilder.java 778600 2009-05-26 07:44:39Z noble $
+ * @version $Id: DocumentBuilder.java 949894 2010-05-31 23:36:01Z hossman $
  */
 
 
@@ -267,7 +267,7 @@ public class DocumentBuilder {
           if (isBinaryField) {
             if (destinationField.getType() instanceof BinaryField) {
               BinaryField binaryField = (BinaryField) destinationField.getType();
-              binaryField.createField(destinationField, v, boost);
+              f = binaryField.createField(destinationField, v, boost);
             }
           } else {
             f = destinationField.createField(cf.getLimitedValue(val), boost);

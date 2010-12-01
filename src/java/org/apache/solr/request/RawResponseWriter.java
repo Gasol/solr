@@ -18,6 +18,7 @@
 package org.apache.solr.request;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.Writer;
 
 import org.apache.commons.io.IOUtils;
@@ -39,7 +40,7 @@ import org.apache.solr.common.util.NamedList;
  * defaults to the "standard" writer.
  * </p>
  * 
- * @version $Id: RawResponseWriter.java 643896 2008-04-02 13:06:15Z ryan $
+ * @version $Id: RawResponseWriter.java 954340 2010-06-14 01:23:34Z hossman $
  * @since solr 1.3
  */
 public class RawResponseWriter implements QueryResponseWriter 
@@ -80,7 +81,12 @@ public class RawResponseWriter implements QueryResponseWriter
     if( obj != null && (obj instanceof ContentStream ) ) {
       // copy the contents to the writer...
       ContentStream content = (ContentStream)obj;
-      IOUtils.copy( content.getReader(), writer );
+      Reader reader = content.getReader();
+      try {
+        IOUtils.copy( reader, writer );
+      } finally {
+        reader.close();
+      }
     }
     else {
       getBaseWriter( request ).write( writer, request, response );

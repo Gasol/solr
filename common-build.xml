@@ -62,7 +62,7 @@
        By default, this should be set to "X.Y.N-dev" where X.Y.N is
        "1 greater" then the last version released (on this branch).
     -->
-  <property name="version" value="1.4.1-dev" />
+  <property name="version" value="1.4.2-dev" />
   
   <!-- Solr Specification Version -->
   <!--
@@ -72,7 +72,7 @@
        By default, this should be set to "X.Y.M.${dateversion}"
        where X.Y.M is the last version released (on this branch).
     -->
-  <property name="specversion" value="1.4.0.${dateversion}" />
+  <property name="specversion" value="1.4.1.${dateversion}" />
 
   
     <!-- Type of checksum to compute for distribution files -->
@@ -92,7 +92,7 @@
   <property name="javadoc.link.junit"
             value="http://junit.sourceforge.net/javadoc/"/>
   <property name="javadoc.link.lucene"
-            value="http://lucene.apache.org/java/2_9_0/api/all/"/>
+            value="http://lucene.apache.org/java/2_9_3/api/all/"/>
   <property name="javadoc.packages" value="org.apache.solr.*"/>
   <property name="build.docs" value="${dest}/docs"/>
   <property name="build.javadoc" value="${common.dir}/${build.docs}/api"/>
@@ -114,9 +114,9 @@
        The version suffix of the Lucene artifacts checked into "lib" 
        IF YOU CHANGE THIS, SANITY CHECK "javadoc.link.lucene"
   -->
-  <property name="lucene_version" value="2.9.1"/>
+  <property name="lucene_version" value="2.9.3"/>
   <!-- The version number to assign to the Maven artifacts. -->
-  <property name="maven_version" value="1.4.1-SNAPSHOT"/>
+  <property name="maven_version" value="1.4.2-SNAPSHOT"/>
 
   <!-- By default, "deploy" to a temporary directory (as well as installing
        into your local repository).  If you wish to deploy to a remote
@@ -265,6 +265,7 @@
     <sequential>
       <copy file="@{pom.xml}" tofile="${maven.build.dir}/@{pom.xml}">
         <filterset begintoken="@" endtoken="@">
+          <filter token="lucene_version" value="${lucene_version}"/>
           <filter token="maven_version" value="${maven_version}"/>
         </filterset>
       </copy>
@@ -312,6 +313,7 @@
       <sign-artifact input.file="@{prefix.dir}/@{artifact.id}/@{maven.version}/@{artifact.id}-@{maven.version}.jar"/>
       <sign-artifact input.file="@{prefix.dir}/@{artifact.id}/@{maven.version}/@{artifact.id}-@{maven.version}-javadoc.jar"/>
       <sign-artifact input.file="@{prefix.dir}/@{artifact.id}/@{maven.version}/@{artifact.id}-@{maven.version}-sources.jar"/>
+      <sign-artifact input.file="@{prefix.dir}/@{artifact.id}/@{maven.version}/@{artifact.id}-@{maven.version}.pom"/>
     </sequential>
   </macrodef>
 

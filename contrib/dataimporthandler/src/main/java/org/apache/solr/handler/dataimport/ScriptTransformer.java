@@ -16,6 +16,9 @@
  */
 package org.apache.solr.handler.dataimport;
 
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
+import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
@@ -34,7 +37,7 @@ import java.util.Map;
  * <p/>
  * <b>This API is experimental and may change in the future.</b>
  *
- * @version $Id: ScriptTransformer.java 752586 2009-03-11 19:17:50Z shalin $
+ * @version $Id: ScriptTransformer.java 949884 2010-05-31 22:53:26Z hossman $
  * @since solr 1.3
  */
 public class ScriptTransformer extends Transformer {
@@ -55,24 +58,27 @@ public class ScriptTransformer extends Transformer {
     } catch (DataImportHandlerException e) {
       throw e;
     } catch (InvocationTargetException e) {
-      throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
+      wrapAndThrow(SEVERE,e,
               "Could not invoke method :"
                       + functionName
                       + "\n <script>\n"
-                      + context.getVariableResolver().resolve(
-                      DataConfig.IMPORTER_NS + "." + DataConfig.SCRIPT)
-                      + "</script>", e);
+                      + context.getScript()
+                      + "</script>");
     } catch (Exception e) {
-      throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
-              "Error invoking script for entity "
-                      + context.getEntityAttribute("name"), e);
+      wrapAndThrow(SEVERE,e, "Error invoking script for entity " + context.getEntityAttribute("name"));
     }
+    //will not reach here
+    return null;
   }
 
   private void initEngine(Context context) {
     try {
       String scriptText = context.getScript();
       String scriptLang = context.getScriptLanguage();
+      if(scriptText == null ){
+        throw new DataImportHandlerException(SEVERE,
+              "<script> tag is not present under <dataConfig>");
+      }
       Object scriptEngineMgr = Class
               .forName("javax.script.ScriptEngineManager").newInstance();
       // create a Script engine
@@ -84,8 +90,7 @@ public class ScriptTransformer extends Transformer {
               String.class, Object[].class);
       evalMethod.invoke(engine, scriptText);
     } catch (Exception e) {
-      throw new DataImportHandlerException(DataImportHandlerException.SEVERE,
-              "<script> can be used only in java 6 or above", e);
+      wrapAndThrow(SEVERE,e, "<script> can be used only in java 6 or above");
     }
   }
 
