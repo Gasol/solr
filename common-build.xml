@@ -219,7 +219,9 @@
       <subant target="@{target}" failonerror="@{failonerror}">
         <fileset dir="."
                  includes="contrib/*/build.xml"
+                 excludes="contrib/clustering/build.xml,contrib/extraction/build.xml,contrib/velocity/build.xml"
         />
+                 <!-- The above excludes have missing build dependencies in debian -->
       </subant>
     </sequential>
   </macrodef>

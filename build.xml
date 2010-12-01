@@ -22,7 +22,7 @@
   <import file="common-build.xml"/>
   
   <!-- 3rd party libraries for compilation -->
-  <property name="lib" location="lib" />
+  <property name="lib" value="/usr/share/java" />
 
   <!-- solr source files -->
   <property name="src" location="src" />
@@ -85,7 +85,7 @@
     <!-- no description, don't advertise -->
 
 
-    <available file="lib/lucene-core-${lucene_version}.jar"
+    <available file="${lib}/lucene-core-${lucene_version}.jar"
                property="lucene-version-ok-m2deploy-wont-fail" />
     <fail unless="lucene-version-ok-m2deploy-wont-fail">
       lib/lucene-core-${lucene_version}.jar Missing
@@ -116,7 +116,24 @@
   <!-- The compilation classpath -->
   <path id="compile.classpath">
     <fileset dir="${lib}">
-      <include name="*.jar" />
+      <include name="commons-codec.jar" />
+      <include name="commons-csv.jar" />
+      <include name="commons-fileupload.jar" />
+      <include name="commons-httpclient.jar" />
+      <include name="commons-io.jar" />
+      <include name="jetty.jar" />
+      <include name="jetty-util.jar" />
+      <include name="lucene-analyzers.jar" />
+      <include name="lucene-core.jar" />
+      <include name="lucene-highlighter.jar" />
+      <include name="lucene-queries.jar" />
+      <include name="lucene-snowball.jar" />
+      <include name="lucene-spellchecker.jar" />
+      <include name="servlet-api-2.5.jar" />
+      <include name="slf4j-api.jar" />
+      <include name="xml-apis-ext.jar" />
+      <include name="xml-apis.jar" />
+      <include name="junit4.jar" />
     </fileset>
     <pathelement location="${dest}/common"/>
   </path>
@@ -138,9 +155,9 @@
     <path refid="compile.classpath" />
     <pathelement location="${dest}/solrj"/>
     <!-- jetty -->
-    <fileset dir="example/lib">
+    <!--fileset dir="example/lib">
       <include name="**/*.jar" />
-    </fileset>
+    </fileset-->
   </path>
     
   <!-- Compile the project. -->
@@ -339,6 +356,10 @@
       
     <pathelement location="${dest}/solr"/>
     <pathelement location="${dest}/solrj"/> <!-- include solrj -->
+    <fileset dir="/usr/share/java">
+      <include name="junit4.jar" />
+      <include name="easymock.jar" />
+    </fileset>
   </path>
 
   <path id="test.run.classpath">
@@ -349,6 +370,13 @@
     <path refid="compile.classpath.solrj" />
     
     <pathelement path="${java.class.path}"/>
+    <fileset dir="/usr/share/java">
+      <include name="junit4.jar" />
+      <include name="easymock.jar" />
+      <include name="jcl-over-slf4j.jar" />
+      <include name="slf4j-jdk14.jar" />
+      <include name="lucene-memory.jar" />
+    </fileset>
   </path>
 
   <!-- Compile unit tests. -->
