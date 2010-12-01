@@ -53,6 +53,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
+import org.apache.solr.common.util.Base64;
 import org.apache.solr.handler.RequestHandlerBase;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.request.SolrQueryResponse;
@@ -74,7 +75,7 @@ import org.apache.solr.search.SolrIndexSearcher;
  * For more documentation see:
  *  http://wiki.apache.org/solr/LukeRequestHandler
  * 
- * @version $Id: LukeRequestHandler.java 810324 2009-09-02 00:56:19Z hossman $
+ * @version $Id: LukeRequestHandler.java 949889 2010-05-31 23:27:44Z hossman $
  * @since solr 1.2
  */
 public class LukeRequestHandler extends RequestHandlerBase 
@@ -240,12 +241,20 @@ public class LukeRequestHandler extends RequestHandlerBase
       f.add( "type", (ftype==null)?null:ftype.getTypeName() );
       f.add( "schema", getFieldFlags( sfield ) );
       f.add( "flags", getFieldFlags( fieldable ) );
-      
-      Term t = new Term( fieldable.name(), fieldable.stringValue() );
+
+      Term t = new Term(fieldable.name(), ftype!=null ? ftype.storedToIndexed(fieldable) : fieldable.stringValue());
+
       f.add( "value", (ftype==null)?null:ftype.toExternal( fieldable ) );
+
+      // TODO: this really should be "stored"
       f.add( "internal", fieldable.stringValue() );  // may be a binary number
+
+      byte[] arr = fieldable.getBinaryValue();
+      if (arr != null) {
+        f.add( "binary", Base64.byteArrayToBase64(arr, 0, arr.length));
+      }
       f.add( "boost", fieldable.getBoost() );
-      f.add( "docFreq", reader.docFreq( t ) ); // this can be 0 for non-indexed fields
+      f.add( "docFreq", t.text()==null ? 0 : reader.docFreq( t ) ); // this can be 0 for non-indexed fields
             
       // If we have a term vector, return that
       if( fieldable.isTermVectorStored() ) {
@@ -478,12 +487,12 @@ public class LukeRequestHandler extends RequestHandlerBase
 
   @Override
   public String getVersion() {
-    return "$Revision: 810324 $";
+    return "$Revision: 949889 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: LukeRequestHandler.java 810324 2009-09-02 00:56:19Z hossman $";
+    return "$Id: LukeRequestHandler.java 949889 2010-05-31 23:27:44Z hossman $";
   }
 
   @Override

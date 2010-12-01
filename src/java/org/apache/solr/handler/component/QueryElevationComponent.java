@@ -51,6 +51,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.core.Config;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.schema.StrField;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.SortSpec;
@@ -65,7 +66,7 @@ import org.w3c.dom.NodeList;
 /**
  * A component to elevate some documents to the top of the result set.
  * 
- * @version $Id: QueryElevationComponent.java 819234 2009-09-26 23:46:44Z markrmiller $
+ * @version $Id: QueryElevationComponent.java 949888 2010-05-31 23:24:40Z hossman $
  * @since solr 1.3
  */
 public class QueryElevationComponent extends SearchComponent implements SolrCoreAware
@@ -152,9 +153,9 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
     }
 
     SchemaField sf = core.getSchema().getUniqueKeyField();
-    if( sf == null ) {
+    if( sf == null || !(sf.getType() instanceof StrField)) {
       throw new SolrException( SolrException.ErrorCode.SERVER_ERROR, 
-          "QueryElevationComponent requires the schema to have a uniqueKeyField" );
+          "QueryElevationComponent requires the schema to have a uniqueKeyField implemented using StrField" );
     }
     idField = StringHelper.intern(sf.getName());
     
@@ -418,12 +419,12 @@ public class QueryElevationComponent extends SearchComponent implements SolrCore
 
   @Override
   public String getVersion() {
-    return "$Revision: 819234 $";
+    return "$Revision: 949888 $";
   }
 
   @Override
   public String getSourceId() {
-    return "$Id: QueryElevationComponent.java 819234 2009-09-26 23:46:44Z markrmiller $";
+    return "$Id: QueryElevationComponent.java 949888 2010-05-31 23:24:40Z hossman $";
   }
 
   @Override

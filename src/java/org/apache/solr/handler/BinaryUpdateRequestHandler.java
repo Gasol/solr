@@ -38,7 +38,7 @@ import java.util.List;
 /**
  * Update handler which uses the JavaBin format
  *
- * @version $Id: BinaryUpdateRequestHandler.java 816376 2009-09-17 20:53:14Z shalin $
+ * @version $Id: BinaryUpdateRequestHandler.java 954340 2010-06-14 01:23:34Z hossman $
  * @see org.apache.solr.client.solrj.request.JavaBinUpdateRequestCodec
  * @see org.apache.solr.common.util.JavaBinCodec
  * @since solr 1.4
@@ -49,7 +49,15 @@ public class BinaryUpdateRequestHandler extends ContentStreamHandlerBase {
   protected ContentStreamLoader newLoader(SolrQueryRequest req, final UpdateRequestProcessor processor) {
     return new ContentStreamLoader() {
       public void load(SolrQueryRequest req, SolrQueryResponse rsp, ContentStream stream) throws Exception {
-        parseAndLoadDocs(req, rsp, stream.getStream(), processor);
+        InputStream is = null;
+        try {
+          is = stream.getStream();
+          parseAndLoadDocs(req, rsp, is, processor);
+        } finally {
+          if(is != null) {
+            is.close();
+          }
+        }
       }
     };
   }
@@ -126,7 +134,7 @@ public class BinaryUpdateRequestHandler extends ContentStreamHandlerBase {
   }
 
   public String getSourceId() {
-    return "$Id: BinaryUpdateRequestHandler.java 816376 2009-09-17 20:53:14Z shalin $";
+    return "$Id: BinaryUpdateRequestHandler.java 954340 2010-06-14 01:23:34Z hossman $";
   }
 
   public String getSource() {
@@ -134,6 +142,6 @@ public class BinaryUpdateRequestHandler extends ContentStreamHandlerBase {
   }
 
   public String getVersion() {
-    return "$Revision: 816376 $";
+    return "$Revision: 954340 $";
   }
 }

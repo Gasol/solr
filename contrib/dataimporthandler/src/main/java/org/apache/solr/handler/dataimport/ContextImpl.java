@@ -30,7 +30,7 @@ import java.util.Map;
  * </p>
  * <b>This API is experimental and subject to change</b>
  *
- * @version $Id: ContextImpl.java 769058 2009-04-27 16:55:46Z shalin $
+ * @version $Id: ContextImpl.java 949884 2010-05-31 22:53:26Z hossman $
  * @since solr 1.3
  */
 public class ContextImpl extends Context {
@@ -89,6 +89,7 @@ public class ContextImpl extends Context {
 
   public DataSource getDataSource() {
     if (ds != null) return ds;
+    if(entity == null) return  null;
     if (entity.dataSrc == null) {
       entity.dataSrc = dataImporter.getDataSourceInstance(entity, entity.dataSource, this);
     }
