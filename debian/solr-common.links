@@ -16,4 +16,3 @@
 /usr/share/java/slf4j-api.jar           /usr/share/solr/WEB-INF/lib/slf4j-api.jar
 /usr/share/java/slf4j-jdk14.jar         /usr/share/solr/WEB-INF/lib/slf4j-jdk14.jar 
 /usr/share/java/xml-apis-ext.jar        /usr/share/solr/WEB-INF/lib/xml-apis-ext.jar
-/usr/share/java/xml-apis.jar            /usr/share/solr/WEB-INF/lib/xml-apis.jar
