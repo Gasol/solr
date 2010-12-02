@@ -47,7 +47,7 @@ import java.util.StringTokenizer;
  * "maxWordCount" - if the token contains more then maxWordCount words, the capitalization is
  * assumed to be correct.<br/>
  *
- * @version $Id: CapitalizationFilterFactory.java 804726 2009-08-16 17:28:58Z yonik $
+ * @version $Id: CapitalizationFilterFactory.java 949471 2010-05-30 04:28:11Z hossman $
  * @since solr 1.3
  */
 public class CapitalizationFilterFactory extends BaseTokenFilterFactory {
@@ -206,6 +206,7 @@ class CapitalizationFilter extends TokenFilter {
     char[] backup = null;
     if (factory.maxWordCount < CapitalizationFilterFactory.DEFAULT_MAX_WORD_COUNT) {
       //make a backup in case we exceed the word count
+      backup = new char[termBufferLength];
       System.arraycopy(termBuffer, 0, backup, 0, termBufferLength);
     }
     if (termBufferLength < factory.maxTokenLength) {

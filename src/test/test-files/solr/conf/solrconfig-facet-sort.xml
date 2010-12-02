@@ -17,7 +17,7 @@
  limitations under the License.
 -->
 
-<!-- $Id: solrconfig-facet-sort.xml 817650 2009-09-22 13:14:35Z noble $
+<!-- $Id: solrconfig-facet-sort.xml 949888 2010-05-31 23:24:40Z hossman $
      $Source$
      $Name$
   -->
@@ -309,21 +309,6 @@
   <requestHandler name="/update"     class="solr.XmlUpdateRequestHandler"          />
   <requestHandler name="/update/csv" class="solr.CSVRequestHandler" startup="lazy">
   	<bool name="httpCaching">false</bool>
-  </requestHandler>
-
-  <!-- test elevation -->
-  <searchComponent name="elevate" class="org.apache.solr.handler.component.QueryElevationComponent" >
-    <str name="queryFieldType">string</str>
-    <str name="config-file">elevate.xml</str>
-  </searchComponent>
-
-  <requestHandler name="/elevate" class="org.apache.solr.handler.component.SearchHandler">
-    <lst name="defaults">
-      <str name="echoParams">explicit</str>
-    </lst>
-    <arr name="last-components">
-      <str>elevate</str>
-    </arr>
   </requestHandler>
 
   <searchComponent name="spellcheck" class="org.apache.solr.handler.component.SpellCheckComponent">

@@ -68,7 +68,7 @@ import java.lang.reflect.Constructor;
 
 
 /**
- * @version $Id: SolrCore.java 818618 2009-09-24 20:35:56Z hossman $
+ * @version $Id: SolrCore.java 949475 2010-05-30 04:50:25Z hossman $
  */
 public final class SolrCore implements SolrInfoMBean {
   public static final String version="1.0";  
@@ -585,7 +585,7 @@ public final class SolrCore implements SolrInfoMBean {
 
       // Finally tell anyone who wants to know
       resourceLoader.inform( resourceLoader );
-      resourceLoader.inform( this );
+      resourceLoader.inform( this );  // last call before the latch is released.
       instance = this;   // set singleton for backwards compatibility
     } catch (IOException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
@@ -1604,7 +1604,7 @@ public final class SolrCore implements SolrInfoMBean {
   }
 
   public String getSourceId() {
-    return "$Id: SolrCore.java 818618 2009-09-24 20:35:56Z hossman $";
+    return "$Id: SolrCore.java 949475 2010-05-30 04:50:25Z hossman $";
   }
 
   public String getSource() {
