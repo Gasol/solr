@@ -1,3 +1,11 @@
+solr (1.4.1+dfsg1-2) unstable; urgency=low
+
+  * Add lucene-memory.jar to WEB-INF/lib. Closes: #573156.
+  * Increase depends version of libjaxp1.3-java. Closes: #575145.
+  * add jcl-over-slf4j.jar to WEB-INF/lib. Closes: #605766.
+
+ -- Thomas Koch <thomas@koch.ro>  Fri, 03 Dec 2010 11:09:05 +0100
+
 solr (1.4.1+dfsg1-1) unstable; urgency=low
 
   * New upstream release (1.4.1). Closes: #602696.
