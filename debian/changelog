@@ -1,3 +1,9 @@
+solr (1.4.1+dfsg1-3) UNRELEASED; urgency=low
+
+  * Removed Jan-Pascal from uploaders.
+
+ -- Jan-Pascal van Best <janpascal@vanbest.org>  Tue, 16 Aug 2011 21:27:22 +0200
+
 solr (1.4.1+dfsg1-2) unstable; urgency=low
 
   * Add lucene-memory.jar to WEB-INF/lib. Closes: #573156.

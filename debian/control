@@ -2,7 +2,7 @@ Source: solr
 Section: java
 Priority: optional
 Maintainer: Debian Java Maintainers <pkg-java-maintainers@lists.alioth.debian.org>
-Uploaders: Jan-Pascal van Best <janpascal@vanbest.org>, Thomas Koch <thomas@koch.ro>
+Uploaders: Thomas Koch <thomas@koch.ro>
 DM-Upload-Allowed: yes
 Homepage: http://lucene.apache.org/solr/
 Vcs-Browser: http://git.debian.org/?p=pkg-java/solr.git
