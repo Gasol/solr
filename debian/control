@@ -8,41 +8,98 @@ Homepage: http://lucene.apache.org/solr/
 Vcs-Browser: http://git.debian.org/?p=pkg-java/solr.git
 Vcs-Git: git://git.debian.org/git/pkg-java/solr.git
 Standards-Version: 3.9.1
-Build-Depends: debhelper (>= 8), po-debconf,
+Build-Depends: debhelper (>= 8),
+ javahelper (>= 0.37),
+ po-debconf,
  default-jdk,
- ant (>= 1.7.0), ant-optional (>= 1.7.0), 
- libcommons-codec-java (>= 1.4),
- libcommons-csv-java (>= 0.1-SNAPSHOT+svn678580),
+ ant (>= 1.7.0),
+ ant-optional (>= 1.7.0),
+ liblucene3-java (= 3.5.0),
+ liblucene3-contrib-java (= 3.5.0),
+ libmaven-ant-tasks-java (>= 2.1.3),
+ libnoggit-java (>= 1.0~svn1099557),
+ libcommons-lang-java (>= 2.4),
+ libcommons-codec-java (>= 1.5),
+ libcommons-csv-java (>= 0.1-SNAPSHOT+svn966014),
  libcommons-fileupload-java (>= 1.2.1),
  libcommons-httpclient-java (>= 3.1),
  libcommons-io-java (>= 1.4),
- libjaxp1.3-java (>= 1.3.04),
- libjetty-java (>= 6.1.21),
- liblucene2-java (>= 2.9.1),
+ libwoodstox-java (>= 3.2.7),
+ libeasymock-java (>= 2.2),
+ libstax-java (> 1.2.0),
+ libguava-java (>= 06),
+ libslf4j-java (>= 1.6.1),
  libservlet2.5-java (>= 6.0.20),
- libslf4j-java (>= 1.5.10),
- libxml-commons-external-java (>= 1.3.04),
- glassfish-mail (>= 1:2ur2-b04),
- junit4,
- libjmock-java
+ junit4 (>= 4.7),
+ libjetty-java (>= 6.1.21),
+ velocity (>= 1.6.4),
+ libvelocity-tools-java (>= 2.0)
+ libjaxp1.3-java (>= 1.3.04)
+
+Package: libsolr3-core-java
+Architecture: all
+Section: java
+Depends: ${java:Depends}, ${misc:Depends},
+ openjdk-6-jre-headless | java5-runtime-headless | java6-runtime-headless,
+ liblucene3-java (= 3.5.0),
+ liblucene3-contrib-java (= 3.5.0),
+ libmaven-ant-tasks-java (>= 2.1.3),
+ libnoggit-java (>= 1.0~svn1099557),
+ libcommons-lang-java (>= 2.4),
+ libcommons-codec-java (>= 1.5),
+ libcommons-csv-java (>= 0.1-SNAPSHOT+svn966014),
+ libcommons-fileupload-java (>= 1.2.1),
+ libcommons-httpclient-java (>= 3.1),
+ libcommons-io-java (>= 1.4),
+ libwoodstox-java (>= 3.2.7),
+ libeasymock-java (>= 2.2),
+ libstax-java (> 1.2.0),
+ libguava-java (>= 06),
+ libslf4j-java (>= 1.6.1),
+ libservlet2.5-java (>= 6.0.20),
+ junit4 (>= 4.7),
+ libjetty-java (>= 6.1.21)
+Description: enterprise search server based on Lucene - core library
+ Solr is an open source enterprise search server based on the Lucene 
+ Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
+ faceted search, caching, replication, and a web administration 
+ interface. It runs in a Java servlet container such as Tomcat.
+
+Package: libsolr3-solrj-java
+Architecture: all
+Section: java
+Depends: ${java:Depends}, ${misc:Depends},
+ openjdk-6-jre-headless | java5-runtime-headless | java6-runtime-headless,
+ libsolr3-core-java (>= ${binary:Version}),
+ liblucene3-java (= 3.5.0),
+ liblucene3-contrib-java (= 3.5.0),
+ libcommons-codec-java (>= 1.5),
+ libcommons-io-java (>= 1.4),
+ libcommons-httpclient-java (>= 3.1),
+ libstax-java (> 1.2.0),
+ libwoodstox-java (>= 3.2.7),
+ libslf4j-java (>= 1.6.1)
+Description: enterprise search server based on Lucene - solrj library
+ Solr is an open source enterprise search server based on the Lucene 
+ Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
+ faceted search, caching, replication, and a web administration 
+ interface. It runs in a Java servlet container such as Tomcat.
+
+Package: libsolr3-solrj-java-doc
+Architecture: all
+Section: doc
+Depends: ${misc:Depends}
+Description: enterprise search server based on Lucene - solrj documentation
+ Solr is an open source enterprise search server based on the Lucene 
+ Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
+ faceted search, caching, replication, and a web administration 
+ interface. It runs in a Java servlet container such as Tomcat.
 
 Package: solr-common
 Architecture: all
 Depends: ${misc:Depends},
- debconf (>= 1.5),
- openjdk-6-jre-headless | java5-runtime-headless | java6-runtime-headless,
- libcommons-codec-java (>= 1.4),
- libcommons-csv-java (>= 0.1-SNAPSHOT+svn678580),
- libcommons-fileupload-java (>= 1.2.1),
- libcommons-httpclient-java (>= 3.1),
- libcommons-io-java (>= 1.4),
- libjaxp1.3-java (>= 1.3.05-1),
- libjetty-java (>= 6.1.21),
- liblucene2-java (>= 2.9.1),
- libservlet2.5-java (>= 6.0.20),
- libslf4j-java (>= 1.5.10),
- libxml-commons-external-java (>= 1.3.04),
- glassfish-mail (>= 1:2ur2-b04),
+ libsolr3-core-java (>= ${binary:Version}),
+ libsolr3-solrj-java (>= ${binary:Version})
 Recommends: solr-tomcat (>= ${binary:Version}) | solr-jetty (>= ${binary:Version})
 Suggests: libmysql-java
 Description: enterprise search server based on Lucene - common files
