@@ -41,6 +41,7 @@ Package: libsolr3-core-java
 Architecture: all
 Section: java
 Depends: ${java:Depends}, ${misc:Depends}
+Recommends: ${java:Recommends}
 Description: enterprise search server based on Lucene - core library
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
@@ -51,6 +52,7 @@ Package: libsolr3-solrj-java
 Architecture: all
 Section: java
 Depends: ${java:Depends}, ${misc:Depends}
+Recommends: ${java:Recommends}
 Description: enterprise search server based on Lucene - solrj library
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
