@@ -40,26 +40,7 @@ Build-Depends: debhelper (>= 8),
 Package: libsolr3-core-java
 Architecture: all
 Section: java
-Depends: ${java:Depends}, ${misc:Depends},
- openjdk-6-jre-headless | java5-runtime-headless | java6-runtime-headless,
- liblucene3-java (= 3.5.0),
- liblucene3-contrib-java (= 3.5.0),
- libmaven-ant-tasks-java (>= 2.1.3),
- libnoggit-java (>= 1.0~svn1099557),
- libcommons-lang-java (>= 2.4),
- libcommons-codec-java (>= 1.5),
- libcommons-csv-java (>= 0.1-SNAPSHOT+svn966014),
- libcommons-fileupload-java (>= 1.2.1),
- libcommons-httpclient-java (>= 3.1),
- libcommons-io-java (>= 1.4),
- libwoodstox-java (>= 3.2.7),
- libeasymock-java (>= 2.2),
- libstax-java (> 1.2.0),
- libguava-java (>= 06),
- libslf4j-java (>= 1.6.1),
- libservlet2.5-java (>= 6.0.20),
- junit4 (>= 4.7),
- libjetty-java (>= 6.1.21)
+Depends: ${java:Depends}, ${misc:Depends}
 Description: enterprise search server based on Lucene - core library
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
@@ -69,17 +50,7 @@ Description: enterprise search server based on Lucene - core library
 Package: libsolr3-solrj-java
 Architecture: all
 Section: java
-Depends: ${java:Depends}, ${misc:Depends},
- openjdk-6-jre-headless | java5-runtime-headless | java6-runtime-headless,
- libsolr3-core-java (>= ${binary:Version}),
- liblucene3-java (= 3.5.0),
- liblucene3-contrib-java (= 3.5.0),
- libcommons-codec-java (>= 1.5),
- libcommons-io-java (>= 1.4),
- libcommons-httpclient-java (>= 3.1),
- libstax-java (> 1.2.0),
- libwoodstox-java (>= 3.2.7),
- libslf4j-java (>= 1.6.1)
+Depends: ${java:Depends}, ${misc:Depends}
 Description: enterprise search server based on Lucene - solrj library
  Solr is an open source enterprise search server based on the Lucene 
  Java search library, with XML/HTTP and JSON APIs, hit highlighting, 
