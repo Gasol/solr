@@ -10,4 +10,5 @@ VERSION=$(shell dpkg-parsechangelog | awk '/^Version: /{print $2}' | sed 's/+.*$
 	dh $@ --with javahelper
 
 override_dh_auto_build:
-	ant -Dversion=$(VERSION) jar-core
+	ant -f solr/build.xml -Dfullnamever="solr-core" dist-core
+	ant -f solr/build.xml -Dfullnamever="solr-solrj" dist-solrj
