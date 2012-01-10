@@ -72,6 +72,12 @@
     </fileset>
   </path>
 
+  <!-- if you extend the classpath refid in one contrib's build.xml (add JARs), use this as basis: -->
+  <path id="base.classpath">
+    <pathelement location="${common.dir}/build/classes/java"/>
+    <pathelement path="${project.classpath}"/>
+  </path>
+
   <!-- default arguments to pass to JVM executing tests -->
   <property name="testmethod" value=""/>
   <property name="args" value=""/>
