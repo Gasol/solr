@@ -1,3 +1,4 @@
 0001-Fix-build-without-Lucene.patch
 0002-Fix-lintian-wrong-name-for-upstream-changelog-warnin.patch
 0003-Remove-configuration-regarding-velocity.patch
+0004-Change-data-directory-to-var-lib.patch

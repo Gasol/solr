@@ -1,0 +1,37 @@
+From: Gasol Wu <gasol.wu@gmail.com>
+Date: Wed, 11 Jan 2012 09:51:01 +0000
+Subject: Change data directory to /var/lib
+
+---
+ solr/example/multicore/solr.xml       |    4 ++--
+ solr/example/solr/conf/solrconfig.xml |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/solr/example/multicore/solr.xml b/solr/example/multicore/solr.xml
+index c6ed7e5..b43ffc5 100644
+--- a/solr/example/multicore/solr.xml
++++ b/solr/example/multicore/solr.xml
+@@ -29,7 +29,7 @@
+     If 'null' (or absent), cores will not be manageable via request handler
+   -->
+   <cores adminPath="/admin/cores">
+-    <core name="core0" instanceDir="core0" />
+-    <core name="core1" instanceDir="core1" />
++    <core name="core0" instanceDir="core0" dataDir="/var/lib/solr/core0"/>
++    <core name="core1" instanceDir="core1" dataDir="/var/lib/solr/core1"/>
+   </cores>
+ </solr>
+diff --git a/solr/example/solr/conf/solrconfig.xml b/solr/example/solr/conf/solrconfig.xml
+index 38d45d3..33983c7 100644
+--- a/solr/example/solr/conf/solrconfig.xml
++++ b/solr/example/solr/conf/solrconfig.xml
+@@ -100,7 +100,7 @@
+        replication is in use, this should match the replication
+        configuration.
+     -->
+-  <dataDir>${solr.data.dir:}</dataDir>
++  <dataDir>${solr.data.dir:/var/lib/solr/default}</dataDir>
+ 
+ 
+   <!-- The DirectoryFactory to use for indexes.
+-- 
