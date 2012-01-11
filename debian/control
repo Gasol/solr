@@ -37,7 +37,7 @@ Build-Depends: debhelper (>= 8),
  libjaxp1.3-java (>= 1.3.04),
  libicu4j-4.4-java (>= 4.4.2)
 
-Package: libsolr3-core-java
+Package: libsolr-core-java
 Architecture: all
 Section: java
 Depends: ${java:Depends}, ${misc:Depends}
@@ -48,7 +48,7 @@ Description: enterprise search server based on Lucene - core library
  faceted search, caching, replication, and a web administration 
  interface. It runs in a Java servlet container such as Tomcat.
 
-Package: libsolr3-solrj-java
+Package: libsolr-solrj-java
 Architecture: all
 Section: java
 Depends: ${java:Depends}, ${misc:Depends}
@@ -59,7 +59,7 @@ Description: enterprise search server based on Lucene - solrj library
  faceted search, caching, replication, and a web administration 
  interface. It runs in a Java servlet container such as Tomcat.
 
-Package: libsolr3-solrj-java-doc
+Package: libsolr-solrj-java-doc
 Architecture: all
 Section: doc
 Depends: ${misc:Depends}
@@ -72,8 +72,8 @@ Description: enterprise search server based on Lucene - solrj documentation
 Package: solr-common
 Architecture: all
 Depends: ${misc:Depends},
- libsolr3-core-java (>= ${binary:Version}),
- libsolr3-solrj-java (>= ${binary:Version})
+ libsolr-core-java (>= ${binary:Version}),
+ libsolr-solrj-java (>= ${binary:Version})
 Recommends: solr-tomcat (>= ${binary:Version}) | solr-jetty (>= ${binary:Version})
 Suggests: libmysql-java
 Description: enterprise search server based on Lucene - common files
