@@ -12,8 +12,8 @@ case "$1" in
         chown root:root /var/lib/solr
         chmod 755 /var/lib/solr
 
-        chown -R tomcat6:tomcat6 /var/lib/solr/data
-        chmod -R 770 /var/lib/solr/data
+        chown -R tomcat6:tomcat6 /var/lib/solr/
+        chmod -R 770 /var/lib/solr/
 
         ln -sf /etc/solr/tomcat.policy /etc/tomcat6/policy.d/05solr.policy
 
