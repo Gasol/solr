@@ -34,7 +34,7 @@ Build-Depends: debhelper (>= 8),
  junit4 (>= 4.7),
  libjetty-java (>= 6.1.21),
  velocity (>= 1.6.4),
- libvelocity-tools-java (>= 2.0)
+ libvelocity-tools-java (>= 2.0),
  libjaxp1.3-java (>= 1.3.04),
  libicu4j-4.4-java (>= 4.4.2)
 
