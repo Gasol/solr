@@ -1,1 +1,1 @@
-solr/core/pom.xml --no-parent
+solr/core/pom.xml --no-parent --java-lib --artifact=solr/dist/solr-core.jar
