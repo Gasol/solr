@@ -25,7 +25,7 @@
 
   <dirname file="${ant.file.common}" property="common.dir"/>
   <property name="dev-tools.dir" value="${common.dir}/../dev-tools"/>
-  <property name="prettify.dir" value="${common.dir}/src/tools/prettify"/>
+  <property name="prettify.dir" value="${common.dir}/prettify"/>
   <property name="maven.build.dir" value="${build.dir}/maven"/>
 
   <!-- Give user a chance to override without editing this file
@@ -429,12 +429,6 @@
     <attribute name="spec.version" default="${spec.version}"/>
     <element name="nested" optional="true" implicit="true"/>
     <sequential>
-      <!-- If possible, include the svnversion -->
-      <exec dir="." executable="${svnversion.exe}"
-            outputproperty="svnversion" failifexecutionfails="false">
-        <arg line="."/>
-      </exec>
-      
       <build-manifest title="@{title}"
                       implementation.title="@{implementation.title}"
                       spec.version="@{spec.version}"/>
