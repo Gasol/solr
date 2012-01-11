@@ -9,12 +9,13 @@ Vcs-Browser: http://git.debian.org/?p=pkg-java/solr.git
 Vcs-Git: git://git.debian.org/git/pkg-java/solr.git
 Standards-Version: 3.9.1
 Build-Depends: debhelper (>= 8),
- javahelper (>= 0.37),
- maven-repo-helper (>= 1.5.2),
- po-debconf,
  default-jdk,
  ant (>= 1.7.0),
  ant-optional (>= 1.7.0),
+ po-debconf,
+Build-Depends-Indep:
+ javahelper (>= 0.37),
+ maven-repo-helper (>= 1.5.2),
  liblucene3-java (>= 3.5.0),
  liblucene3-contrib-java (>= 3.5.0),
  libmaven-ant-tasks-java (>= 2.1.3),
