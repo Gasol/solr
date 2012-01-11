@@ -1,4 +1,5 @@
 solr/webapp/web/WEB-INF/web.xml /etc/solr/
 solr/scripts /usr/share/solr
-solr/example/solr/conf /etc/solr
 solr/webapp/web/* /usr/share/solr/
+solr/example/solr/conf /etc/solr/home-available/default
+solr/example/multicore /etc/solr/home-available/

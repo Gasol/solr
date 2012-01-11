@@ -1,4 +1,3 @@
 /etc/solr
-/etc/tomcat6/policy.d 
+/etc/tomcat6/policy.d
 /var/lib/solr
-/var/lib/solr/data

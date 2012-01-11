@@ -1,3 +1,5 @@
 /etc/solr
 /usr/share/solr/WEB-INF/lib/
-/var/lib/solr/data
+/var/lib/solr/default
+/var/lib/solr/core0
+/var/lib/solr/core1
