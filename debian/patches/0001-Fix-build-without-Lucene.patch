@@ -1,0 +1,244 @@
+From: Gasol Wu <gasol.wu@gmail.com>
+Date: Tue, 10 Jan 2012 07:08:53 +0000
+Subject: Fix build without Lucene
+
+---
+ build.xml                              |    9 ---------
+ debian/common-build.xml                |    8 +-------
+ solr/build.xml                         |    4 ++--
+ solr/common-build.xml                  |   25 +++----------------------
+ solr/contrib/analysis-extras/build.xml |    4 ++--
+ solr/contrib/clustering/build.xml      |    2 +-
+ solr/core/build.xml                    |    2 +-
+ solr/webapp/build.xml                  |    9 ++-------
+ 8 files changed, 12 insertions(+), 51 deletions(-)
+
+diff --git a/build.xml b/build.xml
+index b01bd5e..31b47fc 100644
+--- a/build.xml
++++ b/build.xml
+@@ -21,17 +21,12 @@
+   <target name="test" description="Test both Lucene and Solr">
+     <sequential>
+       <subant target="test" inheritall="false" failonerror="true">
+-        <fileset dir="lucene" includes="build.xml" />
+-      </subant>
+-
+-      <subant target="test" inheritall="false" failonerror="true">
+         <fileset dir="solr" includes="build.xml" />
+       </subant>
+     </sequential>
+   </target>
+   <target name="validate" description="Validate dependencies, licenses, etc.">
+     <sequential><subant target="validate" inheritall="false" failonerror="true">
+-        <fileset dir="lucene" includes="build.xml" />
+         <fileset dir="solr" includes="build.xml" />
+       </subant></sequential>
+   </target>
+@@ -39,7 +34,6 @@
+     <sequential>
+ 
+       <subant target="compile" inheritall="false" failonerror="true">
+-        <!--<fileset dir="lucene" includes="build.xml" /> -->
+         <fileset dir="solr" includes="build.xml" />
+       </subant>
+     </sequential>
+@@ -64,7 +58,6 @@
+     <sequential>
+       <subant target="generate-maven-artifacts" inheritall="false" failonerror="true">
+         <property name="maven.dist.dir"  location="${maven.dist.dir}" />
+-        <fileset dir="lucene" includes="build.xml" />
+         <fileset dir="solr" includes="build.xml" />
+       </subant>
+     </sequential>
+@@ -96,14 +89,12 @@
+     <delete failonerror="true">
+       <fileset dir="." includes="*.iml,*.ipr,*.iws"/>
+       <fileset dir="solr" includes="**/*.iml"/>
+-      <fileset dir="lucene" includes="**/*.iml"/>
+     </delete>
+   </target>
+ 
+   <target name="clean" description="Clean Lucene and Solr">
+     <sequential>
+       <subant target="clean" inheritall="false" failonerror="true">
+-        <fileset dir="lucene" includes="build.xml" />
+         <fileset dir="solr" includes="build.xml" />
+       </subant>
+     </sequential>
+diff --git a/debian/common-build.xml b/debian/common-build.xml
+index 57b9c28..8c7600a 100644
+--- a/debian/common-build.xml
++++ b/debian/common-build.xml
+@@ -25,7 +25,7 @@
+ 
+   <dirname file="${ant.file.common}" property="common.dir"/>
+   <property name="dev-tools.dir" value="${common.dir}/../dev-tools"/>
+-  <property name="prettify.dir" value="${common.dir}/src/tools/prettify"/>
++  <property name="prettify.dir" value="${common.dir}/prettify"/>
+   <property name="maven.build.dir" value="${build.dir}/maven"/>
+ 
+   <!-- Give user a chance to override without editing this file
+@@ -429,12 +429,6 @@
+     <attribute name="spec.version" default="${spec.version}"/>
+     <element name="nested" optional="true" implicit="true"/>
+     <sequential>
+-      <!-- If possible, include the svnversion -->
+-      <exec dir="." executable="${svnversion.exe}"
+-            outputproperty="svnversion" failifexecutionfails="false">
+-        <arg line="."/>
+-      </exec>
+-      
+       <build-manifest title="@{title}"
+                       implementation.title="@{implementation.title}"
+                       spec.version="@{spec.version}"/>
+diff --git a/solr/build.xml b/solr/build.xml
+index 6d6bbe0..1fa8fbf 100644
+--- a/solr/build.xml
++++ b/solr/build.xml
+@@ -420,7 +420,7 @@
+     </copy>
+   </target>
+ 
+-  <target name="javadocs-all" depends="prep-lucene-jars,javadocs-dep"
++  <target name="javadocs-all" depends="javadocs-dep"
+           description="Generate javadoc for core, java client and contrib">
+     <sequential>
+       <mkdir dir="${dest}/docs/api"/>
+@@ -488,7 +488,7 @@
+   <!-- ========================= COMMITTERS' HELPERS =========================== -->
+   <!-- ========================================================================= -->
+  
+-  <target name="stub-factories" depends="dist-core,lucene-jars-to-solr"
++  <target name="stub-factories" depends="dist-core"
+           description="Generates stub factories as needed">
+  
+     <path id="stub.jars">
+diff --git a/solr/common-build.xml b/solr/common-build.xml
+index 0295771..875e5a4 100644
+--- a/solr/common-build.xml
++++ b/solr/common-build.xml
+@@ -61,7 +61,7 @@
+ 
+   <pathconvert property="project.classpath" targetos="unix" refid="additional.dependencies"/>
+ 
+-  <import file="${common-solr.dir}/../lucene/contrib/contrib-build.xml"/>
++  <import file="${common-solr.dir}/../debian/common-build.xml"/>
+ 
+   <!-- Solr Specification Version
+ 
+@@ -158,26 +158,7 @@
+     <mkdir dir="${package.dir}"/>
+     <mkdir dir="${dist}"/>
+     <mkdir dir="${maven.dist.dir}"/>
+-  </target>
+-
+-  <target name="prep-lucene-jars" 
+-  	      depends="jar-lucene-core, jar-analyzers-common, jar-spellchecker, jar-highlighter,
+-  	               jar-memory, jar-misc, jar-spatial, jar-grouping, jar-queries"/>
+-
+-  <target name="lucene-jars-to-solr" depends="prep-lucene-jars">
+-    <sequential>
+-    <copy todir="${lucene-libs}" preservelastmodified="true" flatten="true" failonerror="true" overwrite="true">
+-      <fileset file="${lucene-core.jar}" />
+-      <fileset file="${analyzers-common.jar}" />
+-      <fileset file="${spellchecker.jar}" />
+-      <fileset file="${grouping.jar}" />
+-      <fileset file="${queries.jar}" />
+-      <fileset file="${highlighter.jar}" />
+-      <fileset file="${memory.jar}" />
+-      <fileset file="${misc.jar}" />
+-      <fileset file="${spatial.jar}" />
+-    </copy>
+-    </sequential>
++    <mkdir dir="${dest}/web"/>
+   </target>
+ 
+   <!-- Shared core/solrj/test-framework/contrib targets -->
+@@ -189,7 +170,7 @@
+             spec.version="${solr.spec.version}"/>
+   </target>
+ 
+-  <target name="compile-core" depends="prep-lucene-jars,common.compile-core"/>
++  <target name="compile-core" depends="common.compile-core"/>
+   <target name="compile-test" depends="compile-solr-test-framework,common.compile-test"/>
+ 
+   <target name="dist" depends="jar-core">
+diff --git a/solr/contrib/analysis-extras/build.xml b/solr/contrib/analysis-extras/build.xml
+index 7bc846d..e4b4b8b 100644
+--- a/solr/contrib/analysis-extras/build.xml
++++ b/solr/contrib/analysis-extras/build.xml
+@@ -32,7 +32,7 @@
+     <path refid="solr.base.classpath"/>
+   </path>
+ 
+-  <target name="contrib-jars-to-solr" depends="jar-icu, jar-analyzers-smartcn, jar-analyzers-stempel">
++  <target name="contrib-jars-to-solr">
+     <mkdir dir="${build.dir}/lucene-libs"/>
+     <copy todir="${build.dir}/lucene-libs" preservelastmodified="true" flatten="true" failonerror="true" overwrite="true">
+       <fileset file="${icu.jar}"/>
+@@ -41,6 +41,6 @@
+     </copy>
+   </target>
+ 
+-  <target name="compile-core" depends="jar-icu, jar-analyzers-smartcn, jar-analyzers-stempel, solr-contrib-build.compile-core"/>
++  <target name="compile-core"/>
+   <target name="dist" depends="contrib-jars-to-solr, common-solr.dist"/>
+ </project>
+diff --git a/solr/contrib/clustering/build.xml b/solr/contrib/clustering/build.xml
+index 1c8d178..5192ed4 100644
+--- a/solr/contrib/clustering/build.xml
++++ b/solr/contrib/clustering/build.xml
+@@ -26,7 +26,7 @@
+   <import file="../contrib-build.xml"/>
+ 
+   <dirname file="${ant.file}" property="antfile.dir"/>
+-  <target name="dist-maven" depends="contrib-build.dist-maven">
++  <target name="dist-maven">
+     <m2-deploy-with-pom-template pom.xml="${antfile.dir}/lib/solr-carrot2-core-pom.xml.template"
+                                  jar.file="${antfile.dir}/lib/carrot2-core-3.5.0.jar" />
+   </target>
+diff --git a/solr/core/build.xml b/solr/core/build.xml
+index 9f74f11..188227c 100644
+--- a/solr/core/build.xml
++++ b/solr/core/build.xml
+@@ -22,7 +22,7 @@
+ 
+   <target name="compile-core" depends="compile-solrj,common-solr.compile-core"/>
+ 
+-  <target name="dist-maven" depends="jar-core,javadocs,jar-src,contrib-build.dist-maven">
++  <target name="dist-maven" depends="jar-core,javadocs,jar-src">
+     <m2-deploy-with-pom-template pom.xml="${common-solr.dir}/lib/solr-commons-csv-pom.xml.template"
+                                  jar.file="${common-solr.dir}/lib/commons-csv-1.0-SNAPSHOT-r966014.jar" />
+ 
+diff --git a/solr/webapp/build.xml b/solr/webapp/build.xml
+index 91682cd..a1a707c 100644
+--- a/solr/webapp/build.xml
++++ b/solr/webapp/build.xml
+@@ -38,15 +38,10 @@
+ 
+   <target name="dist"
+           description="Creates the Solr WAR Distribution file."
+-          depends="test, init-dist, dist-core, dist-solrj, lucene-jars-to-solr">
+-    <exec dir="." executable="${svnversion.exe}"
+-          outputproperty="svnversion" failifexecutionfails="false">
+-      <arg line="."/>
+-    </exec>
++          depends="init-dist, dist-core, dist-solrj">
+     <build-manifest title="Apache Solr Search Server"
+                     implementation.title="org.apache.solr"
+                     spec.version="${solr.spec.version}"/>
+-    <ant dir="${common-solr.dir}" inheritall="false" target="contribs-add-to-war"/>
+     <war destfile="${dist}/apache-solr-${version}.war"
+          webxml="web/WEB-INF/web.xml"
+          manifest="${dest}/META-INF/MANIFEST.MF">
+@@ -57,7 +52,7 @@
+         <exclude name="*.txt" />
+         <exclude name="*.template" />
+       </lib>
+-      <lib dir="${lucene-libs}"/>
++
+       <lib dir="${dist}">
+         <include name="apache-solr-solrj-${version}.jar" />
+         <include name="apache-solr-core-${version}.jar" />
+-- 
