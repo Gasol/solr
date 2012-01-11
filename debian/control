@@ -73,9 +73,9 @@ Description: enterprise search server based on Lucene - solrj documentation
 Package: solr-common
 Architecture: all
 Depends: ${misc:Depends},
- libsolr-core-java (>= ${binary:Version}),
- libsolr-solrj-java (>= ${binary:Version})
-Recommends: solr-tomcat (>= ${binary:Version}) | solr-jetty (>= ${binary:Version})
+ libsolr-core-java (>= ${source:Version}),
+ libsolr-solrj-java (>= ${source:Version})
+Recommends: solr-tomcat (>= ${source:Version}) | solr-jetty (>= ${source:Version})
 Suggests: libmysql-java
 Description: enterprise search server based on Lucene - common files
  Solr is an open source enterprise search server based on the Lucene 
@@ -94,7 +94,7 @@ Description: enterprise search server based on Lucene - common files
 
 Package: solr-tomcat
 Architecture: all
-Depends: ${misc:Depends}, solr-common (= ${binary:Version}), tomcat6 (>= 6.0.20)
+Depends: ${misc:Depends}, solr-common (= ${source:Version}), tomcat6 (>= 6.0.20)
 Conflicts: solr-jetty, solr-tomcat6
 Description: enterprise search server based on Lucene - Tomcat integration
  Solr is an open source enterprise search server based on the Lucene 
@@ -106,7 +106,7 @@ Description: enterprise search server based on Lucene - Tomcat integration
 
 Package: solr-jetty
 Architecture: all
-Depends: ${misc:Depends}, solr-common (= ${binary:Version}), jetty (>= 6.1.22),
+Depends: ${misc:Depends}, solr-common (= ${source:Version}), jetty (>= 6.1.22),
  libjetty-extra-java (>= 6.1.22)
 Conflicts: solr-tomcat
 Description: enterprise search server based on Lucene - Jetty integration
