@@ -14,9 +14,9 @@ TODO.Debian for solr
   example). 
 - Maybe: move the API docs to a separate package (it's 8.7 MB, and not generally
   useful to people just interested in running Solr, only to those extending it).
-- Maybe: make seperate solrj client library package
 - Do a license check also of things that 'licensecheck -r' does not catch
 - Check what to do about the file KEYS.txt that was formerly copied to /usr/share/doc...
+- Add all contrib packages
 
 Tests
 -----
