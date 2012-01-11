@@ -1,1 +1,1 @@
-usr/share/java/solr-solrj.jar /usr/share/java/commons-codec.jar /usr/share/java/commons-io.jar /usr/share/java/commons-httpclient.jar /usr/share/java/stax-api.jar /usr/share/java/wstx-lgpl.jar /usr/share/java/jcl-over-slf4j.jar /usr/share/java/slf4j-api.jar
+solr/dist/solr-solrj.jar /usr/share/java/commons-codec.jar /usr/share/java/commons-io.jar /usr/share/java/commons-httpclient.jar /usr/share/java/stax-api.jar /usr/share/java/wstx-lgpl.jar /usr/share/java/jcl-over-slf4j.jar /usr/share/java/slf4j-api.jar
