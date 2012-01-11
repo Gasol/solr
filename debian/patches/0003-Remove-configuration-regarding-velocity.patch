@@ -1,0 +1,50 @@
+From: Gasol Wu <gasol.wu@gmail.com>
+Date: Wed, 11 Jan 2012 09:47:36 +0000
+Subject: Remove configuration regarding velocity
+
+---
+ solr/example/solr/conf/solrconfig.xml |    9 ---------
+ 1 files changed, 0 insertions(+), 9 deletions(-)
+
+diff --git a/solr/example/solr/conf/solrconfig.xml b/solr/example/solr/conf/solrconfig.xml
+index abe5fea..38d45d3 100644
+--- a/solr/example/solr/conf/solrconfig.xml
++++ b/solr/example/solr/conf/solrconfig.xml
+@@ -70,7 +70,6 @@
+     -->
+   <lib dir="../../contrib/extraction/lib" />
+   <lib dir="../../contrib/clustering/lib/" />
+-  <lib dir="../../contrib/velocity/lib" />
+ 
+   <!-- When a regex is specified in addition to a directory, only the
+        files in that directory which completely match the regex
+@@ -80,7 +79,6 @@
+   <lib dir="../../dist/" regex="apache-solr-clustering-\d.*\.jar" />
+   <lib dir="../../dist/" regex="apache-solr-dataimporthandler-\d.*\.jar" />
+   <lib dir="../../dist/" regex="apache-solr-langid-\d.*\.jar" />
+-  <lib dir="../../dist/" regex="apache-solr-velocity-\d.*\.jar" />
+ 
+   <!-- If a dir option (with or without a regex) is used and nothing
+        is found that matches, it will be ignored
+@@ -787,9 +785,6 @@
+      <lst name="defaults">
+        <str name="echoParams">explicit</str>
+ 
+-       <!-- VelocityResponseWriter settings -->
+-       <str name="wt">velocity</str>
+-
+        <str name="v.template">browse</str>
+        <str name="v.layout">layout</str>
+        <str name="title">Solritas</str>
+@@ -1549,10 +1544,6 @@
+   <!--
+      Custom response writers can be declared as needed...
+     -->
+-    <!-- The solr.velocity.enabled flag is used by Solr's test cases so that this response writer is not
+-         loaded (causing an error if contrib/velocity has not been built fully) -->
+-    <queryResponseWriter name="velocity" class="solr.VelocityResponseWriter" enable="${solr.velocity.enabled:true}"/>
+-  
+ 
+   <!-- XSLT response writer transforms the XML output by any xslt file found
+        in Solr's conf/xslt directory.  Changes to xslt files are checked for
+-- 
