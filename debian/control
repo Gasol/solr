@@ -10,7 +10,6 @@ Vcs-Git: git://git.debian.org/git/pkg-java/solr.git
 Standards-Version: 3.9.1
 Build-Depends: debhelper (>= 8),
  default-jdk,
- ant (>= 1.7.0),
  ant-optional (>= 1.7.0),
  po-debconf,
 Build-Depends-Indep:
