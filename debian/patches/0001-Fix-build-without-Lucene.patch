@@ -4,15 +4,16 @@ Subject: Fix build without Lucene
 
 ---
  build.xml                              |    9 ---------
- debian/common-build.xml                |    8 +-------
  solr/build.xml                         |    4 ++--
  solr/common-build.xml                  |   25 +++----------------------
  solr/contrib/analysis-extras/build.xml |    4 ++--
  solr/contrib/clustering/build.xml      |    2 +-
  solr/core/build.xml                    |    2 +-
  solr/webapp/build.xml                  |    9 ++-------
- 8 files changed, 12 insertions(+), 51 deletions(-)
+ 7 files changed, 11 insertions(+), 44 deletions(-)
 
+diff --git a/build.xml b/build.xml
+index b01bd5e..31b47fc 100644
 --- a/build.xml
 +++ b/build.xml
 @@ -21,17 +21,12 @@
@@ -64,6 +65,8 @@ Subject: Fix build without Lucene
          <fileset dir="solr" includes="build.xml" />
        </subant>
      </sequential>
+diff --git a/solr/build.xml b/solr/build.xml
+index 6d6bbe0..1fa8fbf 100644
 --- a/solr/build.xml
 +++ b/solr/build.xml
 @@ -420,7 +420,7 @@
@@ -84,6 +87,8 @@ Subject: Fix build without Lucene
            description="Generates stub factories as needed">
   
      <path id="stub.jars">
+diff --git a/solr/common-build.xml b/solr/common-build.xml
+index 0295771..875e5a4 100644
 --- a/solr/common-build.xml
 +++ b/solr/common-build.xml
 @@ -61,7 +61,7 @@
@@ -132,6 +137,8 @@ Subject: Fix build without Lucene
    <target name="compile-test" depends="compile-solr-test-framework,common.compile-test"/>
  
    <target name="dist" depends="jar-core">
+diff --git a/solr/contrib/analysis-extras/build.xml b/solr/contrib/analysis-extras/build.xml
+index 7bc846d..e4b4b8b 100644
 --- a/solr/contrib/analysis-extras/build.xml
 +++ b/solr/contrib/analysis-extras/build.xml
 @@ -32,7 +32,7 @@
@@ -151,6 +158,8 @@ Subject: Fix build without Lucene
 +  <target name="compile-core"/>
    <target name="dist" depends="contrib-jars-to-solr, common-solr.dist"/>
  </project>
+diff --git a/solr/contrib/clustering/build.xml b/solr/contrib/clustering/build.xml
+index 1c8d178..5192ed4 100644
 --- a/solr/contrib/clustering/build.xml
 +++ b/solr/contrib/clustering/build.xml
 @@ -26,7 +26,7 @@
@@ -162,6 +171,8 @@ Subject: Fix build without Lucene
      <m2-deploy-with-pom-template pom.xml="${antfile.dir}/lib/solr-carrot2-core-pom.xml.template"
                                   jar.file="${antfile.dir}/lib/carrot2-core-3.5.0.jar" />
    </target>
+diff --git a/solr/core/build.xml b/solr/core/build.xml
+index 9f74f11..188227c 100644
 --- a/solr/core/build.xml
 +++ b/solr/core/build.xml
 @@ -22,7 +22,7 @@
@@ -173,6 +184,8 @@ Subject: Fix build without Lucene
      <m2-deploy-with-pom-template pom.xml="${common-solr.dir}/lib/solr-commons-csv-pom.xml.template"
                                   jar.file="${common-solr.dir}/lib/commons-csv-1.0-SNAPSHOT-r966014.jar" />
  
+diff --git a/solr/webapp/build.xml b/solr/webapp/build.xml
+index 91682cd..a1a707c 100644
 --- a/solr/webapp/build.xml
 +++ b/solr/webapp/build.xml
 @@ -38,15 +38,10 @@
@@ -201,3 +214,4 @@ Subject: Fix build without Lucene
        <lib dir="${dist}">
          <include name="apache-solr-solrj-${version}.jar" />
          <include name="apache-solr-core-${version}.jar" />
+-- 
