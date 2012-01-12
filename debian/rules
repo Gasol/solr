@@ -14,3 +14,12 @@ override_dh_auto_build:
 	ant -f solr/build.xml -Dfullnamever="solr-core" -Dversion=3.5.0 dist-core
 	ant -f solr/build.xml -Dfullnamever="solr-solrj" -Dversion=3.5.0 dist-solrj
 	ant -f solr/build.xml -Dfullnamever="solr-solrj" -Dversion=3.5.0 javadocs-solrj
+
+override_dh_auto_clean:
+	# clean without lucene
+	-$(RM) -rf build
+	-$(RM) -rf dist
+	-$(RM) -rf package
+	-$(RM) -rf example/solr/lib
+	jh_clean
+	mh_clean
