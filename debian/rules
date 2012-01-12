@@ -4,16 +4,18 @@ include /usr/share/javahelper/java-vars.mk
 
 export JAVA_HOME=/usr/lib/jvm/default-java/
 
+ANT?=/usr/bin/ant
+
 VERSION=$(shell dpkg-parsechangelog | awk '/^Version: /{print $2}' | sed 's/+.*$$//')
 
 %:
 	dh $@ --with javahelper,maven-repo-helper
 
 override_dh_auto_build:
-	ant -Dversion=3.5.0 get-maven-poms
-	ant -f solr/build.xml -Dfullnamever="solr-core" -Dversion=3.5.0 dist-core
-	ant -f solr/build.xml -Dfullnamever="solr-solrj" -Dversion=3.5.0 dist-solrj
-	ant -f solr/build.xml -Dfullnamever="solr-solrj" -Dversion=3.5.0 javadocs-solrj
+	$(ANT) -Dversion=3.5.0 get-maven-poms
+	$(ANT) -f solr/build.xml -Dfullnamever="solr-core" -Dversion=3.5.0 dist-core
+	$(ANT) -f solr/build.xml -Dfullnamever="solr-solrj" -Dversion=3.5.0 dist-solrj
+	$(ANT) -f solr/build.xml -Dfullnamever="solr-solrj" -Dversion=3.5.0 javadocs-solrj
 
 override_dh_auto_clean:
 	# clean without lucene
