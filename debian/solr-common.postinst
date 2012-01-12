@@ -6,6 +6,9 @@ case "$1" in
     configure)
         chmod 755 /usr/share/solr/scripts/*
 
+	update-alternatives --install /etc/solr/home solr-home /etc/solr/home-available/default 990
+	update-alternatives --install /etc/solr/home solr-home /etc/solr/home-available/multicore 500
+
         . /usr/share/debconf/confmodule
     ;;
 

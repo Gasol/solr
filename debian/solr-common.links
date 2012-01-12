@@ -1,4 +1,4 @@
-/etc/solr/home-available/default /etc/solr/home-current
+/etc/alternatives/solr-home /etc/solr/home
 /etc/solr/web.xml /usr/share/solr/WEB-INF/web.xml
 /usr/share/java/noggit.jar              /usr/share/solr/WEB-INF/lib/noggit.jar
 /usr/share/java/commons-lang.jar        /usr/share/solr/WEB-INF/lib/commons-lang.jar

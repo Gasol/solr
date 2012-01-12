@@ -3,6 +3,8 @@
 set -e
 
 if [ "$1" = "purge"  ]; then
+    update-alternatives --remove-all solr-home
+
     if [ -e /usr/share/debconf/confmodule ]; then
 	. /usr/share/debconf/confmodule
 	db_input high solr/purgeindexfiles || true

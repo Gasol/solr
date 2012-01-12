@@ -6,7 +6,7 @@
 <Configure class="org.mortbay.jetty.webapp.WebAppContext">
   <Call name="setProperty" class="java.lang.System">
     <Arg type="String">solr.solr.home</Arg>
-    <Arg type="String">/usr/share/solr</Arg>
+    <Arg type="String">/etc/solr/home</Arg>
   </Call>
 </Configure>
 
