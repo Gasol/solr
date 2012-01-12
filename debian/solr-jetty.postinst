@@ -14,12 +14,20 @@ case "$1" in
 	    dpkg-statoverride --quiet --update --add jetty root 0750 /var/lib/solr 
 	fi
 
-	if ! dpkg-statoverride --quiet --list /var/lib/solr/data > /dev/null ; then
-	    dpkg-statoverride --quiet --update --add jetty root 0750 /var/lib/solr/data 
+	if ! dpkg-statoverride --quiet --list /var/lib/solr/default > /dev/null ; then
+	    dpkg-statoverride --quiet --update --add jetty root 0750 /var/lib/solr/default 
 	fi
 
-	if [ -d /var/lib/solr/data/index ]; then
-	    chown -R jetty:root /var/lib/solr/data
+	if ! dpkg-statoverride --quiet --list /var/lib/solr/core0 > /dev/null ; then
+	    dpkg-statoverride --quiet --update --add jetty root 0750 /var/lib/solr/core0 
+	fi
+
+	if ! dpkg-statoverride --quiet --list /var/lib/solr/core1 > /dev/null ; then
+	    dpkg-statoverride --quiet --update --add jetty root 0750 /var/lib/solr/core1 
+	fi
+
+	if [ -d /var/lib/solr ]; then
+	    chown -R jetty:root /var/lib/solr/
 	fi
 
 	invoke-rc.d --quiet jetty restart || {
