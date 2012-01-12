@@ -1,6 +1,8 @@
 solr (3.5.0+dfsg1-1) UNRELEASE; urgency=low
 
   * New upstream release (3.5.0).
+  * New package libsolr-core-java, libsolr-solrj-java, libsolr-solrj-java-doc.
+  * Fix solr-jetty doesn't work.
 
  -- Gasol Wu <gasol.wu@gmail.com>  Tue, 10 Jan 2012 12:56:46 +0000
 
