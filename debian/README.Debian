@@ -27,7 +27,7 @@ MultiCore
 Solr upstream does not really support the seperation of the application and
 configuration directory, but knows only a Solr "homedir". We could partly
 handle this by placing a symlink conf to /etc/solr/home-available/multicore in
-/etc/solr/home-current.
+/etc/solr/home using `update-alternatives --config solr-home`.
 
 If you want to use the dataDir parameter in the dynamic core admin interface
 make sure, that no datadir is specified in solrconfig.xml.
